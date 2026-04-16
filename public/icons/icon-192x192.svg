@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" fill="#00008B" rx="38.400000000000006"/>
+  <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" 
+        font-family="Arial, sans-serif" font-size="57.599999999999994" font-weight="bold" fill="white">
+    IP
+  </text>
+  <circle cx="134.39999999999998" cy="57.599999999999994" r="15.36" fill="#ff4444"/>
+  <circle cx="57.599999999999994" cy="57.599999999999994" r="15.36" fill="#4444ff"/>
+</svg>

@@ -1,0 +1,63 @@
+{
+  "name": "InterPulse",
+  "short_name": "InterPulse",
+  "description": "Aplikasi kesehatan untuk monitoring tensi darah dan jantung",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#00008B",
+  "theme_color": "#00008B",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "id",
+  "categories": ["health", "fitness", "medical"],
+  "icons": [
+    {
+      "src": "/logo-app.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Catat Tensi",
+      "short_name": "Tensi",
+      "description": "Catat pengukuran tensi darah",
+      "url": "/catat-tensi",
+      "icons": [
+        {
+          "src": "/logo-app.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Riwayat",
+      "short_name": "Riwayat",
+      "description": "Lihat riwayat pengukuran",
+      "url": "/riwayat-tensi",
+      "icons": [
+        {
+          "src": "/logo-app.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "375x667",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}
