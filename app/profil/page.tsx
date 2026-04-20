@@ -44,6 +44,7 @@ const defaultProfile: UserProfile = {
   uid: '',
   name: 'Pengguna InterPulse',
   email: 'user@interpulse.com',
+  nik: '',
   phone: '+62 812 3456 7890',
   birthDate: '1990-01-01',
   height: 170,
@@ -107,6 +108,7 @@ export default function Profil() {
       const profileData: UserProfile = {
         uid: authProfile.uid,
         email: authProfile.email,
+        nik: authProfile.nik || '',
         name: authProfile.name,
         phone: authProfile.phone,
         birthDate: authProfile.birthDate,
@@ -117,6 +119,7 @@ export default function Profil() {
         rt: authProfile.rt,
         rw: authProfile.rw,
         kelurahan: authProfile.kelurahan,
+        adminKelurahan: authProfile.adminKelurahan || '',
         role: authProfile.role,
         createdAt: authProfile.createdAt
       }
@@ -165,7 +168,8 @@ export default function Profil() {
         gender: editedProfile.gender,
         rt: editedProfile.rt,
         rw: editedProfile.rw,
-        kelurahan: editedProfile.kelurahan
+        kelurahan: editedProfile.kelurahan,
+        adminKelurahan: editedProfile.adminKelurahan || ''
       })
       
       setProfile({ ...editedProfile })
@@ -344,9 +348,6 @@ export default function Profil() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-teal-50 via-cyan-50 to-blue-50">
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <BackButton />
-        </div>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Profil Saya</h1>
           <p className="text-gray-600">Kelola informasi dan pengaturan akun Anda</p>
@@ -390,6 +391,17 @@ export default function Profil() {
                       <label htmlFor="edit-phone" className="text-sm font-medium text-gray-700 mb-1 block">Telepon</label>
                       <input id="edit-phone" type="tel" value={editedProfile.phone} onChange={(e) => handleChange('phone', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                     </div>
+                    <div>
+                      <label htmlFor="edit-birthDate" className="text-sm font-medium text-gray-700 mb-1 block">Tanggal Lahir</label>
+                      <input id="edit-birthDate" type="date" value={editedProfile.birthDate} onChange={(e) => handleChange('birthDate', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                    <div>
+                      <label htmlFor="edit-gender" className="text-sm font-medium text-gray-700 mb-1 block">Jenis Kelamin</label>
+                      <select id="edit-gender" value={editedProfile.gender} onChange={(e) => handleChange('gender', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 bg-white">
+                        <option value="Laki-laki">Laki-laki</option>
+                        <option value="Perempuan">Perempuan</option>
+                      </select>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label htmlFor="edit-height" className="text-sm font-medium text-gray-700 mb-1 block">Tinggi (cm)</label>
@@ -401,21 +413,34 @@ export default function Profil() {
                       </div>
                     </div>
                     <div className="border-t pt-4 mt-4">
-                      <p className="text-sm font-medium text-gray-700 mb-3">Alamat (Untuk Riwayat)</p>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <label htmlFor="edit-rt" className="text-sm text-gray-600 mb-1 block">RT</label>
-                          <input id="edit-rt" type="text" value={editedProfile.rt} onChange={(e) => handleChange('rt', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="001" />
+                      <p className="text-sm font-medium text-gray-700 mb-3">Alamat Kelurahan</p>
+                      {editedProfile.role === 'admin' ? (
+                        <div className="p-4 bg-blue-50 rounded-lg">
+                          <label htmlFor="edit-admin-kelurahan" className="text-sm font-medium text-blue-700 mb-2 block">Alamat Kelurahan (Admin)</label>
+                          <input id="edit-admin-kelurahan" type="text" value={editedProfile.adminKelurahan || ''} onChange={(e) => handleChange('adminKelurahan', e.target.value)} className="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Isi alamat kelurahan" />
                         </div>
-                        <div>
-                          <label htmlFor="edit-rw" className="text-sm text-gray-600 mb-1 block">RW</label>
-                          <input id="edit-rw" type="text" value={editedProfile.rw} onChange={(e) => handleChange('rw', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="01" />
+                      ) : (
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <label htmlFor="edit-rt" className="text-sm text-gray-600 mb-1 block">RT</label>
+                            <select id="edit-rt" value={editedProfile.rt || ''} onChange={(e) => handleChange('rt', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 bg-white">
+                              <option value="">Pilih RT</option>
+                              {Array.from({ length: 20 }, (_, i) => {
+                                const value = String(i + 1).padStart(3, '0')
+                                return <option key={value} value={value}>{value}</option>
+                              })}
+                            </select>
+                          </div>
+                          <div>
+                            <label htmlFor="edit-rw" className="text-sm text-gray-600 mb-1 block">RW</label>
+                            <input id="edit-rw" type="text" value={editedProfile.rw} onChange={(e) => handleChange('rw', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="01" />
+                          </div>
+                          <div>
+                            <label htmlFor="edit-kelurahan" className="text-sm text-gray-600 mb-1 block">Kelurahan</label>
+                            <input id="edit-kelurahan" type="text" value={editedProfile.kelurahan} onChange={(e) => handleChange('kelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" />
+                          </div>
                         </div>
-                        <div>
-                          <label htmlFor="edit-kelurahan" className="text-sm text-gray-600 mb-1 block">Kelurahan</label>
-                          <input id="edit-kelurahan" type="text" value={editedProfile.kelurahan} onChange={(e) => handleChange('kelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" />
-                        </div>
-                      </div>
+                      )}
                     </div>
                     <div className="flex gap-3 pt-4">
                       <Button variant="outline" className="flex-1" onClick={handleCancel}>
@@ -445,9 +470,9 @@ export default function Profil() {
                     </div>
                     <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                       <div className="bg-blue-100 p-3 rounded-full"><Mail className="w-6 h-6 text-blue-600" /></div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-500">Email</p>
-                        <p className="font-semibold text-gray-900">{profile.email}</p>
+                        <p className="font-semibold text-gray-900 break-all">{profile.email}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
@@ -465,180 +490,37 @@ export default function Profil() {
                       </div>
                     </div>
                     <div className="border-t pt-4 mt-4">
-                      <p className="text-sm text-gray-500 mb-2">Alamat (Riwayat)</p>
-                      <div className="flex items-center space-x-4 p-4 bg-teal-50 rounded-lg">
-                        <div className="bg-teal-100 p-3 rounded-full"><span className="text-teal-600 text-xs font-bold">RT/RW</span></div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-900">RT {profile.rt} / RW {profile.rw}</p>
-                          <p className="text-sm text-gray-600">{profile.kelurahan}</p>
-                        </div>
-                      </div>
+                      {profile.role === 'admin' ? (
+                        <>
+                          <p className="text-sm text-gray-500 mb-2">Alamat Kelurahan</p>
+                          <div className="flex items-center space-x-4 p-4 bg-blue-50 rounded-lg">
+                            <div className="bg-blue-100 p-3 rounded-full"><span className="text-blue-600 text-xs font-bold">ADMIN</span></div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-900">{profile.adminKelurahan || 'Belum diisi'}</p>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-gray-500 mb-2">Alamat Kelurahan</p>
+                          <div className="flex items-center space-x-4 p-4 bg-teal-50 rounded-lg">
+                            <div className="bg-teal-100 p-3 rounded-full"><span className="text-teal-600 text-xs font-bold">RT/RW</span></div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-900">RT {profile.rt} / RW {profile.rw}</p>
+                              <p className="text-sm text-gray-600">{profile.kelurahan}</p>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
               </CardContent>
             </Card>
 
-            {/* Data Kesehatan dengan CRUD */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Data Kesehatan</CardTitle>
-                    <CardDescription>Kelola data kesehatan Anda</CardDescription>
-                  </div>
-                  <Button size="sm" onClick={handleAddHealth}>
-                    <Plus className="w-4 h-4 mr-2" /> Tambah
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {healthData.map((data) => (
-                    <div key={data.id} className="bg-blue-50 p-3 rounded-xl relative group">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-blue-600 font-medium">{data.type}</span>
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                          <button onClick={() => handleEditHealth(data)} className="p-1 hover:bg-white rounded" title="Edit">
-                            <Edit3 className="w-3 h-3" />
-                          </button>
-                          <button onClick={() => handleDeleteHealth(data.id)} className="p-1 hover:bg-white rounded text-red-500" title="Hapus">
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-xl font-bold text-blue-900">{data.value} <span className="text-xs font-normal">{data.unit}</span></p>
-                      <p className="text-xs text-gray-400">{data.date}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Progress Target dengan CRUD */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Progress Target</CardTitle>
-                    <CardDescription>Target dan pencapaian Anda</CardDescription>
-                  </div>
-                  <Button size="sm" onClick={() => { setEditingTarget(null); setTargetForm({ title: '', description: '', targetValue: 0, currentValue: 0, unit: '', deadline: '' }); setShowTargetModal(true) }}>
-                    <Plus className="w-4 h-4 mr-2" /> Tambah
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {progressTargets.map((target) => {
-                  const percentage = Math.min((target.currentValue / target.targetValue) * 100, 100)
-                  return (
-                    <div key={target.id} className="bg-gray-50 p-4 rounded-xl group">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <h4 className="font-semibold text-gray-800">{target.title}</h4>
-                          <p className="text-sm text-gray-500">{target.description}</p>
-                        </div>
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                          <button onClick={() => handleEditTarget(target)} className="p-2 hover:bg-white rounded-lg" title="Edit">
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeleteTarget(target.id)} className="p-2 hover:bg-white rounded-lg text-red-500" title="Hapus">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mb-2 text-sm">
-                        <span className="text-gray-600">{target.currentValue} / {target.targetValue} {target.unit}</span>
-                        <span className="font-semibold text-gray-800">{percentage.toFixed(0)}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div className={`bg-gradient-to-r from-teal-500 to-cyan-500 h-2.5 rounded-full w-[${percentage}%]`}></div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
           </div>
 
           <div className="lg:col-span-1 space-y-6">
-            {/* Pencapaian dengan CRUD */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Pencapaian</CardTitle>
-                    <CardDescription>Badge yang telah Anda raih</CardDescription>
-                  </div>
-                  <Button size="sm" onClick={() => { setEditingAchievement(null); setAchievementForm({ title: '', description: '', icon: '🏆', target: 100, current: 0 }); setShowAchievementModal(true) }}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-3">
-                  {achievements.map((achievement) => (
-                    <div key={achievement.id} className={`p-3 rounded-xl text-center transition-all relative group ${achievement.earned ? 'bg-gradient-to-br from-teal-100 to-cyan-100 border-2 border-teal-300' : 'bg-gray-100 opacity-60'}`}>
-                      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <button onClick={() => handleEditAchievement(achievement)} className="p-1 hover:bg-white rounded" title="Edit">
-                          <Edit3 className="w-3 h-3" />
-                        </button>
-                        <button onClick={() => handleDeleteAchievement(achievement.id)} className="p-1 hover:bg-white rounded text-red-500" title="Hapus">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <div className="text-2xl mb-1">{achievement.icon}</div>
-                      <p className="text-xs font-medium text-gray-700 leading-tight">{achievement.title}</p>
-                      <div className="mt-2">
-                        <div className="w-full bg-gray-200 rounded-full h-1.5">
-                          <div className={`bg-teal-500 h-1.5 rounded-full w-[${Math.min((achievement.current / achievement.target) * 100, 100)}%]`}></div>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">{achievement.current}/{achievement.target}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Statistik Dinamis */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Statistik</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Pencapaian</span>
-                  <span className="font-bold text-gray-900">{earnedCount}/{achievements.length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Progress Rata-rata</span>
-                  <span className="font-bold text-gray-900">{avgProgressValue}%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Data Kesehatan</span>
-                  <span className="font-bold text-gray-900">{healthData.length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Target Aktif</span>
-                  <span className="font-bold text-gray-900">{progressTargets.length}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* BMI Card */}
-            <Card className="bg-gradient-to-br from-teal-500 to-cyan-600 text-white border-0">
-              <CardContent className="p-6">
-                <div className="text-center">
-                  <p className="text-sm text-white/80 mb-1">BMI Anda</p>
-                  <p className="text-4xl font-bold">{bmi}</p>
-                  <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${bmiStatus.bg} ${bmiStatus.color}`}>
-                    {bmiStatus.status}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* QR Code Card - Akses Cepat */}
             <Card className="border-2 border-dashed border-teal-200">
               <CardHeader className="pb-3">
@@ -646,32 +528,33 @@ export default function Profil() {
                   <QrCode className="w-5 h-5 text-teal-600" />
                   Akses Cepat
                 </CardTitle>
-                <CardDescription>Scan untuk masuk ke aplikasi</CardDescription>
+                <CardDescription>Scan untuk login otomatis tanpa password</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex flex-col items-center">
                   <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 mb-3">
                     <QRCodeSVG 
-                      value={appUrl}
+                      value={`${appUrl}/login-qr?userId=${profile.uid}&email=${encodeURIComponent(profile.email)}`}
                       size={180}
                       level="H"
                       includeMargin={true}
                     />
                   </div>
                   <p className="text-xs text-gray-500 text-center mb-3">
-                    Scan QR code ini dengan kamera HP untuk mengakses aplikasi InterPulse
+                    Scan QR code ini dengan kamera HP untuk login otomatis ke InterPulse
                   </p>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     className="w-full text-teal-600 border-teal-200 hover:bg-teal-50"
                     onClick={() => {
-                      navigator.clipboard.writeText(appUrl)
-                      alert('Link aplikasi telah disalin ke clipboard!')
+                      const loginUrl = `${appUrl}/login-qr?userId=${profile.uid}&email=${encodeURIComponent(profile.email)}`
+                      navigator.clipboard.writeText(loginUrl)
+                      alert('Link login telah disalin ke clipboard!')
                     }}
                   >
                     <Share2 className="w-4 h-4 mr-2" />
-                    Salin Link
+                    Salin Link Login
                   </Button>
                 </div>
               </CardContent>

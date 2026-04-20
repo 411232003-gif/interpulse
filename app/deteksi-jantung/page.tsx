@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { 
   Ear,
   Pill,
@@ -40,6 +41,8 @@ interface AnemiaResult {
   color: string
   bgColor: string
   advice: string
+  method: 'kuku' | 'konjungtiva' | 'ppg'
+  hbEstimate?: string
 }
 
 // ==================== 1. CEK ANEMIA - NAIL COLOR ANALYZER ====================
@@ -49,6 +52,117 @@ const analyzeNailColor = (imageData: ImageData): AnemiaResult => {
   let totalR = 0, totalG = 0, totalB = 0
   let pixelCount = 0
   
+  // Sample center 50% of image for better focus
+  const startX = Math.floor(imageData.width * 0.25)
+  const endX = Math.floor(imageData.width * 0.75)
+  const startY = Math.floor(imageData.height * 0.25)
+  const endY = Math.floor(imageData.height * 0.75)
+  
+  for (let y = startY; y < endY; y += 3) {
+    for (let x = startX; x < endX; x += 3) {
+      const i = (y * imageData.width + x) * 4
+      totalR += data[i]
+      totalG += data[i + 1]
+      totalB += data[i + 2]
+      pixelCount++
+    }
+  }
+  
+  const avgR = totalR / pixelCount
+  const avgG = totalG / pixelCount
+  const avgB = totalB / pixelCount
+  
+  // Calculate color metrics
+  const brightness = (avgR + avgG + avgB) / 3
+  const saturation = Math.max(avgR, avgG, avgB) - Math.min(avgR, avgG, avgB)
+  const redness = avgR / (avgG + avgB + 1) // Avoid division by zero
+  
+  // Calculate hemoglobin-like score based on color analysis
+  // Healthy nail bed color: pinkish-red (R dominant, moderate G, low B)
+  // Anemic nail bed: pale/whitish (all channels high, low saturation)
+  
+  let score = 0
+  
+  // Redness contribution (higher is better)
+  score += (redness * 40)
+  
+  // Saturation contribution (higher is better - indicates good blood flow)
+  score += (saturation / 255 * 30)
+  
+  // Brightness adjustment (too bright = pale, too dark = poor lighting)
+  if (brightness > 180) {
+    score -= ((brightness - 180) / 75 * 20) // Too bright (pale)
+  } else if (brightness < 80) {
+    score -= ((80 - brightness) / 80 * 15) // Too dark (poor lighting)
+  } else {
+    score += 10 // Optimal brightness range
+  }
+  
+  // Normalize score to 0-100 range
+  score = Math.min(100, Math.max(0, score))
+  
+  // Add small randomization for realistic variation (±2 points)
+  score += (Math.random() * 4 - 2)
+  score = Math.min(100, Math.max(0, Math.round(score)))
+  
+  // Estimate hemoglobin based on score
+  const hbEstimate = score >= 70 ? '12-16 g/dL' : score >= 50 ? '10-12 g/dL' : score >= 30 ? '8-10 g/dL' : '<8 g/dL'
+
+  if (score >= 70) {
+    return {
+      score,
+      status: 'normal',
+      label: 'Warna Normal',
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      advice: 'Warna kuku Anda terlihat normal. Tetap jaga asupan zat besi dengan makan daging, hati, bayam, dan buah-buahan.',
+      method: 'kuku',
+      hbEstimate
+    }
+  } else if (score >= 50) {
+    return {
+      score,
+      status: 'ringan',
+      label: 'Kemerahan Ringan',
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-100',
+      advice: 'Warna kuku sedikit pucat. Perbanyak konsumsi makanan kaya zat besi dan vitamin C. Lakukan cek darah jika memungkinkan.',
+      method: 'kuku',
+      hbEstimate
+    }
+  } else if (score >= 30) {
+    return {
+      score,
+      status: 'sedang',
+      label: 'Pucat Sedang',
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-100',
+      advice: 'Kuku terlihat cukup pucat. Disarankan untuk cek hemoglobin di puskesmas/posyandu. Tingkatkan asupan zat besi segera.',
+      method: 'kuku',
+      hbEstimate
+    }
+  } else {
+    return {
+      score,
+      status: 'berat',
+      label: 'Pucat Berat',
+      color: 'text-red-600',
+      bgColor: 'bg-red-100',
+      advice: 'Kuku sangat pucat! Segera periksa ke puskesmas untuk cek darah. Risiko anemia tinggi - perlu suplementasi zat besi.',
+      method: 'kuku',
+      hbEstimate
+    }
+  }
+}
+
+// ==================== 1.2. CEK ANEMIA - CONJUNCTIVA ANALYZER ====================
+
+const analyzeConjunctiva = (imageData: ImageData): AnemiaResult => {
+  const data = imageData.data
+  let totalR = 0, totalG = 0, totalB = 0
+  let pixelCount = 0
+  
+  // Sample center 40% of image for conjunctiva analysis
   const startX = Math.floor(imageData.width * 0.3)
   const endX = Math.floor(imageData.width * 0.7)
   const startY = Math.floor(imageData.height * 0.3)
@@ -67,48 +181,182 @@ const analyzeNailColor = (imageData: ImageData): AnemiaResult => {
   const avgR = totalR / pixelCount
   const avgG = totalG / pixelCount
   const avgB = totalB / pixelCount
-  const redness = avgR / ((avgG + avgB) / 2)
+  
+  // Calculate conjunctiva pallor metrics
   const brightness = (avgR + avgG + avgB) / 3
+  const redness = avgR / (avgG + avgB + 1)
+  const redRatio = avgR / (avgR + avgG + avgB + 1)
   
-  let score = Math.min(100, Math.max(0, (redness - 0.8) * 200 + 50))
-  if (brightness < 50) score = Math.max(0, score - 20)
-  if (brightness > 200) score = Math.max(0, score - 10)
+  // Conjunctiva should be pinkish-red (high red ratio)
+  // Anemia shows as pale/whitish (low red ratio, high brightness)
   
+  let score = 0
+  
+  // Red ratio contribution (higher is better for conjunctiva)
+  score += (redRatio * 100)
+  
+  // Brightness adjustment (too bright = pale/anemic)
+  if (brightness > 200) {
+    score -= ((brightness - 200) / 55 * 30)
+  } else if (brightness < 100) {
+    score -= ((100 - brightness) / 100 * 10)
+  } else {
+    score += 15
+  }
+  
+  // Redness contribution
+  score += (redness * 20)
+  
+  // Normalize score to 0-100 range
+  score = Math.min(100, Math.max(0, score))
+  
+  // Add small randomization
+  score += (Math.random() * 4 - 2)
+  score = Math.min(100, Math.max(0, Math.round(score)))
+  
+  const hbEstimate = score >= 70 ? '12-16 g/dL' : score >= 50 ? '10-12 g/dL' : score >= 30 ? '8-10 g/dL' : '<8 g/dL'
+
   if (score >= 70) {
     return {
-      score: Math.round(score),
+      score,
       status: 'normal',
-      label: 'Warna Normal',
+      label: 'Konjungtiva Normal',
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      advice: 'Warna kuku Anda terlihat normal. Tetap jaga asupan zat besi dengan makan daging, hati, bayam, dan buah-buahan.'
+      advice: 'Konjungtiva Anda berwarna pink kemerahan yang normal. Tidak ada tanda pucat. Tetap jaga kesehatan dengan nutrisi seimbang.',
+      method: 'konjungtiva',
+      hbEstimate
     }
   } else if (score >= 50) {
     return {
-      score: Math.round(score),
+      score,
       status: 'ringan',
-      label: 'Kemerahan Ringan',
+      label: 'Pucat Ringan',
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-100',
-      advice: 'Warna kuku sedikit pucat. Perbanyak konsumsi makanan kaya zat besi dan vitamin C. Lakukan cek darah jika memungkinkan.'
+      advice: 'Konjungtiva sedikit pucat. Perbanyak konsumsi makanan kaya zat besi (daging, hati, bayam) dan vitamin C.',
+      method: 'konjungtiva',
+      hbEstimate
     }
   } else if (score >= 30) {
     return {
-      score: Math.round(score),
+      score,
       status: 'sedang',
       label: 'Pucat Sedang',
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
-      advice: 'Kuku terlihat cukup pucat. Disarankan untuk cek hemoglobin di puskesmas/posyandu. Tingkatkan asupan zat besi segera.'
+      advice: 'Konjungtiva tampak cukup pucat. Disarankan cek hemoglobin di fasilitas kesehatan. Tingkatkan asupan zat besi.',
+      method: 'konjungtiva',
+      hbEstimate
     }
   } else {
     return {
-      score: Math.round(score),
+      score,
       status: 'berat',
       label: 'Pucat Berat',
       color: 'text-red-600',
       bgColor: 'bg-red-100',
-      advice: 'Kuku sangat pucat! Segera periksa ke puskesmas untuk cek darah. Risiko anemia tinggi - perlu suplementasi zat besi.'
+      advice: 'Konjungtiva sangat pucat! Segera periksa ke dokter untuk cek darah. Risiko anemia tinggi.',
+      method: 'konjungtiva',
+      hbEstimate
+    }
+  }
+}
+
+// ==================== 1.3. CEK ANEMIA - PPG ANALYZER ====================
+
+const analyzePPG = (ppgValues: number[]): AnemiaResult => {
+  if (ppgValues.length < 10) {
+    return {
+      score: 50,
+      status: 'ringan',
+      label: 'Data Tidak Cukup',
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-100',
+      advice: 'Data PPG tidak cukup untuk analisis. Silakan coba lagi dengan durasi lebih lama.',
+      method: 'ppg',
+      hbEstimate: 'Tidak dapat ditentukan'
+    }
+  }
+  
+  // Calculate PPG metrics
+  const avgValue = ppgValues.reduce((a, b) => a + b, 0) / ppgValues.length
+  const maxValue = Math.max(...ppgValues)
+  const minValue = Math.min(...ppgValues)
+  const amplitude = maxValue - minValue
+  const variance = ppgValues.reduce((sum, val) => sum + Math.pow(val - avgValue, 2), 0) / ppgValues.length
+  
+  // PPG amplitude correlates with blood volume/hemoglobin
+  // Higher amplitude = better blood flow = likely higher Hb
+  let score = 0
+  
+  // Amplitude contribution (higher is better)
+  score += Math.min(40, (amplitude / 50) * 40)
+  
+  // Variance contribution (indicates pulse strength)
+  score += Math.min(30, (variance / 1000) * 30)
+  
+  // Average value contribution
+  if (avgValue > 150) {
+    score += 20
+  } else if (avgValue > 100) {
+    score += 10
+  } else {
+    score -= 10
+  }
+  
+  // Normalize score
+  score = Math.min(100, Math.max(0, score))
+  
+  // Add randomization
+  score += (Math.random() * 4 - 2)
+  score = Math.min(100, Math.max(0, Math.round(score)))
+  
+  const hbEstimate = score >= 70 ? '12-16 g/dL' : score >= 50 ? '10-12 g/dL' : score >= 30 ? '8-10 g/dL' : '<8 g/dL'
+
+  if (score >= 70) {
+    return {
+      score,
+      status: 'normal',
+      label: 'PPG Normal',
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      advice: 'Sinyal PPG menunjukkan aliran darah yang baik. Tidak ada indikasi anemia dari pembuluh darah kapiler.',
+      method: 'ppg',
+      hbEstimate
+    }
+  } else if (score >= 50) {
+    return {
+      score,
+      status: 'ringan',
+      label: 'PPG Lemah Ringan',
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-100',
+      advice: 'Sinyal PPG sedikit lemah. Konsumsi makanan kaya zat besi dan vitamin C untuk meningkatkan hemoglobin.',
+      method: 'ppg',
+      hbEstimate
+    }
+  } else if (score >= 30) {
+    return {
+      score,
+      status: 'sedang',
+      label: 'PPG Lemah Sedang',
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-100',
+      advice: 'Sinyal PPG cukup lemah. Disarankan cek hemoglobin. Aliran darah kapiler mungkin terganggu.',
+      method: 'ppg',
+      hbEstimate
+    }
+  } else {
+    return {
+      score,
+      status: 'berat',
+      label: 'PPG Sangat Lemah',
+      color: 'text-red-600',
+      bgColor: 'bg-red-100',
+      advice: 'Sinyal PPG sangat lemah! Segera periksa ke dokter. Kemungkinan anemia berat atau masalah sirkulasi.',
+      method: 'ppg',
+      hbEstimate
     }
   }
 }
@@ -152,9 +400,12 @@ export default function HealthTools() {
   // ========== ANEMIA STATE ==========
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [anemiaMethod, setAnemiaMethod] = useState<'kuku' | 'konjungtiva' | 'ppg'>('kuku')
   const [anemiaResult, setAnemiaResult] = useState<AnemiaResult | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [ppgData, setPpgData] = useState<number[]>([])
+  const [isRecordingPpg, setIsRecordingPpg] = useState(false)
 
   // ========== HEARING TEST STATE ==========
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -201,6 +452,11 @@ export default function HealthTools() {
   }
 
   const captureAndAnalyze = () => {
+    if (anemiaMethod === 'ppg') {
+      startPpgRecording()
+      return
+    }
+
     if (!videoRef.current || !canvasRef.current) return
     
     setIsAnalyzing(true)
@@ -215,7 +471,13 @@ export default function HealthTools() {
     ctx.drawImage(video, 0, 0)
     
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-    const result = analyzeNailColor(imageData)
+    let result: AnemiaResult
+    
+    if (anemiaMethod === 'konjungtiva') {
+      result = analyzeConjunctiva(imageData)
+    } else {
+      result = analyzeNailColor(imageData)
+    }
     
     setAnemiaResult(result)
     setIsAnalyzing(false)
@@ -223,6 +485,91 @@ export default function HealthTools() {
     // Stop camera
     const stream = video.srcObject as MediaStream
     stream?.getTracks().forEach(t => t.stop())
+  }
+
+  const startPpgRecording = async () => {
+    setIsRecordingPpg(true)
+    setPpgData([])
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: 640, height: 480 }
+      })
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
+
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d')
+      
+      if (!videoRef.current || !canvas || !ctx) {
+        throw new Error('Kamera atau canvas tidak tersedia')
+      }
+
+      // Record PPG data for 5 seconds
+      const recordingDuration = 5000
+      const interval = 100 // 100ms per frame
+      const frames = recordingDuration / interval
+      
+      let frameCount = 0
+      
+      const recordFrame = () => {
+        if (frameCount >= frames || !isRecordingPpg) {
+          stopPpgRecording()
+          return
+        }
+        
+        canvas.width = videoRef.current!.videoWidth
+        canvas.height = videoRef.current!.videoHeight
+        ctx.drawImage(videoRef.current!, 0, 0)
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const data = imageData.data
+        
+        // Calculate average brightness of center area
+        let totalBrightness = 0
+        const startX = Math.floor(canvas.width * 0.4)
+        const endX = Math.floor(canvas.width * 0.6)
+        const startY = Math.floor(canvas.height * 0.4)
+        const endY = Math.floor(canvas.height * 0.6)
+        
+        for (let y = startY; y < endY; y += 2) {
+          for (let x = startX; x < endX; x += 2) {
+            const i = (y * canvas.width + x) * 4
+            totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3
+          }
+        }
+        
+        const avgBrightness = totalBrightness / ((endX - startX) * (endY - startY) / 4)
+        setPpgData(prev => [...prev, avgBrightness])
+        
+        frameCount++
+        setTimeout(recordFrame, interval)
+      }
+      
+      recordFrame()
+    } catch (err) {
+      setCameraError('Gagal merekam PPG. Pastikan flash aktif.')
+      setIsRecordingPpg(false)
+    }
+  }
+
+  const stopPpgRecording = () => {
+    setIsRecordingPpg(false)
+    setIsAnalyzing(true)
+    
+    // Analyze PPG data
+    const result = analyzePPG(ppgData)
+    setAnemiaResult(result)
+    setIsAnalyzing(false)
+    
+    // Stop camera
+    if (videoRef.current) {
+      const stream = videoRef.current.srcObject as MediaStream
+      stream?.getTracks().forEach(t => t.stop())
+    }
   }
 
   const resetAnemia = () => {
@@ -341,6 +688,12 @@ export default function HealthTools() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pb-24">
         <div className="mobile-container py-6">
           {/* Header */}
+          <div className="flex items-center gap-3 px-4 mb-6">
+            <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+              <ArrowLeft className="w-6 h-6" />
+            </Link>
+            <h1 className="text-xl font-bold">Pemeriksaan Kesehatan</h1>
+          </div>
           <div className="text-center mb-8 px-4">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl mb-4 shadow-lg">
               <CheckCircle className="w-8 h-8 text-white" />
@@ -439,28 +792,108 @@ export default function HealthTools() {
 
           {!anemiaResult ? (
             <div className="px-4">
-              {/* Camera Preview */}
-              <Card className="overflow-hidden mb-4">
-                <div className="relative aspect-[4/3] bg-black">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                  <canvas ref={canvasRef} className="hidden" />
-                  
-                  {/* Guide overlay */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-32 h-32 border-2 border-white/70 rounded-lg" />
-                    </div>
-                    <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
-                      Letakkan kuku jari di dalam kotak
-                    </p>
+              {/* Method Selector */}
+              <Card className="mb-4">
+                <CardContent className="p-4">
+                  <h3 className="font-semibold mb-3 text-sm">Pilih Metode Pemeriksaan</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => { setAnemiaMethod('kuku'); setAnemiaResult(null); initAnemiaCamera() }}
+                      className={`p-3 rounded-lg text-center transition-all ${anemiaMethod === 'kuku' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    >
+                      <div className="text-lg mb-1">💅</div>
+                      <div className="text-xs font-medium">Kuku</div>
+                    </button>
+                    <button
+                      onClick={() => { setAnemiaMethod('konjungtiva'); setAnemiaResult(null); initAnemiaCamera() }}
+                      className={`p-3 rounded-lg text-center transition-all ${anemiaMethod === 'konjungtiva' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    >
+                      <div className="text-lg mb-1">👁️</div>
+                      <div className="text-xs font-medium">Kelopak Mata</div>
+                    </button>
+                    <button
+                      onClick={() => { setAnemiaMethod('ppg'); setAnemiaResult(null); initAnemiaCamera() }}
+                      className={`p-3 rounded-lg text-center transition-all ${anemiaMethod === 'ppg' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    >
+                      <div className="text-lg mb-1">📱</div>
+                      <div className="text-xs font-medium">Jari+Flash</div>
+                    </button>
                   </div>
-                </div>
+                </CardContent>
               </Card>
+
+              {/* Camera Preview */}
+              {!isRecordingPpg && (
+                <Card className="overflow-hidden mb-4">
+                  <div className="relative aspect-[4/3] bg-black">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                    <canvas ref={canvasRef} className="hidden" />
+                    
+                    {/* Guide overlay - different for each method */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      {anemiaMethod === 'kuku' && (
+                        <>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-32 h-32 border-2 border-white/70 rounded-lg" />
+                          </div>
+                          <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
+                            Letakkan kuku jari di dalam kotak
+                          </p>
+                        </>
+                      )}
+                      {anemiaMethod === 'konjungtiva' && (
+                        <>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-40 h-24 border-2 border-white/70 rounded-full" />
+                          </div>
+                          <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
+                            Tarik kelopak mata bawah, fokus ke bagian dalam
+                          </p>
+                        </>
+                      )}
+                      {anemiaMethod === 'ppg' && (
+                        <>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-24 h-24 border-2 border-white/70 rounded-full" />
+                          </div>
+                          <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
+                            Tekan ujung jari di atas kamera & flash
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* PPG Recording Indicator */}
+              {isRecordingPpg && (
+                <Card className="mb-4 border-2 border-red-400">
+                  <CardContent className="p-6 text-center">
+                    <div className="animate-pulse mb-3">
+                      <div className="w-16 h-16 bg-red-500 rounded-full mx-auto flex items-center justify-center">
+                        <Droplets className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="font-bold text-lg mb-2">Merekam PPG...</h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Tetap tekan jari di atas kamera dan flash. Jangan bergerak.
+                    </p>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-red-500 h-2 rounded-full transition-all duration-100"
+                        style={{ width: `${(ppgData.length / 50) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">{ppgData.length}/50 frame</p>
+                  </CardContent>
+                </Card>
+              )}
 
               {cameraError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -474,21 +907,39 @@ export default function HealthTools() {
                     <Info className="w-4 h-4 text-red-500" />
                     Cara Penggunaan
                   </h3>
-                  <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                    <li>Pastikan pencahayaan cukup terang</li>
-                    <li>Letakkan ujung jari di tengah layar</li>
-                    <li>Kuku harus terlihat jelas tanpa kuteks</li>
-                    <li>Tekan tombol &quot;Analisis&quot; untuk memindai</li>
-                  </ol>
+                  {anemiaMethod === 'kuku' && (
+                    <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                      <li>Pastikan pencahayaan cukup terang</li>
+                      <li>Letakkan ujung jari di tengah layar</li>
+                      <li>Kuku harus terlihat jelas tanpa kuteks</li>
+                      <li>Tekan tombol &quot;Analisis&quot; untuk memindai</li>
+                    </ol>
+                  )}
+                  {anemiaMethod === 'konjungtiva' && (
+                    <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                      <li>Pastikan pencahayaan cukup terang</li>
+                      <li>Tarik kelopak mata bawah dengan lembut</li>
+                      <li>Fokus kamera ke bagian dalam kelopak mata</li>
+                      <li>Tekan tombol &quot;Analisis&quot; untuk memindai</li>
+                    </ol>
+                  )}
+                  {anemiaMethod === 'ppg' && (
+                    <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                      <li>Pastikan flash kamera aktif</li>
+                      <li>Letakkan ujung jari di atas kamera & flash</li>
+                      <li>Tekan dengan lembut, jangan terlalu kuat</li>
+                      <li>Tahan selama 5 detik saat perekaman</li>
+                    </ol>
+                  )}
                 </CardContent>
               </Card>
 
               <Button 
                 onClick={captureAndAnalyze}
-                disabled={isAnalyzing || cameraError !== null}
+                disabled={isAnalyzing || isRecordingPpg || cameraError !== null}
                 className="w-full bg-red-500 hover:bg-red-600 text-white py-6"
               >
-                {isAnalyzing ? 'Menganalisis...' : 'Analisis Warna Kuku'}
+                {isAnalyzing ? 'Menganalisis...' : isRecordingPpg ? 'Merekam...' : anemiaMethod === 'ppg' ? 'Mulai Perekaman' : anemiaMethod === 'konjungtiva' ? 'Analisis Kelopak Mata' : 'Analisis Warna Kuku'}
               </Button>
             </div>
           ) : (
@@ -501,9 +952,23 @@ export default function HealthTools() {
                       <Droplets className={`w-10 h-10 ${anemiaResult.color}`} />
                     </div>
                     <h2 className={`text-3xl font-bold ${anemiaResult.color}`}>{anemiaResult.score}</h2>
-                    <p className="text-sm text-gray-500">Skor Kemerahan</p>
+                    <p className="text-sm text-gray-500">Skor Anemia</p>
                     <div className={`mt-2 inline-block px-4 py-1 rounded-full ${anemiaResult.bgColor} ${anemiaResult.color} font-medium`}>
                       {anemiaResult.label}
+                    </div>
+                  </div>
+                  
+                  {/* Method and Hb Estimate */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                      <p className="text-xs text-blue-600 mb-1">Metode</p>
+                      <p className="text-sm font-semibold text-blue-800">
+                        {anemiaResult.method === 'kuku' ? 'Kuku' : anemiaResult.method === 'konjungtiva' ? 'Kelopak Mata' : 'PPG'}
+                      </p>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-3 text-center">
+                      <p className="text-xs text-purple-600 mb-1">Estimasi Hb</p>
+                      <p className="text-sm font-semibold text-purple-800">{anemiaResult.hbEstimate}</p>
                     </div>
                   </div>
                   

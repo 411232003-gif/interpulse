@@ -1,0 +1,15 @@
+{
+  "name": "scripts",
+  "version": "1.0.0",
+  "description": "## Langkah 1: Download Service Account Key 1. Buka [Firebase Console](https://console.firebase.google.com) 2. Klik ⚙️ (Settings) → Project Settings → Service Accounts 3. Klik \"Generate new private key\" 4. Simpan file `serviceAccountKey.json` di folder `scripts/`",
+  "main": "cleanup-users.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "firebase-admin": "^13.8.0"
+  }
+}

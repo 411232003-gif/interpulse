@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import BackButton from '@/components/BackButton'
+import Link from 'next/link'
 import CharacterAvatar from '@/components/CharacterAvatar'
-import { User, Activity, TrendingUp, TrendingDown } from 'lucide-react'
+import { User, Activity, TrendingUp, TrendingDown, ArrowLeft } from 'lucide-react'
 
 export default function PosturTubuh() {
   const [tinggi, setTinggi] = useState<number>(170)
@@ -99,7 +99,9 @@ export default function PosturTubuh() {
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20 md:pb-8">
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <BackButton />
+          <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
         </div>
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">

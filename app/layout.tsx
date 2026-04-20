@@ -49,28 +49,18 @@ export default function RootLayout({
         {/* Manifest */}
         <link rel="manifest" href="/manifest.json" />
         
-        {/* Service Worker - Unregister old then register new */}
+        {/* Service Worker - Temporarily disabled to fix cache issues */}
         <script dangerouslySetInnerHTML={{
           __html: `
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
-                // Unregister semua service worker lama (dari app lain)
+                // Unregister semua service worker untuk clear cache
                 navigator.serviceWorker.getRegistrations().then(function(registrations) {
                   for(let registration of registrations) {
-                    if (registration.scope !== window.location.origin + '/') {
-                      console.log('[InterPulse] Unregistering old SW from:', registration.scope);
-                      registration.unregister();
-                    }
+                    console.log('[InterPulse] Unregistering SW:', registration.scope);
+                    registration.unregister();
                   }
                 });
-                // Register service worker baru
-                navigator.serviceWorker.register('/sw.js')
-                  .then(function(registration) {
-                    console.log('[InterPulse] SW registered:', registration);
-                  })
-                  .catch(function(err) {
-                    console.log('[InterPulse] SW registration failed:', err);
-                  });
               });
             }
           `

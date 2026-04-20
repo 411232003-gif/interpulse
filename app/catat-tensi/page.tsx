@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BigNumpad from '@/components/BigNumpad'
 import { Heart, Activity, TrendingUp, CheckCircle, AlertCircle, XCircle, History } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
+import { db } from '@/lib/firebase'
+import { collection, addDoc, query, where, getDocs } from 'firebase/firestore'
 
 type InputStep = 'sistolik' | 'diastolik' | 'nadi' | 'result'
 
@@ -27,6 +30,7 @@ interface ValidationResult {
 
 export default function CatatTensi() {
   const router = useRouter()
+  const { userProfile } = useAuth()
   const [step, setStep] = useState<InputStep>('sistolik')
   const [sistolik, setSistolik] = useState('')
   const [diastolik, setDiastolik] = useState('')
@@ -63,7 +67,7 @@ export default function CatatTensi() {
     }
   }
 
-  const validateAndSave = () => {
+  const validateAndSave = async () => {
     const sys = parseInt(sistolik)
     const dia = parseInt(diastolik)
     const pulse = parseInt(nadi)
@@ -129,6 +133,27 @@ export default function CatatTensi() {
     const readings = existingData ? JSON.parse(existingData) : []
     readings.push(reading)
     localStorage.setItem('tensiReadings', JSON.stringify(readings))
+
+    // Simpan ke Firestore healthReadings untuk riwayat user
+    if (userProfile?.uid) {
+      try {
+        await addDoc(collection(db, 'healthReadings'), {
+          type: 'tensi',
+          sistolik,
+          diastolik,
+          nadi,
+          userId: userProfile.uid,
+          userName: userProfile.name,
+          rt: userProfile.rt,
+          rw: userProfile.rw,
+          kelurahan: userProfile.kelurahan,
+          timestamp: new Date().toISOString(),
+          source: 'pribadi'
+        })
+      } catch (error) {
+        console.error('Error saving to Firestore:', error)
+      }
+    }
 
     setResult(validationResult)
     setStep('result')

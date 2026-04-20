@@ -7,10 +7,10 @@ import MiniPlayer from '@/components/MiniPlayer'
 import { GlobalAudioProvider } from '@/contexts/GlobalAudioContext'
 import { useAuth } from '@/lib/auth-context'
 
-const publicRoutes = ['/login', '/register']
+const publicRoutes = ['/login', '/register', '/complete-profile']
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, userProfile, loading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -20,13 +20,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       
       if (!user && !isPublicRoute) {
         router.push('/login')
+        return
       }
       
-      if (user && isPublicRoute) {
+      if (user && (pathname === '/login' || pathname === '/register')) {
         router.push('/')
+        return
+      }
+
+      // Check if user has incomplete profile (no NIK) and redirect to complete-profile
+      // Admin users can bypass this requirement
+      if (user && userProfile && !userProfile.nik && userProfile.role !== 'admin' && pathname !== '/complete-profile' && !isPublicRoute) {
+        router.push('/complete-profile')
+        return
       }
     }
-  }, [user, loading, pathname, router])
+  }, [user, userProfile, loading, pathname, router])
 
   // Show loading state
   if (loading) {

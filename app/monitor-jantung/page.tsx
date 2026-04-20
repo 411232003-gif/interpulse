@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import BackButton from '@/components/BackButton'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Heart, Activity, TrendingUp, TrendingDown, AlertCircle, Calendar, Filter, Download } from 'lucide-react'
+import { Heart, Activity, TrendingUp, TrendingDown, AlertCircle, Calendar, Filter, Download, ArrowLeft } from 'lucide-react'
 
 interface TensiReading {
   sistolik: string
@@ -267,7 +267,9 @@ export default function RiwayatTensi() {
     <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white">
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <BackButton />
+          <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
         </div>
         
         <div className="mb-8">
@@ -437,8 +439,8 @@ export default function RiwayatTensi() {
                 <p className="text-gray-500 mb-4">
                   Belum ada pengukuran tensi dalam periode yang dipilih
                 </p>
-                <Button 
-                  onClick={() => window.location.href = '/catat-kesehatan'}
+                <Button
+                  onClick={() => window.location.href = '/Fasca'}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Activity className="w-4 h-4 mr-2" />

@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import BackButton from '@/components/BackButton'
+import Link from 'next/link'
 
 // Types
 interface FoodItem {
@@ -361,7 +361,9 @@ export default function KaloriTracker() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-nav">
-      <BackButton />
+      <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+        <ChevronLeft className="w-6 h-6" />
+      </Link>
       
       <div className="mobile-container py-4 sm:py-6">
         {/* Header - Mobile Optimized */}

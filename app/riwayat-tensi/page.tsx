@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import BackButton from '@/components/BackButton'
+import Link from 'next/link'
 import { 
   History, 
   Download, 
@@ -22,7 +22,8 @@ import {
   XCircle,
   TrendingUp,
   TrendingDown,
-  Minus
+  Minus,
+  ArrowLeft
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useAuth } from '@/lib/auth-context'
@@ -545,7 +546,9 @@ export default function RiwayatKesehatan() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pb-nav">
-      <BackButton />
+      <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+        <ArrowLeft className="w-6 h-6" />
+      </Link>
       
       <div className="mobile-container py-4 sm:py-6">
         {/* Header */}
@@ -809,38 +812,6 @@ export default function RiwayatKesehatan() {
                   <option value="hipertensi">Tinggi</option>
                   <option value="rendah">Rendah</option>
                 </select>
-              </div>
-              <div className="border-t pt-3 mt-3">
-                <label className="text-xs font-medium text-gray-700 mb-2 block">Filter Lokasi (RT/RW/Kelurahan)</label>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="RT"
-                      value={filters.rt}
-                      onChange={(e) => setFilters({...filters, rt: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="RW"
-                      value={filters.rw}
-                      onChange={(e) => setFilters({...filters, rw: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="Kelurahan"
-                      value={filters.kelurahan}
-                      onChange={(e) => setFilters({...filters, kelurahan: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
               </div>
             </div>
           )}

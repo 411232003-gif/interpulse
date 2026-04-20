@@ -1,6 +1,6 @@
-import BackButton from '@/components/BackButton'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Heart, Droplets, Moon, Apple, Dumbbell, Brain, Sun, Wind } from 'lucide-react'
+import { Heart, Droplets, Moon, Apple, Dumbbell, Brain, Sun, Wind, ArrowLeft } from 'lucide-react'
 
 const healthTips = [
   {
@@ -106,7 +106,9 @@ export default function TipsKesehatan() {
     <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white">
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <BackButton />
+          <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
         </div>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Tips Kesehatan</h1>

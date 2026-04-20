@@ -1,22 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { Heart, Mail, Lock, Loader2, Eye, EyeOff, User, Phone, Calendar, Ruler, Weight, Target, Home } from 'lucide-react'
+import { Heart, Mail, Lock, Loader2, Eye, EyeOff, User, Calendar, Home, Badge } from 'lucide-react'
+import ReCAPTCHA from 'react-google-recaptcha'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
+    nik: '',
     email: '',
     password: '',
     confirmPassword: '',
     name: '',
-    phone: '',
     birthDate: '',
-    height: '',
-    weight: '',
-    targetWeight: '',
     rt: '',
     rw: '',
     kelurahan: ''
@@ -24,8 +22,12 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
+  const recaptchaRef = useRef<ReCAPTCHA>(null)
   const router = useRouter()
-  const { register } = useAuth()
+  const { register, loginWithGoogle } = useAuth()
+
+  const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -45,25 +47,57 @@ export default function RegisterPage() {
       return
     }
 
+    // Validasi NIK wajib dan harus 16 digit angka
+    if (!formData.nik || formData.nik.trim() === '') {
+      setError('NIK wajib diisi')
+      return
+    }
+
+    if (!/^\d{16}$/.test(formData.nik)) {
+      setError('NIK harus 16 digit angka')
+      return
+    }
+
+    // Validasi field wajib lainnya
+    if (!formData.name || formData.name.trim() === '') {
+      setError('Nama lengkap wajib diisi')
+      return
+    }
+
+    if (!formData.birthDate) {
+      setError('Tanggal lahir wajib diisi')
+      return
+    }
+
+    if (!recaptchaToken) {
+      setError('Verifikasi reCAPTCHA diperlukan')
+      return
+    }
+
     setLoading(true)
 
     try {
       console.log('Starting registration...', formData.email)
       await register(formData.email, formData.password, {
+        nik: formData.nik,
         name: formData.name,
-        phone: formData.phone,
+        phone: '',
         birthDate: formData.birthDate,
-        height: parseFloat(formData.height) || 0,
-        weight: parseFloat(formData.weight) || 0,
-        targetWeight: parseFloat(formData.targetWeight) || 0,
+        height: 0,
+        weight: 0,
+        targetWeight: 0,
         gender: 'Laki-laki', // Default, bisa diedit nanti
         rt: formData.rt,
         rw: formData.rw,
         kelurahan: formData.kelurahan
       })
       console.log('Registration successful!')
+      recaptchaRef.current?.reset()
+      setRecaptchaToken(null)
       router.push('/')
     } catch (err: any) {
+      recaptchaRef.current?.reset()
+      setRecaptchaToken(null)
       console.error('Registration error:', err)
       console.error('Error code:', err.code)
       console.error('Error message:', err.message)
@@ -76,6 +110,8 @@ export default function RegisterPage() {
         errorMessage = 'Format email tidak valid.'
       } else if (err.code === 'auth/weak-password') {
         errorMessage = 'Password terlalu lemah. Minimal 6 karakter.'
+      } else if (err.message && err.message.includes('NIK')) {
+        errorMessage = err.message
       } else if (err.code === 'auth/network-request-failed') {
         errorMessage = 'Koneksi internet bermasalah. Periksa koneksi Anda.'
       } else if (err.code === 'permission-denied') {
@@ -85,6 +121,20 @@ export default function RegisterPage() {
       }
       
       setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleRegister = async () => {
+    setError('')
+    setLoading(true)
+
+    try {
+      await loginWithGoogle()
+      router.push('/')
+    } catch (err: any) {
+      setError(err.message || 'Pendaftaran dengan Google gagal.')
     } finally {
       setLoading(false)
     }
@@ -167,6 +217,24 @@ export default function RegisterPage() {
               
               <div className="space-y-3">
                 <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">NIK (16 digit)</label>
+                  <div className="relative">
+                    <Badge className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.nik}
+                      onChange={(e) => handleChange('nik', e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      placeholder="Masukkan 16 digit NIK"
+                      required
+                      maxLength={16}
+                      pattern="[0-9]{16}"
+                      title="NIK harus 16 digit angka"
+                    />
+                  </div>
+                </div>
+
+                <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nama Lengkap</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -181,82 +249,22 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">No. HP</label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => handleChange('phone', e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        placeholder="0812xxxx"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tanggal Lahir</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="date"
-                        value={formData.birthDate}
-                        onChange={(e) => handleChange('birthDate', e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        required
-                        aria-label="Pilih tanggal lahir"
-                        title="Pilih tanggal lahir"
-                      />
-                    </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Tanggal Lahir</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="date"
+                      value={formData.birthDate}
+                      onChange={(e) => handleChange('birthDate', e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      required
+                      aria-label="Pilih tanggal lahir"
+                      title="Pilih tanggal lahir"
+                    />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tinggi (cm)</label>
-                    <div className="relative">
-                      <Ruler className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={formData.height}
-                        onChange={(e) => handleChange('height', e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        placeholder="170"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Berat (kg)</label>
-                    <div className="relative">
-                      <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={formData.weight}
-                        onChange={(e) => handleChange('weight', e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        placeholder="65"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Target (kg)</label>
-                    <div className="relative">
-                      <Target className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={formData.targetWeight}
-                        onChange={(e) => handleChange('targetWeight', e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        placeholder="60"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -304,10 +312,21 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* reCAPTCHA */}
+            <div className="flex justify-center py-2">
+              <ReCAPTCHA
+                ref={recaptchaRef}
+                sitekey={RECAPTCHA_SITE_KEY}
+                onChange={(token) => setRecaptchaToken(token)}
+                onExpired={() => setRecaptchaToken(null)}
+                size="compact"
+              />
+            </div>
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-medium rounded-xl hover:from-teal-600 hover:to-cyan-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-6"
+              disabled={loading || !recaptchaToken}
+              className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-medium rounded-xl hover:from-teal-600 hover:to-cyan-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -319,6 +338,44 @@ export default function RegisterPage() {
               )}
             </button>
           </form>
+
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-gray-500">atau</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleRegister}
+              disabled={loading}
+              className="mt-4 w-full py-3 border border-gray-200 rounded-xl flex items-center justify-center gap-3 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                />
+              </svg>
+              <span className="text-gray-700 font-medium">Daftar dengan Google</span>
+            </button>
+          </div>
 
           <div className="mt-4 text-center">
             <p className="text-gray-500 text-sm">

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import BackButton from '@/components/BackButton'
-import { Play, Pause, Volume2, VolumeX, Maximize2, Clock, FileVideo } from 'lucide-react'
+import Link from 'next/link'
+import { Play, Pause, Volume2, VolumeX, Maximize2, Clock, FileVideo, ArrowLeft } from 'lucide-react'
 
 // Data video WhatsApp yang tersedia
 const videosData = [
@@ -123,7 +123,9 @@ export default function VideoEdukasi() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-nav">
-      <BackButton />
+      <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+        <ArrowLeft className="w-6 h-6" />
+      </Link>
       
       <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6">
         {/* Header */}
@@ -370,8 +372,8 @@ export default function VideoEdukasi() {
                 Gunakan fitur aplikasi untuk memantau kesehatan Anda secara rutin.
               </p>
               <div className="space-y-2">
-                <a 
-                  href="/catat-kesehatan" 
+                <a
+                  href="/Fasca"
                   className="block w-full py-2.5 px-4 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-medium text-center transition-colors"
                 >
                   Catat Kesehatan

@@ -1,8 +1,8 @@
 'use client'
 
 import { useGlobalAudio, availableTracks } from '@/contexts/GlobalAudioContext'
-import BackButton from '@/components/BackButton'
-import { Music, Play, Pause, Volume2, VolumeX, Headphones } from 'lucide-react'
+import Link from 'next/link'
+import { Music, Play, Pause, Volume2, VolumeX, Headphones, ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 
 export default function MusikRelaksasi() {
@@ -38,7 +38,9 @@ export default function MusikRelaksasi() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-nav">
-      <BackButton />
+      <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+        <ArrowLeft className="w-6 h-6" />
+      </Link>
       
       <div className="mobile-container py-4 sm:py-6">
         {/* Header */}

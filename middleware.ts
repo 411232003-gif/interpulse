@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public paths yang tidak perlu login
-  const publicPaths = ['/login', '/register', '/_next', '/favicon.ico', '/logo-app.png', '/manifest.json', '/sw.js', '/icons', '/video']
+  const publicPaths = ['/login', '/register', '/complete-profile', '/_next', '/favicon.ico', '/logo-app.png', '/manifest.json', '/sw.js', '/icons', '/video']
   
   // Cek kalau path saat ini adalah public path
   const isPublicPath = publicPaths.some(path => 
