@@ -240,6 +240,38 @@ export default function PosbinduMonitoring() {
     return () => unsubscribe()
   }, [])
 
+  // Auto-cleanup: Hapus data monitoring pribadi yang lebih dari 7 hari
+  useEffect(() => {
+    const cleanupOldPribadiData = async () => {
+      try {
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        
+        const oldPribadiQuery = query(
+          collection(db, 'healthReadings'),
+          where('source', '==', 'pribadi'),
+          where('timestamp', '<', sevenDaysAgo.toISOString())
+        )
+        
+        const snapshot = await getDocs(oldPribadiQuery)
+        const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref))
+        await Promise.all(deletePromises)
+        
+        if (deletePromises.length > 0) {
+          console.log(`Cleaned up ${deletePromises.length} old pribadi records from monitoring`)
+        }
+      } catch (error) {
+        console.error('Error cleaning up old pribadi data:', error)
+      }
+    }
+    
+    // Run cleanup on mount and every hour
+    cleanupOldPribadiData()
+    const interval = setInterval(cleanupOldPribadiData, 60 * 60 * 1000) // 1 hour
+    
+    return () => clearInterval(interval)
+  }, [])
+
   // CRUD functions
   const handleAddResident = async (e: React.FormEvent) => {
     e.preventDefault()
