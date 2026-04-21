@@ -122,6 +122,18 @@ export default function PosbinduMonitoring() {
   // Health data edit modal state
   const [isHealthEditModalOpen, setIsHealthEditModalOpen] = useState(false)
   const [editingHealth, setEditingHealth] = useState<any>(null)
+
+  // Attendance edit modal state
+  const [isAttendanceEditModalOpen, setIsAttendanceEditModalOpen] = useState(false)
+  const [editingAttendance, setEditingAttendance] = useState<any>(null)
+  const [attendanceForm, setAttendanceForm] = useState({
+    nama: '',
+    nik: '',
+    umur: '',
+    rt: '',
+    rw: '',
+    alamat: ''
+  })
   const [healthEditForm, setHealthEditForm] = useState({
     type: 'tensi',
     userName: '',
@@ -386,6 +398,53 @@ export default function PosbinduMonitoring() {
     } catch (error) {
       console.error('Error deleting health reading:', error)
       alert('Gagal menghapus data kesehatan')
+    }
+  }
+
+  // Attendance CRUD functions
+  const handleDeleteAttendance = async (id: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus data absensi ini?')) return
+    try {
+      await deleteDoc(doc(db, 'attendance', id))
+      alert('Data absensi berhasil dihapus')
+    } catch (error) {
+      console.error('Error deleting attendance:', error)
+      alert('Gagal menghapus data absensi')
+    }
+  }
+
+  const openAttendanceEditModal = (attendance: any) => {
+    setEditingAttendance(attendance)
+    setAttendanceForm({
+      nama: attendance.nama || '',
+      nik: attendance.nik || '',
+      umur: attendance.umur?.toString() || '',
+      rt: attendance.rt || '',
+      rw: attendance.rw || '',
+      alamat: attendance.alamat || ''
+    })
+    setIsAttendanceEditModalOpen(true)
+  }
+
+  const handleEditAttendance = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingAttendance) return
+    try {
+      const updatedAttendance = {
+        nama: attendanceForm.nama,
+        nik: attendanceForm.nik,
+        umur: parseInt(attendanceForm.umur) || 0,
+        rt: attendanceForm.rt,
+        rw: attendanceForm.rw,
+        alamat: attendanceForm.alamat
+      }
+      await updateDoc(doc(db, 'attendance', editingAttendance.id), updatedAttendance)
+      setIsAttendanceEditModalOpen(false)
+      setEditingAttendance(null)
+      alert('Data absensi berhasil diperbarui')
+    } catch (error) {
+      console.error('Error updating attendance:', error)
+      alert('Gagal memperbarui data absensi')
     }
   }
 
@@ -1147,6 +1206,7 @@ export default function PosbinduMonitoring() {
                           <th className="px-4 py-3 text-center font-medium text-gray-700">RT/RW</th>
                           <th className="px-4 py-3 text-left font-medium text-gray-700">Tanggal</th>
                           <th className="px-4 py-3 text-left font-medium text-gray-700">Waktu</th>
+                          <th className="px-4 py-3 text-center font-medium text-gray-700">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -1179,6 +1239,28 @@ export default function PosbinduMonitoring() {
                             </td>
                             <td className="px-4 py-3 text-gray-600">{item.date || '-'}</td>
                             <td className="px-4 py-3 text-gray-600">{item.time || '-'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => openAttendanceEditModal(item)}
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                  title="Edit"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteAttendance(item.id)}
+                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Hapus"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                           ))
                         })()}
@@ -2033,6 +2115,124 @@ export default function PosbinduMonitoring() {
                   <button
                     type="button"
                     onClick={() => setIsHealthEditModalOpen(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Simpan Perubahan
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Form for Edit Attendance */}
+      {isAttendanceEditModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-800">Edit Data Absensi</h3>
+                <button
+                  onClick={() => setIsAttendanceEditModalOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Tutup modal"
+                  aria-label="Tutup modal"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              <form onSubmit={handleEditAttendance} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nama *</label>
+                  <input
+                    type="text"
+                    required
+                    value={attendanceForm.nama}
+                    onChange={(e) => setAttendanceForm({ ...attendanceForm, nama: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Masukkan nama"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">NIK</label>
+                    <input
+                      type="text"
+                      value={attendanceForm.nik}
+                      onChange={(e) => setAttendanceForm({ ...attendanceForm, nik: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Masukkan NIK"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Umur</label>
+                    <input
+                      type="number"
+                      value={attendanceForm.umur}
+                      onChange={(e) => setAttendanceForm({ ...attendanceForm, umur: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Umur"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">RT *</label>
+                    <select
+                      required
+                      value={attendanceForm.rt}
+                      onChange={(e) => setAttendanceForm({ ...attendanceForm, rt: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      title="Pilih RT"
+                    >
+                      <option value="">Pilih RT</option>
+                      {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rt => (
+                        <option key={rt} value={rt}>RT {rt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">RW *</label>
+                    <select
+                      required
+                      value={attendanceForm.rw}
+                      onChange={(e) => setAttendanceForm({ ...attendanceForm, rw: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      title="Pilih RW"
+                    >
+                      <option value="">Pilih RW</option>
+                      {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rw => (
+                        <option key={rw} value={rw}>RW {rw}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
+                  <input
+                    type="text"
+                    value={attendanceForm.alamat}
+                    onChange={(e) => setAttendanceForm({ ...attendanceForm, alamat: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Masukkan alamat"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsAttendanceEditModalOpen(false)}
                     className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                   >
                     Batal
