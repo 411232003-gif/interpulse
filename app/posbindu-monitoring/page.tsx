@@ -1143,7 +1143,7 @@ export default function PosbinduMonitoring() {
                       </div>
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                         <button
-                          onClick={() => openHealthEditModal(reading)}
+                          onClick={() => openEditHealthModal(reading)}
                           className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Edit"
                         >
