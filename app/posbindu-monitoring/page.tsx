@@ -1106,7 +1106,7 @@ export default function PosbinduMonitoring() {
               {/* Health Readings List */}
               <div className="space-y-3">
                 {healthReadings
-                  .filter(reading => reading.type === activeHealthTab)
+                  .filter(reading => reading.type === activeHealthTab && reading.source === 'posbindu')
                   .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
                   .map((reading) => (
                     <div key={reading.id} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
@@ -1161,7 +1161,7 @@ export default function PosbinduMonitoring() {
                       </div>
                     </div>
                   ))}
-                {healthReadings.filter(reading => reading.type === activeHealthTab).length === 0 && (
+                {healthReadings.filter(reading => reading.type === activeHealthTab && reading.source === 'posbindu').length === 0 && (
                   <p className="text-center text-gray-500 py-8">Belum ada data {activeHealthTab}</p>
                 )}
               </div>

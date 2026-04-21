@@ -918,11 +918,11 @@ export default function RiwayatKesehatan() {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl font-bold text-gray-800">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xl font-bold text-gray-800 break-words">
                             {displayValue}
                           </span>
-                          <span className={`px-2 py-0.5 ${status.bgColor} ${status.color} rounded-full text-xs font-medium`}>
+                          <span className={`px-2 py-0.5 ${status.bgColor} ${status.color} rounded-full text-xs font-medium whitespace-nowrap`}>
                             {status.label}
                           </span>
                         </div>
