@@ -1,7 +1,7 @@
 {
   "/login/page": "app/login/page.js",
-  "/tips/page": "app/tips/page.js",
-  "/riwayat-tensi/page": "app/riwayat-tensi/page.js",
   "/profil/page": "app/profil/page.js",
-  "/posbindu-monitoring/page": "app/posbindu-monitoring/page.js"
+  "/posbindu-monitoring/page": "app/posbindu-monitoring/page.js",
+  "/tips/page": "app/tips/page.js",
+  "/riwayat-tensi/page": "app/riwayat-tensi/page.js"
 }
