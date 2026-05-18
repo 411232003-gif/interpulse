@@ -10,43 +10,27 @@ const videosData = [
     id: 1,
     title: 'Manfaat Daun Salam',
     description: 'Menurunkan Gula Darah, Menjaga Kesehatan Pencernaan, Menurunkan Kolesterol',
-    src: '/video/WhatsApp%20Video%202026-04-02%20at%2022.52.13.mp4',
+    src: '/video/daun-salam.mp4',
     duration: '10:00',
-    content: `1. Daun Salam
+    content: `Video ini menjelaskan berbagai manfaat daun salam untuk kesehatan:
+
 • Menurunkan Gula Darah: Membantu meningkatkan sensitivitas insulin, sehingga baik dikonsumsi penderita diabetes.
 • Menjaga Kesehatan Pencernaan: Kandungan enzim di dalamnya membantu melancarkan proses pencernaan dan mengurangi gejala perut kembung.
 • Menurunkan Kolesterol: Membantu menurunkan kadar kolesterol jahat (LDL) dan trigliserida dalam darah.`,
   },
   {
     id: 2,
-    title: '6 Bahan Alami untuk Kesehatan',
+    title: 'Bahan Alami untuk Kesehatan',
     description: 'Kunyit, Cengkeh, Daun Mint, Minyak Wijen, dan Air Garam',
-    src: '/video/WhatsApp%20Video%202026-04-02%20at%2022.52.27.mp4',
+    src: '/video/bahan-alami.mp4',
     duration: '10:00',
-    content: `2. Kunyit
-• Anti-inflamasi Alami: Kandungan kurkumin yang tinggi sangat efektif meredakan peradangan di dalam tubuh.
-• Meningkatkan Imunitas: Memiliki sifat antioksidan dan imunomodulator yang memperkuat daya tahan tubuh terhadap penyakit.
-• Menjaga Kesehatan Lambung: Membantu mengatasi masalah pencernaan seperti maag dan gejala dispepsia lainnya.
+    content: `Video ini menjelaskan manfaat 6 bahan alami untuk kesehatan:
 
-3. Cengkeh
-• Meredakan Sakit Gigi: Senyawa eugenol di dalamnya berfungsi sebagai anestesi alami dan antiseptik untuk mengatasi nyeri gigi.
-• Melawan Infeksi: Memiliki sifat antibakteri dan antivirus yang kuat untuk membantu melawan berbagai jenis infeksi.
-• Meredakan Gangguan Pernapasan: Membantu mengencerkan lendir dan melegakan tenggorokan saat batuk atau pilek.
-
-4. Daun Mint
-• Melegakan Saluran Napas: Kandungan mentol memberikan sensasi dingin yang membantu membuka saluran napas saat tersumbat.
-• Mengatasi Mual: Aroma dan sifat alaminya efektif meredakan rasa mual atau pusing, termasuk motion sickness.
-• Meningkatkan Fokus: Menghirup aromanya dapat membantu meningkatkan kewaspadaan dan mengurangi rasa lelah mental.
-
-5. Minyak Wijen
-• Menjaga Kesehatan Jantung: Kaya akan lemak tak jenuh (asam oleat dan linoleat) yang baik untuk menurunkan risiko penyakit kardiovaskular.
-• Perawatan Kulit: Bersifat melembapkan dan mengandung antioksidan yang baik untuk menutrisi kulit serta melindunginya dari radikal bebas.
-• Menjaga Kesehatan Tulang: Mengandung kalsium dan seng yang penting untuk mempertahankan kepadatan dan kekuatan tulang.
-
-6. Air Garam
-• Pembersih Tenggorokan: Berkumur dengan air garam dapat membantu meredakan sakit tenggorokan dan membunuh bakteri di area mulut.
-• Mempercepat Penyembuhan Luka: Larutan air garam steril dapat digunakan untuk membersihkan luka kecil agar tidak terinfeksi.
-• Mengatasi Masalah Gusi: Efektif mengurangi peradangan gusi dan menjaga kesehatan jaringan mulut secara umum.`,
+• Kunyit: Anti-inflamasi alami dengan kandungan kurkumin, meningkatkan imunitas, dan menjaga kesehatan lambung.
+• Cengkeh: Meredakan sakit gigi dengan eugenol, melawan infeksi antibakteri, dan meredakan gangguan pernapasan.
+• Daun Mint: Melegakan saluran napas dengan mentol, mengatasi mual, dan meningkatkan fokus.
+• Minyak Wijen: Menjaga kesehatan jantung dengan lemak tak jenuh, perawatan kulit, dan kesehatan tulang.
+• Air Garam: Pembersih tenggorokan, mempercepat penyembuhan luka, dan mengatasi masalah gusi.`,
   },
 ]
 
