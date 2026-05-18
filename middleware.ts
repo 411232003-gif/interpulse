@@ -24,7 +24,7 @@ export function middleware(request: NextRequest) {
 
   // Add CSP headers to allow reCAPTCHA
   const response = NextResponse.next()
-  response.headers.set('Content-Security-Policy', "frame-src 'self' https://www.google.com https://www.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;")
+  response.headers.set('Content-Security-Policy', "frame-src 'self' https://www.google.com https://www.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://apis.google.com https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;")
 
   return response
 }
