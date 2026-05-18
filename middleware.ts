@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public paths yang tidak perlu login
-  const publicPaths = ['/login', '/register', '/complete-profile', '/_next', '/favicon.ico', '/logo-app.png', '/manifest.json', '/sw.js', '/icons', '/video']
+  const publicPaths = ['/', '/login', '/register', '/complete-profile', '/login-qr', '/_next', '/favicon.ico', '/logo-app.png', '/manifest.json', '/sw.js', '/icons', '/video']
   
   // Cek kalau path saat ini adalah public path
   const isPublicPath = publicPaths.some(path => 
@@ -20,10 +20,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Kalau sudah login tapi masuk ke login/register, redirect ke home
-  if (authToken && (pathname === '/login' || pathname === '/register')) {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
+  // Biarkan user yang sudah login bisa akses login/register untuk scan QR code
 
   return NextResponse.next()
 }

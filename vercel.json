@@ -1,0 +1,4 @@
+{
+  "buildCommand": "cp next.config.vercel.js next.config.js && next build",
+  "framework": "nextjs"
+}

@@ -5,13 +5,11 @@ import {
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  signInWithPopup,
   signOut,
   User as FirebaseUser,
   getIdToken,
   sendPasswordResetEmail
 } from 'firebase/auth'
-import { GoogleAuthProvider } from 'firebase/auth'
 import { doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore'
 import { auth, db } from './firebase'
 
@@ -49,7 +47,6 @@ interface AuthContextType {
   loading: boolean
   isAdmin: boolean
   login: (email: string, password: string) => Promise<void>
-  loginWithGoogle: () => Promise<void>
   register: (email: string, password: string, profile: Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>) => Promise<void>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -142,36 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, email)
   }
 
-  const loginWithGoogle = async () => {
-    const provider = new GoogleAuthProvider()
-    const result = await signInWithPopup(auth, provider)
-    
-    // Check if user profile exists in Firestore
-    const profileDoc = await getDoc(doc(db, 'users', result.user.uid))
-    if (!profileDoc.exists()) {
-      // Don't auto-create profile - user must complete registration first
-      // The app will check for incomplete profile and redirect to completion page
-      const userProfileData: UserProfile = {
-        uid: result.user.uid,
-        email: result.user.email!,
-        nik: '', // Must be filled by user
-        name: result.user.displayName || 'User',
-        phone: '',
-        birthDate: '',
-        height: 0,
-        weight: 0,
-        targetWeight: 0,
-        gender: 'Laki-laki',
-        rt: '',
-        rw: '',
-        kelurahan: '',
-        role: 'user',
-        createdAt: new Date().toISOString()
-      }
-      await setDoc(doc(db, 'users', result.user.uid), userProfileData)
-    }
-  }
-
   const register = async (
     email: string, 
     password: string, 
@@ -241,8 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userProfile, 
       loading, 
       isAdmin,
-      login, 
-      loginWithGoogle,
+      login,
       register, 
       logout,
       refreshProfile,
