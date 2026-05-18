@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   // reCAPTCHA site key - untuk production, ganti dengan key Anda sendiri dari https://www.google.com/recaptcha/admin
   // Key test ini hanya untuk development
-  const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'
+  const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeCjvAsAAAAJimjdrQXBU97Anx8_cM54rBkONg'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
