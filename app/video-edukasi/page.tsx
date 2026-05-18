@@ -9,28 +9,61 @@ const videosData = [
   {
     id: 1,
     title: 'Manfaat Daun Salam',
-    description: 'Menurunkan Gula Darah, Menjaga Kesehatan Pencernaan, Menurunkan Kolesterol',
+    description: 'Cengkih, Kunyit, Daun Mint, Minyak Wijen, dan Air Garam',
     src: '/video/daun-salam.mp4',
     duration: '10:00',
-    content: `Video ini menjelaskan berbagai manfaat daun salam untuk kesehatan:
+    content: `Video ini menjelaskan manfaat 5 bahan alami untuk kesehatan:
 
-• Menurunkan Gula Darah: Membantu meningkatkan sensitivitas insulin, sehingga baik dikonsumsi penderita diabetes.
-• Menjaga Kesehatan Pencernaan: Kandungan enzim di dalamnya membantu melancarkan proses pencernaan dan mengurangi gejala perut kembung.
-• Menurunkan Kolesterol: Membantu menurunkan kadar kolesterol jahat (LDL) dan trigliserida dalam darah.`,
+1. Cengkih (Antibakteri & Pereda Nyeri)
+Manfaat Utama: Mengandung eugenol yang berfungsi sebagai anestesi (mati rasa) alami untuk meredakan sakit gigi atau gusi bengkak.
+
+Fungsi: Membunuh bakteri penyebab bau mulut dan infeksi tenggorokan.
+
+2. Kunyit (Antiradang & Penyembuh Luka)
+Manfaat Utama: Kaya akan kurkumin yang memiliki sifat anti-inflamasi (antiradang) dan antioksidan yang sangat kuat.
+
+Fungsi: Mempercepat penyembuhan sariawan, meredakan radang tenggorokan, dan mengurangi pembengkakan pada gusi.
+
+3. Daun Mint (Penyegar & Penyejuk)
+Manfaat Utama: Mengandung menthol yang memberikan efek sensasi dingin dan segar.
+
+Fungsi: Melegakan saluran pernapasan, mengurangi rasa tidak nyaman di tenggorokan, dan memberikan aroma napas yang segar secara instan.
+
+4. Minyak Wijen (Pembersih Toksin / Oil Pulling)
+Manfaat Utama: Dalam tradisi kesehatan kuno, minyak wijen sering digunakan untuk teknik oil pulling (berkumur dengan minyak).
+
+Fungsi: Menarik keluar bakteri dan plak yang menempel di sela-sela gigi, memperkuat gusi, serta melembapkan jaringan mulut yang kering.
+
+5. Air Garam (Antiseptik Alami & Penarik Cairan)
+Manfaat Utama: Larutan garam bersifat osmotik (menarik cairan).
+
+Fungsi: Mengurangi pembengkakan pada jaringan tenggorokan atau gusi dengan cara menarik keluar cairan berlebih, sekaligus menciptakan lingkungan yang tidak ramah bagi bakteri untuk berkembang biak.`,
   },
   {
     id: 2,
     title: 'Bahan Alami untuk Kesehatan',
-    description: 'Kunyit, Cengkeh, Daun Mint, Minyak Wijen, dan Air Garam',
+    description: 'Menurunkan Gula Darah, Menurunkan Kolesterol, Pencernaan, Peradangan',
     src: '/video/bahan-alami.mp4',
     duration: '10:00',
-    content: `Video ini menjelaskan manfaat 6 bahan alami untuk kesehatan:
+    content: `Video ini menjelaskan manfaat daun salam untuk kesehatan:
 
-• Kunyit: Anti-inflamasi alami dengan kandungan kurkumin, meningkatkan imunitas, dan menjaga kesehatan lambung.
-• Cengkeh: Meredakan sakit gigi dengan eugenol, melawan infeksi antibakteri, dan meredakan gangguan pernapasan.
-• Daun Mint: Melegakan saluran napas dengan mentol, mengatasi mual, dan meningkatkan fokus.
-• Minyak Wijen: Menjaga kesehatan jantung dengan lemak tak jenuh, perawatan kulit, dan kesehatan tulang.
-• Air Garam: Pembersih tenggorokan, mempercepat penyembuhan luka, dan mengatasi masalah gusi.`,
+1. Menurunkan dan Mengontrol Gula Darah
+Ini adalah salah satu manfaat daun salam yang paling terkenal. Penelitian menunjukkan bahwa kandungan antioksidan dalam daun salam dapat membantu meningkatkan fungsi insulin, sehingga tubuh lebih efektif dalam memproses gula darah. Daun salam sangat baik dikonsumsi (dalam bentuk air rebusan) oleh penderita diabetes tipe 2.
+
+2. Menurunkan Kolesterol dan Menjaga Kesehatan Jantung
+Daun salam mengandung senyawa rutin dan asam kafeat. Kedua senyawa ini dapat memperkuat dinding kapiler jantung dan membantu menurunkan kadar kolesterol jahat (LDL) serta trigliserida dalam darah. Hal ini berkontribusi besar dalam mencegah risiko serangan jantung dan stroke.
+
+3. Mengatasi Gangguan Pencernaan
+Jika Anda sering mengalami masalah perut kembung, begah, atau diare, daun salam bisa menjadi solusinya. Senyawa organik di dalamnya dapat membantu meredakan sakit perut, memperlancar proses pencernaan, dan mengurangi toksin di dalam saluran pencernaan.
+
+4. Meredakan Peradangan dan Nyeri (Asam Urat/Rematik)
+Daun salam memiliki sifat anti-inflamasi (antiradang) yang kuat berkat kandungan parthenolide. Air rebusan daun salam sering digunakan dalam pengobatan tradisional untuk meredakan nyeri sendi akibat asam urat, rematik, atau cedera otot.
+
+5. Meningkatkan Sistem Kekebalan Tubuh
+Daun salam kaya akan vitamin C, vitamin A, dan zat besi. Kombinasi nutrisi ini, bersama dengan sifat antibakteri yang dimilikinya, membantu memperkuat sistem imun tubuh dalam melawan infeksi bakteri dan virus penyebab penyakit (seperti flu dan batuk).
+
+6. Membantu Menurunkan Berat Badan
+Bagi yang sedang menjalani program diet, air rebusan daun salam dapat membantu mempercepat metabolisme tubuh dan membakar lemak. Selain itu, daun salam juga memberikan efek kenyang lebih lama sehingga membantu mengontrol nafsu makan.`,
   },
 ]
 
