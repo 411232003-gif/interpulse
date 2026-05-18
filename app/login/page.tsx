@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
   const recaptchaRef = useRef<ReCAPTCHA>(null)
   const router = useRouter()
-  const { login, loginWithGoogle, resetPassword } = useAuth()
+  const { login, resetPassword } = useAuth()
 
   // reCAPTCHA site key - untuk production, ganti dengan key Anda sendiri dari https://www.google.com/recaptcha/admin
   // Key test ini hanya untuk development
