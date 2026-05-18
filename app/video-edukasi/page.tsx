@@ -8,9 +8,9 @@ import { Play, Pause, Volume2, VolumeX, Maximize2, Clock, FileVideo, ArrowLeft }
 const videosData = [
   {
     id: 1,
-    title: 'Manfaat Daun Salam',
+    title: 'Bahan Alami untuk Kesehatan',
     description: 'Cengkih, Kunyit, Daun Mint, Minyak Wijen, dan Air Garam',
-    src: '/video/daun-salam.mp4',
+    src: '/video/bahan-alami.mp4',
     duration: '10:00',
     content: `Video ini menjelaskan manfaat 5 bahan alami untuk kesehatan:
 
@@ -41,9 +41,9 @@ Fungsi: Mengurangi pembengkakan pada jaringan tenggorokan atau gusi dengan cara 
   },
   {
     id: 2,
-    title: 'Bahan Alami untuk Kesehatan',
+    title: 'Manfaat Daun Salam',
     description: 'Menurunkan Gula Darah, Menurunkan Kolesterol, Pencernaan, Peradangan',
-    src: '/video/bahan-alami.mp4',
+    src: '/video/daun-salam.mp4',
     duration: '10:00',
     content: `Video ini menjelaskan manfaat daun salam untuk kesehatan:
 
