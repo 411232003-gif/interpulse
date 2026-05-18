@@ -22,11 +22,7 @@ export function middleware(request: NextRequest) {
 
   // Biarkan user yang sudah login bisa akses login/register untuk scan QR code
 
-  // Add CSP headers to allow reCAPTCHA
-  const response = NextResponse.next()
-  response.headers.set('Content-Security-Policy', "frame-src 'self' https://www.google.com https://www.gstatic.com https://vercel.live https://*.firebaseapp.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://apis.google.com https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;")
-
-  return response
+  return NextResponse.next()
 }
 
 export const config = {
