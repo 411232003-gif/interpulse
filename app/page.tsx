@@ -85,8 +85,8 @@ export default function Home() {
     )
   }
 
-  // Admin feature cards
-  const adminCards = [
+  // Admin feature cards - Top row
+  const adminTopCards = [
     {
       title: 'Data Warga',
       description: 'Kelola data warga dan riwayat kesehatan',
@@ -95,6 +95,18 @@ export default function Home() {
       gradient: 'from-blue-500 to-cyan-500',
       bgColor: 'bg-blue-50'
     },
+    {
+      title: 'Input Kesehatan',
+      description: 'Catat hasil pemeriksaan kesehatan',
+      href: '/Fasca',
+      icon: Heart,
+      gradient: 'from-red-500 to-orange-500',
+      bgColor: 'bg-red-50'
+    }
+  ]
+
+  // Admin feature cards - Bottom row
+  const adminBottomCards = [
     {
       title: 'Monitoring',
       description: 'Pantau data kesehatan warga',
@@ -148,7 +160,7 @@ export default function Home() {
     }] : [])
   ]
 
-  const featureCards = isAdmin ? adminCards : userCards
+  const featureCards = isAdmin ? [...adminTopCards, ...adminBottomCards] : userCards
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-24">

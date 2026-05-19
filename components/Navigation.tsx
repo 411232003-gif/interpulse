@@ -7,10 +7,11 @@ import { Home, User, Activity, Heart, Flame, Music, History, PlayCircle, Grid3x3
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 
-// Admin nav: Beranda + Fasca + Profil
+// Admin nav: Beranda + Monitoring + Partisipasi + Profil
 const adminNavItems = [
   { href: '/', label: 'Beranda', icon: Home },
-  { href: '/Fasca', label: 'Fasca', icon: Activity },
+  { href: '/monitoring', label: 'Monitoring', icon: Activity },
+  { href: '/partisipasi', label: 'Partisipasi', icon: Grid3x3 },
   { href: '/profil', label: 'Profil', icon: User },
 ]
 
