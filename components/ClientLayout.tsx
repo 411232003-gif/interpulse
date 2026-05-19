@@ -7,7 +7,10 @@ import MiniPlayer from '@/components/MiniPlayer'
 import { GlobalAudioProvider } from '@/contexts/GlobalAudioContext'
 import { useAuth } from '@/lib/auth-context'
 
-const publicRoutes = ['/login', '/register', '/complete-profile']
+const publicRoutes = [
+  '/login', '/register', '/complete-profile',
+  '/', '/video-edukasi', '/Fasca', '/kalori-tracker', '/deteksi-jantung', '/musik-relaksasi', '/sehat-sentosa', '/monitoring', '/partisipasi'
+]
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, userProfile, loading } = useAuth()
