@@ -485,34 +485,48 @@ export default function CatatKesehatan() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {(Object.keys(healthConfig) as HealthType[]).map((type) => (
-              <button
-                key={type}
-                onClick={() => { 
-                  setHealthType(type); 
-                  setStep('input'); 
-                  setInputIndex(0); 
-                  setCurrentInput('');
-                  // Pre-fill data if exists for today
-                  const existingReading = todayReadingsForResident.find(r => r.type === type)
-                  if (existingReading) {
-                    const config = healthConfig[type]
-                    const prefilledData: Record<string, string> = {}
-                    config.fields.forEach((field) => {
-                      prefilledData[field.key] = existingReading[field.key] || ''
-                    })
-                    setData(prefilledData)
-                    setInputIndex(config.fields.length - 1)
-                  } else {
-                    setData({})
-                  }
-                }}
-                className={`p-4 rounded-xl bg-gradient-to-br ${healthConfig[type].color} text-white shadow-lg active:scale-95 transition-all text-left`}
-              >
-                <span className="text-3xl mb-2 block">{healthConfig[type].icon}</span>
-                <h3 className="font-bold">{healthConfig[type].title}</h3>
-              </button>
-            ))}
+            {(Object.keys(healthConfig) as HealthType[]).map((type) => {
+              const existingReading = todayReadingsForResident.find(r => r.type === type)
+              return (
+                <button
+                  key={type}
+                  onClick={() => { 
+                    setHealthType(type); 
+                    setStep('input'); 
+                    setInputIndex(0); 
+                    setCurrentInput('');
+                    // Pre-fill data if exists for today
+                    if (existingReading) {
+                      const config = healthConfig[type]
+                      const prefilledData: Record<string, string> = {}
+                      config.fields.forEach((field) => {
+                        prefilledData[field.key] = existingReading[field.key] || ''
+                      })
+                      setData(prefilledData)
+                      setInputIndex(config.fields.length - 1)
+                    } else {
+                      setData({})
+                    }
+                  }}
+                  className={`p-4 rounded-xl bg-gradient-to-br ${healthConfig[type].color} text-white shadow-lg active:scale-95 transition-all text-left`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-3xl">{healthConfig[type].icon}</span>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-sm">{healthConfig[type].title}</h3>
+                      {existingReading && (
+                        <p className="text-xs mt-1 opacity-90">
+                          {type === 'tensi' && `${existingReading.sistolik}/${existingReading.diastolik} mmHg`}
+                          {type === 'kolesterol' && `${existingReading.total} mg/dL`}
+                          {type === 'asamurat' && `${existingReading.nilai} mg/dL`}
+                          {type === 'guladarah' && `${existingReading.nilai} mg/dL`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
 
           {todayReadingsForResident.length > 0 && (
