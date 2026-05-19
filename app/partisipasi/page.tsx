@@ -271,7 +271,7 @@ export default function PartisipasiPage() {
             <Users className="w-4 h-4 text-green-600" />
             Partisipasi per RW
           </h3>
-          {Object.entries(rwTargets).map(([rw, target]) => {
+          {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, target]) => {
             const hadir = elderlyAttendance[rw]?.[selectedMonth] || 0
             const pct = target > 0 ? Math.round((hadir / target) * 100) : 0
             const barColor = pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-500' : 'bg-red-500'
