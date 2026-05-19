@@ -28,10 +28,6 @@ interface Resident {
   rt: string
   umur: number
   jenisKelamin: 'L' | 'P'
-  tekananDarah: number
-  gulaDarah: number
-  kolesterol: number
-  asamUrat: number
   alamat: string
 }
 
@@ -65,10 +61,6 @@ export default function PosbinduMonitoring() {
     rt: '',
     umur: '',
     jenisKelamin: 'L',
-    tekananDarah: '',
-    gulaDarah: '',
-    kolesterol: '',
-    asamUrat: '',
     alamat: '',
   })
 
@@ -279,10 +271,6 @@ export default function PosbinduMonitoring() {
         rt: residentForm.rt,
         umur: parseInt(residentForm.umur),
         jenisKelamin: residentForm.jenisKelamin,
-        tekananDarah: parseFloat(residentForm.tekananDarah),
-        gulaDarah: parseInt(residentForm.gulaDarah),
-        kolesterol: parseInt(residentForm.kolesterol),
-        asamUrat: parseFloat(residentForm.asamUrat),
         alamat: residentForm.alamat,
       }
       await addDoc(collection(db, 'residents'), newResident)
@@ -306,10 +294,6 @@ export default function PosbinduMonitoring() {
         rt: residentForm.rt,
         umur: parseInt(residentForm.umur),
         jenisKelamin: residentForm.jenisKelamin,
-        tekananDarah: parseFloat(residentForm.tekananDarah),
-        gulaDarah: parseInt(residentForm.gulaDarah),
-        kolesterol: parseInt(residentForm.kolesterol),
-        asamUrat: parseFloat(residentForm.asamUrat),
         alamat: residentForm.alamat,
       }
       await updateDoc(doc(db, 'residents', editingResident.id), updatedResident)
@@ -349,10 +333,6 @@ export default function PosbinduMonitoring() {
       rt: resident.rt,
       umur: resident.umur.toString(),
       jenisKelamin: resident.jenisKelamin,
-      tekananDarah: resident.tekananDarah.toString(),
-      gulaDarah: resident.gulaDarah.toString(),
-      kolesterol: resident.kolesterol.toString(),
-      asamUrat: resident.asamUrat.toString(),
       alamat: resident.alamat,
     })
     setIsModalOpen(true)
@@ -547,10 +527,6 @@ export default function PosbinduMonitoring() {
       rt: '',
       umur: '',
       jenisKelamin: 'L',
-      tekananDarah: '',
-      gulaDarah: '',
-      kolesterol: '',
-      asamUrat: '',
       alamat: '',
     })
   }
@@ -575,28 +551,8 @@ export default function PosbinduMonitoring() {
     return true
   })
 
-  // Categorize health values
+  // Categorize health values (not used since health data removed from resident form)
   const getKategori = (value: number, type: 'gula' | 'kolesterol' | 'asamUrat' | 'tekananDarah') => {
-    if (type === 'gula') {
-      if (value > 160) return { label: 'Tinggi', color: 'bg-red-500' }
-      if (value > 140) return { label: 'Sedang', color: 'bg-yellow-500' }
-      return { label: 'Normal', color: 'bg-green-500' }
-    }
-    if (type === 'kolesterol') {
-      if (value > 240) return { label: 'Tinggi', color: 'bg-red-500' }
-      if (value > 200) return { label: 'Sedang', color: 'bg-yellow-500' }
-      return { label: 'Normal', color: 'bg-green-500' }
-    }
-    if (type === 'asamUrat') {
-      if (value > 7) return { label: 'Tinggi', color: 'bg-red-500' }
-      if (value > 6) return { label: 'Sedang', color: 'bg-yellow-500' }
-      return { label: 'Normal', color: 'bg-green-500' }
-    }
-    if (type === 'tekananDarah') {
-      if (value > 140/90) return { label: 'Tinggi', color: 'bg-red-500' }
-      if (value > 130/85) return { label: 'Sedang', color: 'bg-yellow-500' }
-      return { label: 'Normal', color: 'bg-green-500' }
-    }
     return { label: 'Normal', color: 'bg-green-500' }
   }
 
@@ -651,16 +607,12 @@ export default function PosbinduMonitoring() {
       `RW ${resident.rw} / RT ${resident.rt}`,
       `${resident.umur} th`,
       resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan',
-      `${resident.tekananDarah} mmHg`,
-      `${resident.gulaDarah} mg/dL`,
-      `${resident.kolesterol} mg/dL`,
-      `${resident.asamUrat} mg/dL`,
       resident.alamat
     ])
     
     autoTable(doc, {
       startY: 55,
-      head: [['Nama', 'NIK', 'RW/RT', 'Umur', 'Jenis Kelamin', 'Tensi', 'Gula', 'Kolesterol', 'Asam Urat', 'Alamat']],
+      head: [['Nama', 'NIK', 'RW/RT', 'Umur', 'Jenis Kelamin', 'Alamat']],
       body: tableData,
       styles: {
         fontSize: 8,
@@ -688,10 +640,6 @@ export default function PosbinduMonitoring() {
       'RT': resident.rt,
       'Umur (Tahun)': resident.umur,
       'Jenis Kelamin': resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan',
-      'Tekanan Darah (mmHg)': resident.tekananDarah,
-      'Gula Darah (mg/dL)': resident.gulaDarah,
-      'Kolesterol (mg/dL)': resident.kolesterol,
-      'Asam Urat (mg/dL)': resident.asamUrat,
       'Alamat': resident.alamat,
     }))
     
@@ -707,10 +655,6 @@ export default function PosbinduMonitoring() {
       { wch: 5 },  // RT
       { wch: 8 },  // Umur
       { wch: 12 }, // Jenis Kelamin
-      { wch: 12 }, // Tensi
-      { wch: 12 }, // Gula
-      { wch: 12 }, // Kolesterol
-      { wch: 12 }, // Asam Urat
       { wch: 30 }, // Alamat
     ]
     
@@ -721,8 +665,6 @@ export default function PosbinduMonitoring() {
   const exportToWhatsApp = () => {
     const total = filteredResidents.length
     const elderly = filteredResidents.filter(r => r.umur >= 60).length
-    const avgTensi = filteredResidents.reduce((sum, r) => sum + r.tekananDarah, 0) / total || 0
-    const avgGula = filteredResidents.reduce((sum, r) => sum + r.gulaDarah, 0) / total || 0
     
     let message = `📊 *DATA WARGA POSBINDU*\n`
     message += `🏥 Kelurahan Duris Selatan\n`
@@ -730,9 +672,7 @@ export default function PosbinduMonitoring() {
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
     message += `• Total Warga: ${total}\n`
-    message += `• Lansia (60+): ${elderly}\n`
-    message += `• Rata-rata Tensi: ${avgTensi.toFixed(0)} mmHg\n`
-    message += `• Rata-rata Gula: ${avgGula.toFixed(0)} mg/dL\n\n`
+    message += `• Lansia (60+): ${elderly}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📋 *DATA DETAIL*\n\n`
     
@@ -740,8 +680,7 @@ export default function PosbinduMonitoring() {
       message += `${index + 1}. ${resident.nama}\n`
       message += `   NIK: ${resident.nik}\n`
       message += `   RW/RT: ${resident.rw}/${resident.rt} | Umur: ${resident.umur} th\n`
-      message += `   Tensi: ${resident.tekananDarah} | Gula: ${resident.gulaDarah}\n`
-      message += `   Kolesterol: ${resident.kolesterol} | Asam Urat: ${resident.asamUrat}\n\n`
+      message += `   Alamat: ${resident.alamat}\n\n`
     })
     
     message += `━━━━━━━━━━━━━━━━━━━━\n`
@@ -1199,19 +1138,6 @@ export default function PosbinduMonitoring() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 mt-3">
-                    {[
-                      { label: 'Tensi', value: `${resident.tekananDarah}`, alert: resident.tekananDarah > 140 },
-                      { label: 'Gula', value: `${resident.gulaDarah}`, alert: resident.gulaDarah > 160 },
-                      { label: 'Kolesterol', value: `${resident.kolesterol}`, alert: resident.kolesterol > 240 },
-                      { label: 'Asam Urat', value: `${resident.asamUrat}`, alert: resident.asamUrat > 7 },
-                    ].map(item => (
-                      <div key={item.label} className={`rounded-lg p-2 text-center ${item.alert ? 'bg-red-50' : 'bg-gray-50'}`}>
-                        <p className="text-[9px] text-gray-500">{item.label}</p>
-                        <p className={`text-xs font-bold ${item.alert ? 'text-red-600' : 'text-gray-700'}`}>{item.value}</p>
-                      </div>
-                    ))}
                   </div>
                 </div>
               ))}
@@ -1901,7 +1827,7 @@ export default function PosbinduMonitoring() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-800">
-                  {editingResident ? 'Edit Data Warga' : 'Tambah Warga Baru'}
+                  {editingResident ? 'Tambah Data Warga' : 'Tambah Data Warga'}
                 </h3>
                 <button
                   onClick={() => setIsModalOpen(false)}
@@ -2013,60 +1939,7 @@ export default function PosbinduMonitoring() {
                   </div>
                 </div>
 
-                <div className="border-t border-gray-200 pt-4 mt-4">
-                  <h4 className="font-semibold text-gray-800 mb-4">Data Kesehatan</h4>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Tekanan Darah *</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        required
-                        value={residentForm.tekananDarah}
-                        onChange={(e) => setResidentForm({ ...residentForm, tekananDarah: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Contoh: 120/80"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Gula Darah (mg/dL) *</label>
-                      <input
-                        type="number"
-                        required
-                        value={residentForm.gulaDarah}
-                        onChange={(e) => setResidentForm({ ...residentForm, gulaDarah: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Contoh: 100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Kolesterol (mg/dL) *</label>
-                      <input
-                        type="number"
-                        required
-                        value={residentForm.kolesterol}
-                        onChange={(e) => setResidentForm({ ...residentForm, kolesterol: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Contoh: 200"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Asam Urat (mg/dL) *</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        required
-                        value={residentForm.asamUrat}
-                        onChange={(e) => setResidentForm({ ...residentForm, asamUrat: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Contoh: 6.0"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-3 pt-4 mt-4">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
