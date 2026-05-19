@@ -192,15 +192,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const loginWithNIK = async (userId: string, password: string) => {
-    // Query Firestore to find user with this email (user ID)
-    const emailQuery = query(collection(db, 'users'), where('email', '==', userId))
-    const snapshot = await getDocs(emailQuery)
-    if (snapshot.empty) {
-      throw new Error('User ID tidak ditemukan. Hubungi admin.')
-    }
-    const userData = snapshot.docs[0].data() as UserProfile
-    const email = userData.email
-    await signInWithEmailAndPassword(auth, email, password)
+    // Use userId directly as email (like original email login)
+    await signInWithEmailAndPassword(auth, userId, password)
   }
 
   const createUserByAdmin = async (
@@ -208,13 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     profile: Partial<Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>>
   ) => {
-    // Check if userId already exists
-    const emailQuery = query(collection(db, 'users'), where('email', '==', userId))
-    const emailSnapshot = await getDocs(emailQuery)
-    if (!emailSnapshot.empty) {
-      throw new Error('User ID sudah terdaftar.')
-    }
-    // Use userId directly as email
+    // Use userId directly as email (like original system)
     const { user: newUser } = await createUserWithEmailAndPassword(auth, userId, password)
     const userProfileData: UserProfile = {
       uid: newUser.uid,

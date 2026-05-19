@@ -19,18 +19,11 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    // Validasi format email untuk User ID
-    if (!userId.includes('@')) {
-      setError('User ID harus dalam format email (contoh: nama@email.com)')
-      setLoading(false)
-      return
-    }
-
     try {
       await loginWithNIK(userId, password)
       router.push('/')
     } catch (err: any) {
-      setError(err.message || 'Login gagal. Periksa User ID dan password.')
+      setError(err.message || 'Login gagal. Periksa Interpulse ID dan password.')
     } finally {
       setLoading(false)
     }
@@ -64,7 +57,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                User ID
+                Interpulse ID
               </label>
               <div className="relative">
                 <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -73,7 +66,7 @@ export default function LoginPage() {
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  placeholder="Masukkan User ID Anda"
+                  placeholder="Masukkan email Anda"
                   required
                 />
               </div>

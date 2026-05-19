@@ -104,12 +104,6 @@ export default function Profil() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validasi format email untuk User ID
-    if (!createUserForm.nik.includes('@')) {
-      alert('User ID harus dalam format email (contoh: nama@email.com)')
-      return
-    }
-
     setCreatingUser(true)
     try {
       await createUserByAdmin(createUserForm.nik, createUserForm.password, {
@@ -118,7 +112,7 @@ export default function Profil() {
         rw: createUserForm.rw,
         kelurahan: createUserForm.kelurahan,
       })
-      alert(`Akun berhasil dibuat untuk User ID: ${createUserForm.nik}`)
+      alert(`Akun berhasil dibuat untuk Interpulse ID: ${createUserForm.nik}`)
       setCreateUserForm({ nik: '', password: '', name: '', rt: '', rw: '', kelurahan: '' })
       setShowCreateUserModal(false)
     } catch (err: any) {
@@ -728,12 +722,12 @@ export default function Profil() {
             </div>
             <form onSubmit={handleCreateUser} className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">User ID *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Interpulse ID *</label>
                 <input
                   type="text"
                   value={createUserForm.nik}
                   onChange={e => setCreateUserForm(f => ({ ...f, nik: e.target.value }))}
-                  placeholder="Masukkan User ID (contoh: nama@email.com)"
+                  placeholder="Masukkan email"
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
