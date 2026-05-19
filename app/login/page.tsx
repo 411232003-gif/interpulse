@@ -19,6 +19,13 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
+    // Validasi format email untuk User ID
+    if (!userId.includes('@')) {
+      setError('User ID harus dalam format email (contoh: nama@email.com)')
+      setLoading(false)
+      return
+    }
+
     try {
       await loginWithNIK(userId, password)
       router.push('/')

@@ -103,6 +103,13 @@ export default function Profil() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validasi format email untuk User ID
+    if (!createUserForm.nik.includes('@')) {
+      alert('User ID harus dalam format email (contoh: nama@email.com)')
+      return
+    }
+
     setCreatingUser(true)
     try {
       await createUserByAdmin(createUserForm.nik, createUserForm.password, {
@@ -111,7 +118,7 @@ export default function Profil() {
         rw: createUserForm.rw,
         kelurahan: createUserForm.kelurahan,
       })
-      alert(`Akun berhasil dibuat untuk NIK: ${createUserForm.nik}`)
+      alert(`Akun berhasil dibuat untuk User ID: ${createUserForm.nik}`)
       setCreateUserForm({ nik: '', password: '', name: '', rt: '', rw: '', kelurahan: '' })
       setShowCreateUserModal(false)
     } catch (err: any) {
