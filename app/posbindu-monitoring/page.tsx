@@ -1080,7 +1080,7 @@ export default function PosbinduMonitoring() {
               }`}
             >
               <History className="w-4 h-4 flex-shrink-0" />
-              <span className="text-sm">Riwayat</span>
+              <span className="text-sm">Monev</span>
             </button>
           </div>
         </div>

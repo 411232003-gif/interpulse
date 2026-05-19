@@ -1,14 +1,79 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+
+// ── Kategorisasi Kesehatan ─────────────────────────────────────────
+const getTensiCategory = (sistolik: number, diastolik: number) => {
+  if (sistolik < 90 || diastolik < 60) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-300' }
+  if (sistolik <= 119 && diastolik <= 79) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100', border: 'border-green-300' }
+  if (sistolik <= 139 || diastolik <= 89) return { label: 'Pre-Hipertensi', color: 'text-yellow-600', bg: 'bg-yellow-100', border: 'border-yellow-300' }
+  return { label: 'Hipertensi', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-300' }
+}
+
+const getGulaCategory = (value: number) => {
+  if (value < 70) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100' }
+  if (value <= 99) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100' }
+  if (value <= 160) return { label: 'Pre-Diabetes', color: 'text-yellow-600', bg: 'bg-yellow-100' }
+  return { label: 'Diabetes', color: 'text-red-600', bg: 'bg-red-100' }
+}
+
+const getKolesterolCategory = (total: number) => {
+  if (total < 150) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100' }
+  if (total <= 199) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100' }
+  if (total <= 239) return { label: 'Batas Tinggi', color: 'text-yellow-600', bg: 'bg-yellow-100' }
+  return { label: 'Tinggi', color: 'text-red-600', bg: 'bg-red-100' }
+}
+
+const getAsamUratCategory = (value: number, gender: string) => {
+  const max = gender === 'pria' ? 7.0 : 6.0
+  if (value < 2.5) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100' }
+  if (value <= max) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100' }
+  if (value <= max + 1) return { label: 'Batas Tinggi', color: 'text-yellow-600', bg: 'bg-yellow-100' }
+  return { label: 'Tinggi', color: 'text-red-600', bg: 'bg-red-100' }
+}
+
+const get4GAdvice = (reading: any): string[] => {
+  const advice: string[] = []
+  if (reading.type === 'tensi') {
+    const cat = getTensiCategory(parseInt(reading.sistolik), parseInt(reading.diastolik))
+    if (cat.label === 'Hipertensi' || cat.label === 'Pre-Hipertensi') {
+      advice.push('🧂 Batasi Garam', '🍳 Batasi Gorengan', '🥩 Batasi Gajih (Lemak)')
+    }
+  } else if (reading.type === 'guladarah') {
+    const cat = getGulaCategory(parseInt(reading.value))
+    if (cat.label === 'Diabetes' || cat.label === 'Pre-Diabetes') {
+      advice.push('🍬 Batasi Gula', '🍳 Batasi Gorengan', '🥩 Batasi Gajih (Lemak)')
+    }
+  } else if (reading.type === 'kolesterol') {
+    const cat = getKolesterolCategory(parseInt(reading.total))
+    if (cat.label === 'Tinggi' || cat.label === 'Batas Tinggi') {
+      advice.push('🥩 Batasi Gajih (Lemak)', '🍳 Batasi Gorengan')
+    }
+  } else if (reading.type === 'asamurat') {
+    const cat = getAsamUratCategory(parseFloat(reading.value), reading.gender || 'pria')
+    if (cat.label === 'Tinggi' || cat.label === 'Batas Tinggi') {
+      advice.push('🥩 Batasi Gajih (Lemak)', '🍳 Batasi Gorengan', '🍬 Batasi Gula')
+    }
+  }
+  return advice
+}
+
+const getReadingCategory = (reading: any) => {
+  if (reading.type === 'tensi') return getTensiCategory(parseInt(reading.sistolik), parseInt(reading.diastolik))
+  if (reading.type === 'guladarah') return getGulaCategory(parseInt(reading.value))
+  if (reading.type === 'kolesterol') return getKolesterolCategory(parseInt(reading.total))
+  if (reading.type === 'asamurat') return getAsamUratCategory(parseFloat(reading.value), reading.gender || 'pria')
+  return { label: '-', color: 'text-gray-600', bg: 'bg-gray-100' }
+}
 
 export default function MonitoringPage() {
   const { isAdmin } = useAuth()
@@ -22,6 +87,8 @@ export default function MonitoringPage() {
   const [isHealthEditModalOpen, setIsHealthEditModalOpen] = useState(false)
   const [editingHealth, setEditingHealth] = useState<any>(null)
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
+  const [showGrafikGula, setShowGrafikGula] = useState(false)
+  const [grafikFilterNama, setGrafikFilterNama] = useState('')
   const [posbinduForm, setPosbinduForm] = useState({
     type: 'tensi', userName: '', rt: '', rw: '', kelurahan: '',
     sistolik: '', diastolik: '', nadi: '', total: '', ldl: '', hdl: '',
@@ -61,20 +128,55 @@ export default function MonitoringPage() {
   const getStats = (source: string) => {
     const readings = filteredReadings(source)
     return {
-      hipertensi: readings.filter(r => r.type === 'tensi' && (parseInt(r.sistolik) > 140 || parseInt(r.diastolik) > 90)).length,
-      gulaTinggi: readings.filter(r => r.type === 'guladarah' && parseInt(r.value) > 160).length,
-      kolesterolTinggi: readings.filter(r => r.type === 'kolesterol' && parseInt(r.total) > 240).length,
-      asamUratTinggi: readings.filter(r => r.type === 'asamurat' && parseFloat(r.value) > 7).length,
+      hipertensi: readings.filter(r => {
+        if (r.type !== 'tensi') return false
+        const cat = getTensiCategory(parseInt(r.sistolik), parseInt(r.diastolik))
+        return cat.label === 'Hipertensi' || cat.label === 'Pre-Hipertensi'
+      }).length,
+      gulaTinggi: readings.filter(r => {
+        if (r.type !== 'guladarah') return false
+        const cat = getGulaCategory(parseInt(r.value))
+        return cat.label === 'Diabetes' || cat.label === 'Pre-Diabetes'
+      }).length,
+      kolesterolTinggi: readings.filter(r => {
+        if (r.type !== 'kolesterol') return false
+        const cat = getKolesterolCategory(parseInt(r.total))
+        return cat.label === 'Tinggi' || cat.label === 'Batas Tinggi'
+      }).length,
+      asamUratTinggi: readings.filter(r => {
+        if (r.type !== 'asamurat') return false
+        const cat = getAsamUratCategory(parseFloat(r.value), r.gender || 'pria')
+        return cat.label === 'Tinggi' || cat.label === 'Batas Tinggi'
+      }).length,
     }
+  }
+
+  const getGulaChartData = (nama: string) => {
+    return healthReadings
+      .filter(r => r.type === 'guladarah' && (!nama || (r.userName || '').toLowerCase().includes(nama.toLowerCase())))
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .map(r => ({
+        tanggal: new Date(r.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+        nilai: parseInt(r.value),
+        nama: r.userName || 'Unknown',
+      }))
+  }
+
+  const getRecordNumber = async (rw: string) => {
+    const q = query(collection(db, 'healthReadings'), where('rw', '==', rw))
+    const snap = await getDocs(q)
+    return `${snap.size + 1}/${rw}`
   }
 
   const handlePosbinduSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const recordNum = await getRecordNumber(posbinduForm.rw)
       const newReading: any = {
         type: posbinduForm.type, source: 'posbindu',
         userName: posbinduForm.userName, rt: posbinduForm.rt, rw: posbinduForm.rw,
-        kelurahan: posbinduForm.kelurahan, timestamp: new Date().toISOString()
+        kelurahan: posbinduForm.kelurahan, timestamp: new Date().toISOString(),
+        recordNumber: recordNum
       }
       if (posbinduForm.type === 'tensi') Object.assign(newReading, { sistolik: posbinduForm.sistolik, diastolik: posbinduForm.diastolik, nadi: posbinduForm.nadi })
       else if (posbinduForm.type === 'kolesterol') Object.assign(newReading, { total: posbinduForm.total, ldl: posbinduForm.ldl, hdl: posbinduForm.hdl, trigliserida: posbinduForm.trigliserida })
@@ -293,18 +395,25 @@ export default function MonitoringPage() {
               )}
             </div>
           </div>
-          <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-gray-50">
             {readings.length === 0 ? (
               <p className="text-center py-8 text-gray-400 text-sm">Belum ada data</p>
-            ) : readings.map((reading) => (
+            ) : readings.map((reading) => {
+              const cat = getReadingCategory(reading)
+              const advice = get4GAdvice(reading)
+              return (
               <div key={reading.id} className="p-4">
                 <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-medium text-gray-800">{reading.userName || 'Unknown'}</p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-gray-800">{reading.userName || 'Unknown'}</p>
+                      {reading.recordNumber && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">#{reading.recordNumber}</span>}
+                    </div>
                     <p className="text-xs text-gray-500">RW {reading.rw || '-'} / RT {reading.rt || '-'}</p>
                     <p className="text-xs text-gray-400">{new Date(reading.timestamp).toLocaleDateString('id-ID')}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${cat.bg} ${cat.color}`}>{cat.label}</span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${reading.type === 'tensi' ? 'bg-red-100 text-red-700' : reading.type === 'kolesterol' ? 'bg-yellow-100 text-yellow-700' : reading.type === 'asamurat' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                       {reading.type === 'tensi' ? 'Tensi' : reading.type === 'kolesterol' ? 'Kolesterol' : reading.type === 'asamurat' ? 'Asam Urat' : 'Gula'}
                     </span>
@@ -321,8 +430,18 @@ export default function MonitoringPage() {
                   {reading.type === 'kolesterol' && <span>Total: {reading.total} • LDL: {reading.ldl} • HDL: {reading.hdl} mg/dL</span>}
                   {(reading.type === 'asamurat' || reading.type === 'guladarah') && <span>Nilai: {reading.value} mg/dL</span>}
                 </div>
+                {advice.length > 0 && (
+                  <div className="mt-2 bg-orange-50 border border-orange-200 rounded-lg p-2">
+                    <p className="text-xs font-semibold text-orange-700 mb-1">⚠️ Anjuran Batasi 4G:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {advice.map((a, i) => (
+                        <span key={i} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{a}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </div>
@@ -341,6 +460,66 @@ export default function MonitoringPage() {
       </div>
 
       <div className="px-4 mt-6 space-y-4">
+        {/* Grafik Tren Gula Darah */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <button
+            onClick={() => setShowGrafikGula(!showGrafikGula)}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-gray-800">Grafik Tren Gula Darah</p>
+                <p className="text-xs text-gray-500">Visualisasi perkembangan kadar gula</p>
+              </div>
+            </div>
+            {showGrafikGula ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+          </button>
+          {showGrafikGula && (
+            <div className="p-4 border-t border-gray-100 bg-gray-50 space-y-3">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Filter nama warga..."
+                  value={grafikFilterNama}
+                  onChange={e => setGrafikFilterNama(e.target.value)}
+                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              {/* Legenda zona warna */}
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full">&lt; 100 Normal</span>
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">100–160 Pre-Diabetes</span>
+                <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full">&gt; 160 Diabetes</span>
+              </div>
+              {getGulaChartData(grafikFilterNama).length === 0 ? (
+                <p className="text-center py-6 text-gray-400 text-sm">Belum ada data gula darah</p>
+              ) : (
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={getGulaChartData(grafikFilterNama)} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="tanggal" tick={{ fontSize: 10 }} />
+                      <YAxis domain={[0, 300]} tick={{ fontSize: 10 }} />
+                      <Tooltip
+                        contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                        formatter={(v: any) => [`${v} mg/dL`, 'Gula Darah']}
+                      />
+                      {/* Zona warna */}
+                      <ReferenceLine y={100} stroke="#22c55e" strokeDasharray="4 4" label={{ value: '100', position: 'right', fontSize: 9, fill: '#22c55e' }} />
+                      <ReferenceLine y={160} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: '160', position: 'right', fontSize: 9, fill: '#f59e0b' }} />
+                      <Line type="monotone" dataKey="nilai" stroke="#6366f1" strokeWidth={2} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Filter */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 mb-3">

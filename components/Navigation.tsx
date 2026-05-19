@@ -23,7 +23,7 @@ const getUserMainNavItems = () => [
 
 // User feature nav items
 const getUserFeatureNavItems = () => [
-  { href: '/riwayat-tensi', label: 'Riwayat', icon: History },
+  { href: '/riwayat-tensi', label: 'Kesehatan', icon: History },
   { href: '/posbindu-monitoring', label: 'Absensi', icon: Activity },
   { href: '/video-edukasi', label: 'Video', icon: PlayCircle },
   { href: '/musik-relaksasi', label: 'Musik', icon: Music },

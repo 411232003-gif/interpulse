@@ -37,7 +37,8 @@ export interface UserProfile {
   rw: string
   kelurahan: string
   adminKelurahan?: string
-  role: 'user' | 'admin'
+  role: 'user' | 'admin' | 'operator_rw'
+  operatorRW?: string
   createdAt: string
 }
 
@@ -46,6 +47,8 @@ interface AuthContextType {
   userProfile: UserProfile | null
   loading: boolean
   isAdmin: boolean
+  isOperatorRW: boolean
+  operatorRW: string | null
   login: (email: string, password: string) => Promise<void>
   loginWithNIK: (nik: string, password: string) => Promise<void>
   register: (email: string, password: string, profile: Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>) => Promise<void>
@@ -293,6 +296,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const isAdmin = userProfile?.role === 'admin'
+  const isOperatorRW = userProfile?.role === 'operator_rw'
+  const operatorRW = userProfile?.operatorRW || null
 
   return (
     <AuthContext.Provider value={{ 
@@ -300,6 +305,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userProfile, 
       loading, 
       isAdmin,
+      isOperatorRW,
+      operatorRW,
       login,
       loginWithNIK,
       register,
