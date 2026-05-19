@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase'
 import Link from 'next/link'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 const rwTargets: Record<string, number> = {
   '01': 32, '02': 65, '03': 60, '04': 60, '05': 70, '06': 33
@@ -21,6 +22,7 @@ const monthLabels: Record<string, string> = {
 export default function PartisipasiPage() {
   const [elderlyAttendance, setElderlyAttendance] = useState<Record<string, Record<string, number>>>({})
   const [selectedMonth, setSelectedMonth] = useState('april')
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
 
   useEffect(() => {
     const attendanceRef = collection(db, 'attendance')
@@ -101,6 +103,63 @@ export default function PartisipasiPage() {
     doc.save(`partisipasi-${selectedMonth}.pdf`)
   }
 
+  const exportToExcel = () => {
+    const data = Object.entries(rwTargets).map(([rw, target]) => {
+      const attendance = elderlyAttendance[rw] || {}
+      const count = attendance[selectedMonth] || 0
+      const pct = target > 0 ? Math.round((count / target) * 100) : 0
+      return {
+        'RW': rw,
+        'Target PMT': target,
+        'Tercapai': count,
+        'Persentase': `${pct}%`,
+        'Status': pct >= 100 ? 'Terpenuhi' : pct >= 80 ? 'Hampir' : 'Belum'
+      }
+    })
+    
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Partisipasi')
+    
+    ws['!cols'] = [
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 12 },
+    ]
+    
+    XLSX.writeFile(wb, `partisipasi-${selectedMonth}.xlsx`)
+  }
+
+  const exportToWhatsApp = () => {
+    let message = `📊 *PARTISIPASI WARGA POSBINDU*\n`
+    message += `🏥 Kelurahan Duris Selatan\n`
+    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `📈 *RINGKASAN DATA*\n`
+    message += `• Total Target: ${totalTarget} PMT\n`
+    message += `• Total Tercapai: ${totalAttendance} PMT\n`
+    message += `• Capaian: ${overallPct}%\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `📋 *DATA DETAIL PER RW*\n\n`
+    
+    Object.entries(rwTargets).forEach(([rw, target]) => {
+      const attendance = elderlyAttendance[rw] || {}
+      const count = attendance[selectedMonth] || 0
+      const pct = target > 0 ? Math.round((count / target) * 100) : 0
+      message += `RW ${rw}:\n`
+      message += `   Target: ${target} PMT | Tercapai: ${count} PMT\n`
+      message += `   Capaian: ${pct}%\n\n`
+    })
+    
+    message += `━━━━━━━━━━━━━━━━━━━━\n`
+    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
+    
+    const encodedMessage = encodeURIComponent(message)
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
@@ -132,13 +191,46 @@ export default function PartisipasiPage() {
               ))}
             </div>
           </div>
-          <button
-            onClick={exportToPDF}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Export PDF</span>
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            {exportDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                <button
+                  onClick={() => { exportToPDF(); setExportDropdownOpen(false); }}
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl"
+                >
+                  <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+                  </svg>
+                  <span className="text-sm text-gray-700">Export PDF</span>
+                </button>
+                <button
+                  onClick={() => { exportToExcel(); setExportDropdownOpen(false); }}
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
+                  </svg>
+                  <span className="text-sm text-gray-700">Export Excel</span>
+                </button>
+                <button
+                  onClick={() => { exportToWhatsApp(); setExportDropdownOpen(false); }}
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
+                >
+                  <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                  </svg>
+                  <span className="text-sm text-gray-700">Export WhatsApp</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Summary */}
