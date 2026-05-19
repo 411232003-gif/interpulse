@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [guestLoading, setGuestLoading] = useState(false)
   const router = useRouter()
   const { loginWithNIK } = useAuth()
 
@@ -29,17 +30,31 @@ export default function LoginPage() {
     }
   }
 
+  const handleGuestAccess = () => {
+    setGuestLoading(true)
+    setTimeout(() => {
+      router.push('/')
+    }, 300)
+  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center p-4 relative">
       {/* Guest Access Button - Top Right */}
       <button
-        onClick={() => router.push('/')}
-        className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-all group"
+        onClick={handleGuestAccess}
+        disabled={guestLoading}
+        className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-all group disabled:opacity-50"
         title="Masuk sebagai Guest"
       >
-        <User className="w-5 h-5 text-teal-600" />
-        <span className="text-sm font-medium text-gray-700 group-hover:text-teal-600">Guest</span>
+        {guestLoading ? (
+          <Loader2 className="w-5 h-5 text-teal-600 animate-spin" />
+        ) : (
+          <User className="w-5 h-5 text-teal-600" />
+        )}
+        <span className="text-sm font-medium text-gray-700 group-hover:text-teal-600">
+          {guestLoading ? 'Memuat...' : 'Guest'}
+        </span>
       </button>
 
       <div className="w-full max-w-md">
