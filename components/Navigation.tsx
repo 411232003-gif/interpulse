@@ -7,16 +7,16 @@ import { Home, User, Activity, Heart, Flame, Music, History, PlayCircle, Grid3x3
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 
-// Admin nav: only Beranda + Profil
+// Admin nav: Beranda + Fasca + Profil
 const adminNavItems = [
   { href: '/', label: 'Beranda', icon: Home },
+  { href: '/Fasca', label: 'Fasca', icon: Activity },
   { href: '/profil', label: 'Profil', icon: User },
 ]
 
 // User nav items (desktop)
 const getUserMainNavItems = () => [
   { href: '/', label: 'Beranda', icon: Home },
-  { href: '/Fasca', label: 'Fasca', icon: Activity },
   { href: '/kalori-tracker', label: 'Kalori', icon: Flame },
   { href: '/deteksi-jantung', label: 'Skrining', icon: Heart },
 ]
