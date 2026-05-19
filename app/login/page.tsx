@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { Heart, Lock, Loader2, Eye, EyeOff, CreditCard } from 'lucide-react'
+import { Heart, Lock, Loader2, Eye, EyeOff, CreditCard, User } from 'lucide-react'
 
 export default function LoginPage() {
   const [userId, setUserId] = useState('')
@@ -31,7 +31,17 @@ export default function LoginPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center p-4 relative">
+      {/* Guest Access Button - Top Right */}
+      <button
+        onClick={() => router.push('/')}
+        className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-all group"
+        title="Masuk sebagai Guest"
+      >
+        <User className="w-5 h-5 text-teal-600" />
+        <span className="text-sm font-medium text-gray-700 group-hover:text-teal-600">Guest</span>
+      </button>
+
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
