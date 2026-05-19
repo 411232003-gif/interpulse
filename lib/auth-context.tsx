@@ -137,12 +137,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password)
   }
 
-  const loginWithNIK = async (nik: string, password: string) => {
-    // Query Firestore to find user with this NIK
-    const nikQuery = query(collection(db, 'users'), where('nik', '==', nik))
-    const snapshot = await getDocs(nikQuery)
+  const loginWithNIK = async (userId: string, password: string) => {
+    // Query Firestore to find user with this email (user ID)
+    const emailQuery = query(collection(db, 'users'), where('email', '==', userId))
+    const snapshot = await getDocs(emailQuery)
     if (snapshot.empty) {
-      throw new Error('NIK tidak ditemukan. Hubungi admin.')
+      throw new Error('User ID tidak ditemukan. Hubungi admin.')
     }
     const userData = snapshot.docs[0].data() as UserProfile
     const email = userData.email
@@ -150,22 +150,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const createUserByAdmin = async (
-    nik: string,
+    userId: string,
     password: string,
     profile: Partial<Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>>
   ) => {
-    // Check if NIK already exists
-    const nikQuery = query(collection(db, 'users'), where('nik', '==', nik))
-    const nikSnapshot = await getDocs(nikQuery)
-    if (!nikSnapshot.empty) {
-      throw new Error('NIK sudah terdaftar.')
+    // Check if userId already exists
+    const emailQuery = query(collection(db, 'users'), where('email', '==', userId))
+    const emailSnapshot = await getDocs(emailQuery)
+    if (!emailSnapshot.empty) {
+      throw new Error('User ID sudah terdaftar.')
     }
-    // Use NIK as internal email
-    const internalEmail = `${nik}@interpulse.local`
-    const { user: newUser } = await createUserWithEmailAndPassword(auth, internalEmail, password)
+    // Use userId directly as email
+    const { user: newUser } = await createUserWithEmailAndPassword(auth, userId, password)
     const userProfileData: UserProfile = {
       uid: newUser.uid,
-      email: internalEmail,
+      email: userId,
       role: 'user',
       createdAt: new Date().toISOString(),
       name: '',
@@ -178,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       rt: '',
       rw: '',
       kelurahan: '',
-      nik,
+      nik: '',
       ...profile,
     }
     await setDoc(doc(db, 'users', newUser.uid), userProfileData)

@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context'
 import { Heart, Lock, Loader2, Eye, EyeOff, CreditCard } from 'lucide-react'
 
 export default function LoginPage() {
-  const [nik, setNik] = useState('')
+  const [userId, setUserId] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
@@ -20,10 +20,10 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      await loginWithNIK(nik, password)
+      await loginWithNIK(userId, password)
       router.push('/')
     } catch (err: any) {
-      setError(err.message || 'Login gagal. Periksa NIK dan password.')
+      setError(err.message || 'Login gagal. Periksa User ID dan password.')
     } finally {
       setLoading(false)
     }
@@ -57,17 +57,16 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                NIK (Nomor Induk Kependudukan)
+                User ID
               </label>
               <div className="relative">
                 <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  value={nik}
-                  onChange={(e) => setNik(e.target.value.replace(/\D/g, '').slice(0, 16))}
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  placeholder="16 digit NIK"
-                  maxLength={16}
+                  placeholder="Masukkan User ID Anda"
                   required
                 />
               </div>

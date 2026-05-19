@@ -721,13 +721,12 @@ export default function Profil() {
             </div>
             <form onSubmit={handleCreateUser} className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">NIK (16 digit) *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">User ID *</label>
                 <input
                   type="text"
                   value={createUserForm.nik}
                   onChange={e => setCreateUserForm(f => ({ ...f, nik: e.target.value }))}
-                  placeholder="Masukkan NIK 16 digit"
-                  maxLength={16}
+                  placeholder="Masukkan User ID (contoh: nama@email.com)"
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
