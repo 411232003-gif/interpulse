@@ -121,11 +121,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUserProfile(profileDoc.data() as UserProfile)
             } else {
               console.warn('User profile not found in Firestore for uid:', firebaseUser.uid)
+              // Create default profile for new user
+              const defaultProfile: UserProfile = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                role: 'user',
+                createdAt: new Date().toISOString(),
+                name: '',
+                phone: '',
+                birthDate: '',
+                height: 0,
+                weight: 0,
+                targetWeight: 0,
+                gender: '',
+                rt: '',
+                rw: '',
+                kelurahan: '',
+                nik: '',
+              }
+              try {
+                await setDoc(doc(db, 'users', firebaseUser.uid), defaultProfile)
+                setUserProfile(defaultProfile)
+                console.log('Created default profile for user:', firebaseUser.uid)
+              } catch (createErr: any) {
+                console.error('Error creating default profile:', createErr)
+                // Still set default profile locally even if Firestore write fails
+                setUserProfile(defaultProfile)
+              }
             }
           } catch (err: any) {
             console.error('Error fetching user profile from Firestore:', err)
             console.error('Error code:', err.code)
             console.error('Error message:', err.message)
+            // Set minimal profile to allow app to function
+            const minimalProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              role: 'user',
+              createdAt: new Date().toISOString(),
+              name: '',
+              phone: '',
+              birthDate: '',
+              height: 0,
+              weight: 0,
+              targetWeight: 0,
+              gender: '',
+              rt: '',
+              rw: '',
+              kelurahan: '',
+              nik: '',
+            }
+            setUserProfile(minimalProfile)
           }
         } else {
           setUserProfile(null)
