@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function MonitoringPage() {
   const { isAdmin } = useAuth()
@@ -95,6 +97,54 @@ export default function MonitoringPage() {
     } catch { alert('Gagal memperbarui data.') }
   }
 
+  const exportMonitoringToPDF = (source: string) => {
+    const doc = new jsPDF()
+    const readings = filteredReadings(source)
+    const sourceName = source === 'pribadi' ? 'Pribadi' : 'Posbindu'
+    
+    doc.setFillColor(37, 99, 235)
+    doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Monitoring Kesehatan ${sourceName}`, 105, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan Duris Selatan - ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 105, 30, { align: 'center' })
+    
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(10)
+    doc.text(`Total Data: ${readings.length}`, 14, 50)
+    
+    const tableData = readings.map(r => [
+      r.userName || 'Unknown',
+      `RW ${r.rw || '-'}/RT ${r.rt || '-'}`,
+      r.type,
+      r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}` : r.type === 'kolesterol' ? r.total : r.value || '-',
+      new Date(r.timestamp).toLocaleDateString('id-ID')
+    ])
+    
+    autoTable(doc, {
+      startY: 55,
+      head: [['Nama', 'RW/RT', 'Jenis', 'Nilai', 'Tanggal']],
+      body: tableData,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [37, 99, 235],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [240, 249, 255],
+      },
+    })
+    
+    doc.save(`monitoring-${source}.pdf`)
+  }
+
   const handleDeleteHealth = async (id: string) => {
     if (!confirm('Hapus data ini?')) return
     try { await deleteDoc(doc(db, 'healthReadings', id)) } catch { alert('Gagal menghapus.') }
@@ -128,11 +178,16 @@ export default function MonitoringPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between p-4 border-b border-gray-100">
             <h4 className="font-semibold text-gray-800">Data Kesehatan ({readings.length})</h4>
-            {isAdmin && source === 'posbindu' && (
-              <button onClick={() => setIsPosbinduModalOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">
-                <Plus className="w-3 h-3" /> Tambah
+            <div className="flex items-center gap-2">
+              <button onClick={() => exportMonitoringToPDF(source)} className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors">
+                <Download className="w-3 h-3" /> PDF
               </button>
-            )}
+              {isAdmin && source === 'posbindu' && (
+                <button onClick={() => setIsPosbinduModalOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">
+                  <Plus className="w-3 h-3" /> Tambah
+                </button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-gray-50">
             {readings.length === 0 ? (

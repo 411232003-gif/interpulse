@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TrendingUp, Users, Target, Calendar } from 'lucide-react'
+import { TrendingUp, Users, Target, Calendar, Download } from 'lucide-react'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 const rwTargets: Record<string, number> = {
   '01': 32, '02': 65, '03': 60, '04': 60, '05': 70, '06': 33
@@ -47,6 +49,58 @@ export default function PartisipasiPage() {
   }, 0)
   const overallPct = totalTarget > 0 ? Math.round((totalAttendance / totalTarget) * 100) : 0
 
+  const exportToPDF = () => {
+    const doc = new jsPDF()
+    
+    doc.setFillColor(37, 99, 235)
+    doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Partisipasi Warga', 105, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan Duris Selatan - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+    
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(10)
+    doc.text(`Total Target: ${totalTarget} PMT`, 14, 50)
+    doc.text(`Total Tercapai: ${totalAttendance} PMT (${overallPct}%)`, 14, 58)
+    
+    const tableData = Object.entries(rwTargets).map(([rw, target]) => {
+      const attendance = elderlyAttendance[rw] || {}
+      const count = attendance[selectedMonth] || 0
+      const pct = target > 0 ? Math.round((count / target) * 100) : 0
+      return [
+        `RW ${rw}`,
+        target,
+        count,
+        `${pct}%`,
+        pct >= 100 ? 'Terpenuhi' : pct >= 80 ? 'Hampir' : 'Belum'
+      ]
+    })
+    
+    autoTable(doc, {
+      startY: 65,
+      head: [['RW', 'Target PMT', 'Tercapai', 'Persentase', 'Status']],
+      body: tableData,
+      styles: {
+        fontSize: 10,
+        cellPadding: 4,
+      },
+      headStyles: {
+        fillColor: [37, 99, 235],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [240, 249, 255],
+      },
+    })
+    
+    doc.save(`partisipasi-${selectedMonth}.pdf`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
@@ -59,23 +113,32 @@ export default function PartisipasiPage() {
       </div>
 
       <div className="px-4 mt-6 space-y-4">
-        {/* Month Filter */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="w-4 h-4 text-green-600" />
-            <span className="font-semibold text-gray-800 text-sm">Pilih Bulan</span>
+        {/* Month Filter + Export */}
+        <div className="flex gap-2">
+          <div className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className="w-4 h-4 text-green-600" />
+              <span className="font-semibold text-gray-800 text-sm">Pilih Bulan</span>
+            </div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {months.map(m => (
+                <button
+                  key={m}
+                  onClick={() => setSelectedMonth(m)}
+                  className={`py-1.5 rounded-lg text-xs font-medium transition-all ${selectedMonth === m ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  {monthLabels[m]}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-6 gap-1.5">
-            {months.map(m => (
-              <button
-                key={m}
-                onClick={() => setSelectedMonth(m)}
-                className={`py-1.5 rounded-lg text-xs font-medium transition-all ${selectedMonth === m ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                {monthLabels[m]}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={exportToPDF}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Export PDF</span>
+          </button>
         </div>
 
         {/* Summary */}
