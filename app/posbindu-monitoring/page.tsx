@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle, Download, FileText, MessageSquare } from 'lucide-react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 // Target PMT per RW
 const rwTargets = {
@@ -619,6 +622,133 @@ export default function PosbinduMonitoring() {
     }
   }
 
+  // Export to PDF
+  const exportToPDF = () => {
+    const doc = new jsPDF()
+    
+    // Header with gradient background
+    doc.setFillColor(37, 99, 235)
+    doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Data Warga Posbindu', 105, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan Duris Selatan - ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 105, 30, { align: 'center' })
+    
+    // Summary
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(10)
+    doc.text(`Total Warga: ${filteredResidents.length}`, 14, 50)
+    
+    // Table data
+    const tableData = filteredResidents.map(resident => [
+      resident.nama,
+      resident.nik,
+      `RW ${resident.rw} / RT ${resident.rt}`,
+      `${resident.umur} th`,
+      resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+      `${resident.tekananDarah} mmHg`,
+      `${resident.gulaDarah} mg/dL`,
+      `${resident.kolesterol} mg/dL`,
+      `${resident.asamUrat} mg/dL`,
+      resident.alamat
+    ])
+    
+    autoTable(doc, {
+      startY: 55,
+      head: [['Nama', 'NIK', 'RW/RT', 'Umur', 'Jenis Kelamin', 'Tensi', 'Gula', 'Kolesterol', 'Asam Urat', 'Alamat']],
+      body: tableData,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [37, 99, 235],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [240, 249, 255],
+      },
+    })
+    
+    doc.save('data-warga-posbindu.pdf')
+  }
+
+  // Export to Excel
+  const exportToExcel = () => {
+    const data = filteredResidents.map(resident => ({
+      'Nama Lengkap': resident.nama,
+      'NIK': resident.nik,
+      'RW': resident.rw,
+      'RT': resident.rt,
+      'Umur (Tahun)': resident.umur,
+      'Jenis Kelamin': resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+      'Tekanan Darah (mmHg)': resident.tekananDarah,
+      'Gula Darah (mg/dL)': resident.gulaDarah,
+      'Kolesterol (mg/dL)': resident.kolesterol,
+      'Asam Urat (mg/dL)': resident.asamUrat,
+      'Alamat': resident.alamat,
+    }))
+    
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Data Warga')
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 20 }, // Nama
+      { wch: 18 }, // NIK
+      { wch: 5 },  // RW
+      { wch: 5 },  // RT
+      { wch: 8 },  // Umur
+      { wch: 12 }, // Jenis Kelamin
+      { wch: 12 }, // Tensi
+      { wch: 12 }, // Gula
+      { wch: 12 }, // Kolesterol
+      { wch: 12 }, // Asam Urat
+      { wch: 30 }, // Alamat
+    ]
+    
+    XLSX.writeFile(wb, 'data-warga-posbindu.xlsx')
+  }
+
+  // Export to WhatsApp
+  const exportToWhatsApp = () => {
+    const total = filteredResidents.length
+    const elderly = filteredResidents.filter(r => r.umur >= 60).length
+    const avgTensi = filteredResidents.reduce((sum, r) => sum + r.tekananDarah, 0) / total || 0
+    const avgGula = filteredResidents.reduce((sum, r) => sum + r.gulaDarah, 0) / total || 0
+    
+    let message = `📊 *DATA WARGA POSBINDU*\n`
+    message += `🏥 Kelurahan Duris Selatan\n`
+    message += `📅 ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `📈 *RINGKASAN DATA*\n`
+    message += `• Total Warga: ${total}\n`
+    message += `• Lansia (60+): ${elderly}\n`
+    message += `• Rata-rata Tensi: ${avgTensi.toFixed(0)} mmHg\n`
+    message += `• Rata-rata Gula: ${avgGula.toFixed(0)} mg/dL\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `📋 *DATA DETAIL*\n\n`
+    
+    filteredResidents.forEach((resident, index) => {
+      message += `${index + 1}. ${resident.nama}\n`
+      message += `   NIK: ${resident.nik}\n`
+      message += `   RW/RT: ${resident.rw}/${resident.rt} | Umur: ${resident.umur} th\n`
+      message += `   Tensi: ${resident.tekananDarah} | Gula: ${resident.gulaDarah}\n`
+      message += `   Kolesterol: ${resident.kolesterol} | Asam Urat: ${resident.asamUrat}\n\n`
+    })
+    
+    message += `━━━━━━━━━━━━━━━━━━━━\n`
+    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
+    
+    const encodedMessage = encodeURIComponent(message)
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
+  }
+
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -712,18 +842,44 @@ export default function PosbinduMonitoring() {
         {/* Data Warga Tab */}
         {activeTab === 'datawarga' && (
           <div className="space-y-4">
-            {/* Summary + Add Button */}
-            <div className="flex items-center justify-between">
+            {/* Summary + Export + Add Button */}
+            <div className="flex items-center justify-between gap-2">
               <div className="bg-blue-50 rounded-xl px-4 py-2">
                 <span className="text-blue-700 font-semibold text-sm">{filteredResidents.length} warga ditemukan</span>
               </div>
-              <button
-                onClick={openAddModal}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Tambah Warga
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={exportToPDF}
+                  className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors"
+                  title="Export ke PDF"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">PDF</span>
+                </button>
+                <button
+                  onClick={exportToExcel}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 transition-colors"
+                  title="Export ke Excel"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Excel</span>
+                </button>
+                <button
+                  onClick={exportToWhatsApp}
+                  className="flex items-center gap-2 px-3 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition-colors"
+                  title="Export ke WhatsApp"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="hidden sm:inline">WA</span>
+                </button>
+                <button
+                  onClick={openAddModal}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Tambah Warga
+                </button>
+              </div>
             </div>
 
             {/* Filter Bar */}
