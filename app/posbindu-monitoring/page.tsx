@@ -26,6 +26,7 @@ interface Resident {
   nik: string
   rw: string
   rt: string
+  birthDate: string
   umur: number
   jenisKelamin: 'L' | 'P'
   alamat: string
@@ -59,6 +60,7 @@ export default function PosbinduMonitoring() {
     nik: '',
     rw: '',
     rt: '',
+    birthDate: '',
     umur: '',
     jenisKelamin: 'L',
     alamat: '',
@@ -261,15 +263,29 @@ export default function PosbinduMonitoring() {
   }, [])
 
   // CRUD functions
+  const calculateAge = (birthDate: string): number => {
+    if (!birthDate) return 0
+    const birth = new Date(birthDate)
+    const today = new Date()
+    let age = today.getFullYear() - birth.getFullYear()
+    const monthDiff = today.getMonth() - birth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--
+    }
+    return age
+  }
+
   const handleAddResident = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const age = calculateAge(residentForm.birthDate)
       const newResident = {
         nama: residentForm.nama,
         nik: residentForm.nik,
         rw: residentForm.rw,
         rt: residentForm.rt,
-        umur: parseInt(residentForm.umur),
+        birthDate: residentForm.birthDate,
+        umur: age,
         jenisKelamin: residentForm.jenisKelamin,
         alamat: residentForm.alamat,
       }
@@ -287,12 +303,14 @@ export default function PosbinduMonitoring() {
     e.preventDefault()
     if (!editingResident) return
     try {
+      const age = calculateAge(residentForm.birthDate)
       const updatedResident = {
         nama: residentForm.nama,
         nik: residentForm.nik,
         rw: residentForm.rw,
         rt: residentForm.rt,
-        umur: parseInt(residentForm.umur),
+        birthDate: residentForm.birthDate,
+        umur: age,
         jenisKelamin: residentForm.jenisKelamin,
         alamat: residentForm.alamat,
       }
@@ -331,6 +349,7 @@ export default function PosbinduMonitoring() {
       nik: resident.nik,
       rw: resident.rw,
       rt: resident.rt,
+      birthDate: resident.birthDate || '',
       umur: resident.umur.toString(),
       jenisKelamin: resident.jenisKelamin,
       alamat: resident.alamat,
@@ -525,6 +544,7 @@ export default function PosbinduMonitoring() {
       nik: '',
       rw: '',
       rt: '',
+      birthDate: '',
       umur: '',
       jenisKelamin: 'L',
       alamat: '',
@@ -1866,7 +1886,7 @@ export default function PosbinduMonitoring() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">RT *</label>
                     <select
@@ -1898,16 +1918,23 @@ export default function PosbinduMonitoring() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Umur *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tanggal Lahir *</label>
                     <input
-                      type="number"
+                      type="date"
                       required
-                      value={residentForm.umur}
-                      onChange={(e) => setResidentForm({ ...residentForm, umur: e.target.value })}
+                      value={residentForm.birthDate}
+                      onChange={(e) => setResidentForm({ ...residentForm, birthDate: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Umur"
-                      min={0}
-                      max={120}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Umur (Tahun)</label>
+                    <input
+                      type="text"
+                      value={residentForm.birthDate ? calculateAge(residentForm.birthDate).toString() : ''}
+                      readOnly
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
+                      placeholder="Otomatis"
                     />
                   </div>
                 </div>

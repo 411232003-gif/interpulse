@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import BigNumpad from '@/components/BigNumpad'
 import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
-import { collection, addDoc, onSnapshot } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 type HealthType = 'tensi' | 'kolesterol' | 'asamurat' | 'guladarah'
@@ -32,6 +32,9 @@ export default function CatatKesehatan() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null)
   const [showFascaModal, setShowFascaModal] = useState(false)
+  const [healthReadings, setHealthReadings] = useState<any[]>([])
+  const [todayReading, setTodayReading] = useState<any>(null)
+  const [isResetting, setIsResetting] = useState(false)
 
   // Fasca form state
   const [healthType, setHealthType] = useState<HealthType | null>(null)
@@ -92,6 +95,27 @@ export default function CatatKesehatan() {
     return () => unsubscribe()
   }, [])
 
+  // Load health readings from database
+  useEffect(() => {
+    const q = collection(db, 'healthReadings')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      setHealthReadings(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Check if resident has health data for today
+  const getTodayReading = (residentId: string) => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    return healthReadings.find(reading => 
+      reading.userId === residentId && 
+      reading.timestamp.startsWith(todayStr) &&
+      reading.source === 'posbindu'
+    )
+  }
+
   // Filter residents
   const filteredResidents = residents.filter(r => {
     const rwMatch = !filterRW || r.rw === filterRW
@@ -101,6 +125,34 @@ export default function CatatKesehatan() {
       r.nik.includes(searchQuery)
     return rwMatch && rtMatch && searchMatch
   })
+
+  // Validation functions
+  const validateBloodPressure = (sys: number, dia: number) => {
+    if (sys < 90 || dia < 60) return { title: 'Hipotensi', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Tekanan Darah Rendah', advice: 'Perbanyak konsumsi air dan garam, istirahat yang cukup' }
+    if (sys < 120 && dia < 80) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Tekanan Darah Normal', advice: 'Pertahankan pola hidup sehat' }
+    if (sys < 130 || dia < 85) return { title: 'Pra-Hipertensi', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Pra-Hipertensi', advice: 'Kurangi garam dan konsumsi makanan sehat' }
+    if (sys < 140 || dia < 90) return { title: 'Hipertensi Stage 1', color: 'text-orange-600', bgColor: 'bg-orange-50', icon: <AlertCircle className="w-16 h-16 text-orange-600" />, message: 'Hipertensi Stage 1', advice: 'Konsultasi dokter, kurangi garam dan stress' }
+    return { title: 'Hipertensi Stage 2', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Hipertensi Stage 2', advice: 'Segera konsultasi dokter' }
+  }
+
+  const validateBloodSugar = (nilai: number) => {
+    if (nilai < 70) return { title: 'Hipoglikemia', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Gula Darah Rendah', advice: 'Segera konsumsi makanan manis' }
+    if (nilai < 100) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Gula Darah Normal', advice: 'Pertahankan pola makan sehat' }
+    if (nilai < 126) return { title: 'Pra-Diabetes', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Pra-Diabetes', advice: 'Kurangi gula dan karbohidrat' }
+    return { title: 'Diabetes', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Diabetes', advice: 'Segera konsultasi dokter' }
+  }
+
+  const validateCholesterol = (total: number) => {
+    if (total < 200) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Kolesterol Normal', advice: 'Pertahankan pola makan sehat' }
+    if (total < 240) return { title: 'Sedang', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Kolesterol Sedang', advice: 'Kurangi makanan berlemak' }
+    return { title: 'Tinggi', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Kolesterol Tinggi', advice: 'Konsultasi dokter, kurangi makanan berlemak' }
+  }
+
+  const validateUricAcid = (nilai: number) => {
+    if (nilai < 6) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Asam Urat Normal', advice: 'Pertahankan pola makan sehat' }
+    if (nilai < 7) return { title: 'Sedang', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Asam Urat Sedang', advice: 'Kurangi makanan purin' }
+    return { title: 'Tinggi', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Asam Urat Tinggi', advice: 'Konsultasi dokter, kurangi makanan purin' }
+  }
 
   // Fasca form handlers
   const handleNumber = (num: string) => {
@@ -156,12 +208,21 @@ export default function CatatKesehatan() {
         kelurahan: userInfo.kelurahan,
         source: 'posbindu'
       }
-      
-      if (sys < 90 || dia < 60) validationResult = { status: 'low', title: 'Tensi Rendah', color: 'text-blue-700', bgColor: 'bg-gradient-to-br from-blue-100 to-blue-200', icon: <AlertCircle className="w-24 h-24 text-blue-600" />, message: `${sys}/${dia} mmHg`, advice: 'Tensi rendah. Jangan lupa makan teratur dan minum air putih.' }
-      else if (sys < 120 && dia < 80) validationResult = { status: 'normal', title: 'Tensi Normal', color: 'text-green-700', bgColor: 'bg-gradient-to-br from-green-100 to-green-200', icon: <CheckCircle className="w-24 h-24 text-green-600" />, message: `${sys}/${dia} mmHg`, advice: 'Bagus! Tensi normal. Pertahankan pola hidup sehat!' }
-      else if (sys < 140 && dia < 90) validationResult = { status: 'warning', title: 'Tensi Tinggi', color: 'text-yellow-700', bgColor: 'bg-gradient-to-br from-yellow-100 to-yellow-200', icon: <AlertCircle className="w-24 h-24 text-yellow-600" />, message: `${sys}/${dia} mmHg`, advice: 'Tensi tinggi. Kurangi garam dan gorengan.' }
-      else validationResult = { status: 'danger', title: 'Hipertensi', color: 'text-red-700', bgColor: 'bg-gradient-to-br from-red-100 to-red-200', icon: <XCircle className="w-24 h-24 text-red-600" />, message: `${sys}/${dia} mmHg`, advice: 'Hipertensi! Segera istirahat dan konsultasi dokter.' }
-      
+      validationResult = validateBloodPressure(sys, dia)
+    } else if (healthType === 'guladarah') {
+      const nilai = parseInt(allData.nilai)
+      newReading = { 
+        type: 'guladarah', 
+        ...allData, 
+        timestamp, 
+        userId: userInfo.uid,
+        userName: userInfo.name, 
+        rt: userInfo.rt, 
+        rw: userInfo.rw, 
+        kelurahan: userInfo.kelurahan,
+        source: 'posbindu'
+      }
+      validationResult = validateBloodSugar(nilai)
     } else if (healthType === 'kolesterol') {
       const total = parseInt(allData.total)
       newReading = { 
@@ -259,7 +320,31 @@ export default function CatatKesehatan() {
 
   const openFascaModal = (resident: Resident) => {
     setSelectedResident(resident)
+    const todayData = getTodayReading(resident.id)
+    setTodayReading(todayData)
     setShowFascaModal(true)
+    if (todayData) {
+      // Pre-fill data if exists for today
+      setData(todayData)
+    }
+  }
+
+  const handleResetTodayData = async () => {
+    if (!todayReading || !selectedResident) return
+    setIsResetting(true)
+    try {
+      await deleteDoc(doc(db, 'healthReadings', todayReading.id))
+      setTodayReading(null)
+      setData({})
+      setCurrentInput('')
+      setInputIndex(0)
+      alert('Data hari ini berhasil dihapus')
+    } catch (error) {
+      console.error('Error deleting today data:', error)
+      alert('Gagal menghapus data')
+    } finally {
+      setIsResetting(false)
+    }
   }
 
   // Main table view
@@ -307,29 +392,40 @@ export default function CatatKesehatan() {
                     <th className="px-4 py-3 text-left font-semibold text-gray-700">RW/RT</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-700">Umur</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-700">Jenis Kelamin</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Status Input</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredResidents.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
                     </tr>
-                  ) : filteredResidents.map(r => (
-                    <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
-                      <td className="px-4 py-3 text-gray-600">{r.nik}</td>
-                      <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
-                      <td className="px-4 py-3 text-gray-600">{r.umur} th</td>
-                      <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
-                          <Stethoscope className="w-3.5 h-3.5" />
-                          Input Kesehatan
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  ) : filteredResidents.map(r => {
+                    const todayData = getTodayReading(r.id)
+                    return (
+                      <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
+                        <td className="px-4 py-3 text-gray-600">{r.nik}</td>
+                        <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
+                        <td className="px-4 py-3 text-gray-600">{r.umur} th</td>
+                        <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+                        <td className="px-4 py-3 text-center">
+                          {todayData ? (
+                            <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-gray-400 mx-auto" />
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
+                            <Stethoscope className="w-3.5 h-3.5" />
+                            Input Kesehatan
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -357,13 +453,33 @@ export default function CatatKesehatan() {
               <Activity className="w-8 h-8 text-white" />
             </div>
             <p className="text-gray-600">Pilih jenis pemeriksaan</p>
+            {todayReading && (
+              <p className="text-xs text-green-600 mt-2">Data hari ini sudah ada</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             {(Object.keys(healthConfig) as HealthType[]).map((type) => (
               <button
                 key={type}
-                onClick={() => { setHealthType(type); setStep('input'); setInputIndex(0); setCurrentInput(''); setData({}) }}
+                onClick={() => { 
+                  setHealthType(type); 
+                  setStep('input'); 
+                  setInputIndex(0); 
+                  setCurrentInput('');
+                  // Pre-fill data if exists for today
+                  if (todayReading && todayReading.type === type) {
+                    const config = healthConfig[type]
+                    const prefilledData: Record<string, string> = {}
+                    config.fields.forEach((field, idx) => {
+                      prefilledData[field.key] = todayReading[field.key] || ''
+                    })
+                    setData(prefilledData)
+                    setInputIndex(config.fields.length - 1)
+                  } else {
+                    setData({})
+                  }
+                }}
                 className={`p-4 rounded-xl bg-gradient-to-br ${healthConfig[type].color} text-white shadow-lg active:scale-95 transition-all text-left`}
               >
                 <span className="text-3xl mb-2 block">{healthConfig[type].icon}</span>
@@ -371,6 +487,18 @@ export default function CatatKesehatan() {
               </button>
             ))}
           </div>
+
+          {todayReading && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={handleResetTodayData}
+                disabled={isResetting}
+                className="w-full px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isResetting ? 'Menghapus...' : 'Reset Data Hari Ini'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -411,11 +539,16 @@ export default function CatatKesehatan() {
           <h2 className="text-2xl font-bold text-gray-800 mb-1">{currentField?.label}</h2>
           <p className="text-gray-600">{config?.title} - Step {inputIndex + 1}</p>
           <p className="text-sm text-gray-500 mt-1">Warga: {selectedResident?.nama}</p>
+          {todayReading && todayReading.type === healthType && (
+            <p className="text-xs text-green-600 mt-1">Data hari ini tersimpan</p>
+          )}
         </div>
 
         <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl p-6 mb-4 border-2 border-blue-300">
           <div className="text-center">
-            <p className="text-6xl font-bold text-blue-700 min-h-[80px] flex items-center justify-center">{currentInput || '---'}</p>
+            <p className="text-6xl font-bold text-blue-700 min-h-[80px] flex items-center justify-center">
+              {currentInput || (todayReading && todayReading.type === healthType && currentField?.key && data[currentField.key] ? data[currentField.key] : '---')}
+            </p>
             <p className="text-xl text-gray-600 mt-4">{currentField?.unit}</p>
           </div>
         </div>
