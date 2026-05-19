@@ -59,7 +59,7 @@ const defaultProfile: UserProfile = {
 }
 
 export default function Profil() {
-  const { userProfile: authProfile, refreshProfile, logout } = useAuth()
+  const { userProfile: authProfile, refreshProfile, logout, isAdmin, createUserByAdmin } = useAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile>(defaultProfile)
   const [isEditing, setIsEditing] = useState(false)
@@ -95,6 +95,31 @@ export default function Profil() {
   const [showTargetModal, setShowTargetModal] = useState(false)
   const [editingTarget, setEditingTarget] = useState<ProgressTarget | null>(null)
   const [targetForm, setTargetForm] = useState({ title: '', description: '', targetValue: 0, currentValue: 0, unit: '', deadline: '' })
+
+  // Admin: Create User state
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false)
+  const [createUserForm, setCreateUserForm] = useState({ nik: '', password: '', name: '', rt: '', rw: '', kelurahan: '' })
+  const [creatingUser, setCreatingUser] = useState(false)
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreatingUser(true)
+    try {
+      await createUserByAdmin(createUserForm.nik, createUserForm.password, {
+        name: createUserForm.name,
+        rt: createUserForm.rt,
+        rw: createUserForm.rw,
+        kelurahan: createUserForm.kelurahan,
+      })
+      alert(`Akun berhasil dibuat untuk NIK: ${createUserForm.nik}`)
+      setCreateUserForm({ nik: '', password: '', name: '', rt: '', rw: '', kelurahan: '' })
+      setShowCreateUserModal(false)
+    } catch (err: any) {
+      alert(`Gagal membuat akun: ${err.message}`)
+    } finally {
+      setCreatingUser(false)
+    }
+  }
 
   // QR Code URL state
   const [appUrl, setAppUrl] = useState('https://interpulse.app')
@@ -352,6 +377,25 @@ export default function Profil() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Profil Saya</h1>
           <p className="text-gray-600">Kelola informasi dan pengaturan akun Anda</p>
         </div>
+
+        {/* Admin: Buat Akun User */}
+        {isAdmin && (
+          <div className="mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Manajemen Akun</h2>
+                <p className="text-blue-100 text-sm mt-0.5">Buat akun baru untuk warga</p>
+              </div>
+              <button
+                onClick={() => setShowCreateUserModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Buat Akun User
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
@@ -662,6 +706,104 @@ export default function Profil() {
                 <Button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSaveTarget}>Simpan</Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Admin: Create User Modal */}
+      {showCreateUserModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
+          <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-800">Buat Akun User Baru</h3>
+              <button onClick={() => setShowCreateUserModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateUser} className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">NIK (16 digit) *</label>
+                <input
+                  type="text"
+                  value={createUserForm.nik}
+                  onChange={e => setCreateUserForm(f => ({ ...f, nik: e.target.value }))}
+                  placeholder="Masukkan NIK 16 digit"
+                  maxLength={16}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                <input
+                  type="password"
+                  value={createUserForm.password}
+                  onChange={e => setCreateUserForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="Minimal 6 karakter"
+                  minLength={6}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
+                <input
+                  type="text"
+                  value={createUserForm.name}
+                  onChange={e => setCreateUserForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Nama warga"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RT</label>
+                  <input
+                    type="text"
+                    value={createUserForm.rt}
+                    onChange={e => setCreateUserForm(f => ({ ...f, rt: e.target.value }))}
+                    placeholder="01"
+                    className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RW</label>
+                  <input
+                    type="text"
+                    value={createUserForm.rw}
+                    onChange={e => setCreateUserForm(f => ({ ...f, rw: e.target.value }))}
+                    placeholder="01"
+                    className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Kelurahan</label>
+                  <input
+                    type="text"
+                    value={createUserForm.kelurahan}
+                    onChange={e => setCreateUserForm(f => ({ ...f, kelurahan: e.target.value }))}
+                    placeholder="Duri Selatan"
+                    className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateUserModal(false)}
+                  className="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingUser}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {creatingUser ? 'Membuat...' : 'Buat Akun'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

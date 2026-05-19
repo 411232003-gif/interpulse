@@ -59,7 +59,7 @@ const mockAttendance = {
 
 export default function PosbinduMonitoring() {
   const { isAdmin } = useAuth()
-  const [activeTab, setActiveTab] = useState<'monitoring' | 'partisipasi' | 'riwayat' | 'absen'>(isAdmin ? 'monitoring' : 'absen')
+  const [activeTab, setActiveTab] = useState<'datawarga' | 'riwayat' | 'absen'>(isAdmin ? 'datawarga' : 'absen')
   const [monitoringSubTab, setMonitoringSubTab] = useState<'pribadi' | 'posbindu'>('pribadi')
   const [filterRW, setFilterRW] = useState<string>('')
   const [filterRT, setFilterRT] = useState<string>('')
@@ -683,22 +683,13 @@ export default function PosbinduMonitoring() {
         <div className="px-4 -mt-4">
           <div className="bg-white rounded-2xl shadow-lg p-2 flex gap-2">
             <button
-              onClick={() => setActiveTab('monitoring')}
+              onClick={() => setActiveTab('datawarga')}
               className={`flex-1 py-3 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'monitoring' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                activeTab === 'datawarga' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               <Users className="w-4 h-4 flex-shrink-0" />
-              <span className="text-sm">Monitoring</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('partisipasi')}
-              className={`flex-1 py-3 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'partisipasi' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <Target className="w-4 h-4 flex-shrink-0" />
-              <span className="text-sm">Partisipasi</span>
+              <span className="text-sm">Data Warga</span>
             </button>
             <button
               onClick={() => setActiveTab('riwayat')}
@@ -714,279 +705,98 @@ export default function PosbinduMonitoring() {
       )}
 
       <div className="px-4 mt-6">
-        {/* Monitoring Tab */}
-        {activeTab === 'monitoring' && (
-          <div className="space-y-6">
-            {/* Monitoring Sub-Tabs */}
-            <div className="bg-white rounded-2xl p-2 shadow-md">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setMonitoringSubTab('pribadi')}
-                  className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
-                    monitoringSubTab === 'pribadi' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  Monitoring-Pribadi
-                </button>
-                <button
-                  onClick={() => setMonitoringSubTab('posbindu')}
-                  className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
-                    monitoringSubTab === 'posbindu' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  Monitoring-Posbindu
-                </button>
+        {/* Data Warga Tab */}
+        {activeTab === 'datawarga' && (
+          <div className="space-y-4">
+            {/* Summary + Add Button */}
+            <div className="flex items-center justify-between">
+              <div className="bg-blue-50 rounded-xl px-4 py-2">
+                <span className="text-blue-700 font-semibold text-sm">{filteredResidents.length} warga ditemukan</span>
               </div>
+              <button
+                onClick={openAddModal}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Tambah Warga
+              </button>
             </div>
 
-            {/* Quick Summary */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-4 text-white">
-              <h3 className="font-semibold mb-2">Ringkasan Monitoring</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-blue-100 text-xs">Total Warga</p>
-                  <p className="text-2xl font-bold">{filteredResidents.length}</p>
-                </div>
-                <div>
-                  <p className="text-blue-100 text-xs">Perlu Perhatian</p>
-                  <p className="text-2xl font-bold">{stats.hipertensi + stats.gulaTinggi + stats.kolesterolTinggi + stats.asamUratTinggi}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl p-4 shadow-md">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="bg-red-100 p-2 rounded-lg">
-                    <AlertCircle className="w-5 h-5 text-red-600" />
-                  </div>
-                  <span className="text-gray-600 text-sm">Hipertensi</span>
-                </div>
-                <p className="text-3xl font-bold text-red-600">{stats.hipertensi}</p>
-                <p className="text-xs text-gray-500 mt-1">Orang</p>
-              </div>
-              <div className="bg-white rounded-2xl p-4 shadow-md">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="bg-orange-100 p-2 rounded-lg">
-                    <AlertCircle className="w-5 h-5 text-orange-600" />
-                  </div>
-                  <span className="text-gray-600 text-sm">Gula Tinggi</span>
-                </div>
-                <p className="text-3xl font-bold text-orange-600">{stats.gulaTinggi}</p>
-                <p className="text-xs text-gray-500 mt-1">Orang</p>
-              </div>
-              <div className="bg-white rounded-2xl p-4 shadow-md">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="bg-yellow-100 p-2 rounded-lg">
-                    <AlertCircle className="w-5 h-5 text-yellow-600" />
-                  </div>
-                  <span className="text-gray-600 text-sm">Kolesterol Tinggi</span>
-                </div>
-                <p className="text-3xl font-bold text-yellow-600">{stats.kolesterolTinggi}</p>
-                <p className="text-xs text-gray-500 mt-1">Orang</p>
-              </div>
-              <div className="bg-white rounded-2xl p-4 shadow-md">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="bg-purple-100 p-2 rounded-lg">
-                    <AlertCircle className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <span className="text-gray-600 text-sm">Asam Urat Tinggi</span>
-                </div>
-                <p className="text-3xl font-bold text-purple-600">{stats.asamUratTinggi}</p>
-                <p className="text-xs text-gray-500 mt-1">Orang</p>
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white rounded-2xl p-4 shadow-md">
-              <div className="flex items-center gap-2 mb-4">
-                <Filter className="w-5 h-5 text-blue-600" />
-                <h3 className="font-semibold text-gray-800">Filter</h3>
-              </div>
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <select
-                    value={filterRW}
-                    onChange={(e) => setFilterRW(e.target.value)}
-                    aria-label="Filter RW"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Semua RW</option>
-                    {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rw => (
-                      <option key={rw} value={rw}>RW {rw}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={filterRT}
-                    onChange={(e) => setFilterRT(e.target.value)}
-                    aria-label="Filter RT"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Semua RT</option>
-                    {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rt => (
-                      <option key={rt} value={rt}>RT {rt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-2">
-                  <select
-                    value={filterUmur}
-                    onChange={(e) => setFilterUmur(e.target.value)}
-                    aria-label="Filter umur"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Semua Umur</option>
-                    <option value="0-20">0-20 Tahun</option>
-                    <option value="21-50">21-50 Tahun</option>
-                    <option value="51-60">51-60 Tahun</option>
-                    <option value="60+">60+ Tahun</option>
-                  </select>
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      placeholder="Cari nama..."
-                      value={searchNama}
-                      onChange={(e) => setSearchNama(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+            {/* Filter Bar */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <div className="grid grid-cols-2 gap-2">
+                <select value={filterRW} onChange={e => setFilterRW(e.target.value)} aria-label="Filter RW" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Semua RW</option>
+                  {['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20'].map(rw => <option key={rw} value={rw}>RW {rw}</option>)}
+                </select>
+                <select value={filterRT} onChange={e => setFilterRT(e.target.value)} aria-label="Filter RT" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Semua RT</option>
+                  {['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20'].map(rt => <option key={rt} value={rt}>RT {rt}</option>)}
+                </select>
+                <select value={filterUmur} onChange={e => setFilterUmur(e.target.value)} aria-label="Filter umur" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Semua Umur</option>
+                  <option value="0-20">0-20 Tahun</option>
+                  <option value="21-50">21-50 Tahun</option>
+                  <option value="51-60">51-60 Tahun</option>
+                  <option value="60+">60+ Tahun</option>
+                </select>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input type="text" placeholder="Cari nama..." value={searchNama} onChange={e => setSearchNama(e.target.value)} className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
             </div>
 
-            {/* Health Readings List */}
-            <div className="bg-white rounded-2xl p-4 shadow-md">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-800">Data Kesehatan ({healthReadings.filter(r => r.source === monitoringSubTab).length})</h3>
-                {monitoringSubTab === 'posbindu' && (
-                  <button
-                    onClick={() => setIsPosbinduModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Tambah Data Posbindu
-                  </button>
-                )}
-              </div>
-              <div className="space-y-4">
-                {healthReadings
-                  .filter(reading => {
-                    if (filterRW && normalizeRTRW(reading.rw) !== normalizeRTRW(filterRW)) return false
-                    if (filterRT && normalizeRTRW(reading.rt) !== normalizeRTRW(filterRT)) return false
-                    if (reading.source !== monitoringSubTab) return false
-                    if (searchNama && reading.userName && !reading.userName.toLowerCase().includes(searchNama.toLowerCase())) return false
-                    return true
-                  })
-                  .map((reading) => (
-                  <div key={reading.id} className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h4 className="font-semibold text-gray-800">{reading.userName || 'Unknown'}</h4>
-                        <p className="text-sm text-gray-500">RW {reading.rw || '-'}/RT {reading.rt || '-'}</p>
-                        <p className="text-xs text-gray-400">{new Date(reading.timestamp).toLocaleDateString('id-ID')}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          reading.type === 'tensi' ? 'bg-red-100 text-red-700' :
-                          reading.type === 'kolesterol' ? 'bg-yellow-100 text-yellow-700' :
-                          reading.type === 'asamurat' ? 'bg-purple-100 text-purple-700' :
-                          'bg-blue-100 text-blue-700'
-                        }`}>
-                          {reading.type === 'tensi' ? 'Tekanan Darah' :
-                           reading.type === 'kolesterol' ? 'Kolesterol' :
-                           reading.type === 'asamurat' ? 'Asam Urat' : 'Gula Darah'}
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openEditHealthModal(reading)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteHealth(reading.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Hapus"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+            {/* Resident Cards */}
+            <div className="space-y-3">
+              {filteredResidents.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">Belum ada data warga</p>
+                </div>
+              ) : filteredResidents.map(resident => (
+                <div key={resident.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-800">{resident.nama}</p>
+                      <p className="text-xs text-gray-500">NIK: {resident.nik}</p>
+                      <div className="flex gap-3 mt-1 text-xs text-gray-600">
+                        <span>RW {resident.rw} / RT {resident.rt}</span>
+                        <span>{resident.umur} tahun</span>
+                        <span>{resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      {reading.type === 'tensi' && (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Sistolik:</span>
-                            <span className="font-semibold text-gray-800">{reading.sistolik} mmHg</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Diastolik:</span>
-                            <span className="font-semibold text-gray-800">{reading.diastolik} mmHg</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Nadi:</span>
-                            <span className="font-semibold text-gray-800">{reading.nadi} bpm</span>
-                          </div>
-                        </>
-                      )}
-                      {reading.type === 'kolesterol' && (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Total:</span>
-                            <span className="font-semibold text-gray-800">{reading.total} mg/dL</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">LDL:</span>
-                            <span className="font-semibold text-gray-800">{reading.ldl} mg/dL</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">HDL:</span>
-                            <span className="font-semibold text-gray-800">{reading.hdl} mg/dL</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Trigliserida:</span>
-                            <span className="font-semibold text-gray-800">{reading.trigliserida} mg/dL</span>
-                          </div>
-                        </>
-                      )}
-                      {reading.type === 'asamurat' && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Nilai:</span>
-                          <span className="font-semibold text-gray-800">{reading.value} mg/dL</span>
-                        </div>
-                      )}
-                      {reading.type === 'guladarah' && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Nilai:</span>
-                          <span className="font-semibold text-gray-800">{reading.value} mg/dL</span>
-                        </div>
-                      )}
+                    <div className="flex gap-1.5">
+                      <button onClick={() => openEditModal(resident)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDeleteResident(resident.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-              {healthReadings.filter(reading => {
-                if (filterRW && normalizeRTRW(reading.rw) !== normalizeRTRW(filterRW)) return false
-                if (filterRT && normalizeRTRW(reading.rt) !== normalizeRTRW(filterRT)) return false
-                if (reading.source !== monitoringSubTab) return false
-                if (searchNama && reading.userName && !reading.userName.toLowerCase().includes(searchNama.toLowerCase())) return false
-                return true
-              }).length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <p>Tidak ada data kesehatan yang sesuai dengan filter</p>
+                  <div className="grid grid-cols-4 gap-2 mt-3">
+                    {[
+                      { label: 'Tensi', value: `${resident.tekananDarah}`, alert: resident.tekananDarah > 140 },
+                      { label: 'Gula', value: `${resident.gulaDarah}`, alert: resident.gulaDarah > 160 },
+                      { label: 'Kolesterol', value: `${resident.kolesterol}`, alert: resident.kolesterol > 240 },
+                      { label: 'Asam Urat', value: `${resident.asamUrat}`, alert: resident.asamUrat > 7 },
+                    ].map(item => (
+                      <div key={item.label} className={`rounded-lg p-2 text-center ${item.alert ? 'bg-red-50' : 'bg-gray-50'}`}>
+                        <p className="text-[9px] text-gray-500">{item.label}</p>
+                        <p className={`text-xs font-bold ${item.alert ? 'text-red-600' : 'text-gray-700'}`}>{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
 
           </div>
         )}
 
-        {/* Partisipasi Tab */}
-        {activeTab === 'partisipasi' && (
+        {/* PARTISIPASI TAB REMOVED - moved to /partisipasi page */}
+        {false && (
           <div className="space-y-6">
             <div className="bg-white rounded-2xl p-4 shadow-md">
               <div className="flex items-center gap-2 mb-4">

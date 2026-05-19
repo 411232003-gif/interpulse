@@ -1,13 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight, Users, TrendingUp, LogIn } from 'lucide-react'
 
 export default function Home() {
-  const router = useRouter()
   const { user, loading, isAdmin, userProfile } = useAuth()
   const [isMobile, setIsMobile] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -30,12 +28,7 @@ export default function Home() {
     }
   ]
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
-    }
-  }, [user, loading, router])
+  // No redirect - guest users can access the home page
 
   // Detect mobile/desktop
   useEffect(() => {
@@ -92,12 +85,36 @@ export default function Home() {
     )
   }
 
-  // Don't render content if not logged in (will redirect)
-  if (!user) {
-    return null
-  }
+  // Admin feature cards
+  const adminCards = [
+    {
+      title: 'Data Warga',
+      description: 'Kelola data warga dan riwayat kesehatan',
+      href: '/posbindu-monitoring',
+      icon: Users,
+      gradient: 'from-blue-500 to-cyan-500',
+      bgColor: 'bg-blue-50'
+    },
+    {
+      title: 'Monitoring',
+      description: 'Pantau data kesehatan warga',
+      href: '/monitoring',
+      icon: Activity,
+      gradient: 'from-indigo-500 to-purple-500',
+      bgColor: 'bg-indigo-50'
+    },
+    {
+      title: 'Partisipasi',
+      description: 'Trafik kehadiran warga',
+      href: '/partisipasi',
+      icon: TrendingUp,
+      gradient: 'from-green-500 to-teal-500',
+      bgColor: 'bg-green-50'
+    }
+  ]
 
-  const featureCards = [
+  // User/guest feature cards
+  const userCards = [
     {
       title: 'Video Edukasi',
       description: 'Tonton video kesehatan dan edukasi',
@@ -107,30 +124,31 @@ export default function Home() {
       bgColor: 'bg-purple-50'
     },
     {
-      title: isAdmin ? 'Data Warga' : 'Absensi',
-      description: isAdmin ? 'Kelola data warga dan riwayat kesehatan' : 'Catat kehadiran',
+      title: 'Fasca',
+      description: 'Fasilitas Catatan Kesehatan',
+      href: '/Fasca',
+      icon: Heart,
+      gradient: 'from-red-500 to-orange-500',
+      bgColor: 'bg-red-50'
+    },
+    ...(user ? [{
+      title: 'Absensi',
+      description: 'Catat kehadiran Posbindu',
       href: '/posbindu-monitoring',
       icon: Activity,
       gradient: 'from-blue-500 to-cyan-500',
       bgColor: 'bg-blue-50'
-    },
-    ...(isAdmin ? [] : [{
+    }, {
       title: 'Riwayat Tensi',
       description: 'Lihat riwayat pengukuran tekanan darah',
       href: '/riwayat-tensi',
       icon: History,
       gradient: 'from-green-500 to-emerald-500',
       bgColor: 'bg-green-50'
-    }]),
-    ...(isAdmin ? [] : [{
-      title: 'Fasca',
-      description: 'Fasilitas Catatan',
-      href: '/Fasca',
-      icon: Heart,
-      gradient: 'from-red-500 to-orange-500',
-      bgColor: 'bg-red-50'
-    }])
+    }] : [])
   ]
+
+  const featureCards = isAdmin ? adminCards : userCards
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-24">
@@ -142,13 +160,19 @@ export default function Home() {
               Selamat Datang 👋
             </h1>
             <p className="text-base text-gray-600">
-              {userProfile?.name || 'Pengguna'}, ayo jaga kesehatanmu
+              {user ? (userProfile?.name || 'Pengguna') : 'Tamu'}, ayo jaga kesehatanmu
             </p>
+            {!user && (
+              <Link href="/login" className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-full hover:bg-teal-700 transition-colors">
+                <LogIn className="w-4 h-4" />
+                Masuk untuk fitur lengkap
+              </Link>
+            )}
           </div>
         </div>
 
         {/* Feature Cards */}
-        <div className={isMobile ? "grid grid-cols-2 gap-6 mb-6 px-2" : "grid grid-cols-2 gap-4 mb-6"}>
+        <div className={isMobile ? `grid gap-6 mb-6 px-2 ${featureCards.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}` : `grid gap-4 mb-6 ${featureCards.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {featureCards.map((card, index) => {
             const Icon = card.icon
             return (
@@ -194,39 +218,41 @@ export default function Home() {
           })}
         </div>
 
-        {/* Additional Features Section */}
-        <div className={isMobile ? "mb-4 px-2" : "bg-white rounded-2xl shadow-lg p-4 mb-4"}>
-          <h2 className="text-lg font-bold text-gray-800 mb-3 text-center">Fitur Lainnya</h2>
-          <div className={isMobile ? "grid grid-cols-3 gap-4" : "grid grid-cols-3 gap-3"}>
-            <Link href="/kalori-tracker" className={isMobile ? "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-all border border-orange-200 shadow-md" : "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-all border border-orange-200"}>
-              <div className={isMobile ? "w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 p-2.5 shadow-lg" : "w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 p-1.5"}>
-                <Activity className="w-full h-full text-white" />
-              </div>
-              <div className="text-center">
-                <h3 className="text-xs font-semibold text-gray-800">Kalori</h3>
-                <p className="text-[10px] text-gray-600">Tracker</p>
-              </div>
-            </Link>
-            <Link href="/deteksi-jantung" className={isMobile ? "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200 shadow-md" : "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200"}>
-              <div className={isMobile ? "w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-pink-500 p-2.5 shadow-lg" : "w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 p-1.5"}>
-                <Heart className="w-full h-full text-white" />
-              </div>
-              <div className="text-center">
-                <h3 className="text-xs font-semibold text-gray-800">Skrining</h3>
-                <p className="text-[10px] text-gray-600">Jantung</p>
-              </div>
-            </Link>
-            <Link href="/musik-relaksasi" className={isMobile ? "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200 shadow-md" : "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200"}>
-              <div className={isMobile ? "w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 p-2.5 shadow-lg" : "w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 p-1.5"}>
-                <PlayCircle className="w-full h-full text-white" />
-              </div>
-              <div className="text-center">
-                <h3 className="text-xs font-semibold text-gray-800">Musik</h3>
-                <p className="text-[10px] text-gray-600">Relaksasi</p>
-              </div>
-            </Link>
+        {/* Additional Features Section - only for non-admin */}
+        {!isAdmin && (
+          <div className={isMobile ? "mb-4 px-2" : "bg-white rounded-2xl shadow-lg p-4 mb-4"}>
+            <h2 className="text-lg font-bold text-gray-800 mb-3 text-center">Fitur Lainnya</h2>
+            <div className={isMobile ? "grid grid-cols-3 gap-4" : "grid grid-cols-3 gap-3"}>
+              <Link href="/kalori-tracker" className={isMobile ? "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-all border border-orange-200 shadow-md" : "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-all border border-orange-200"}>
+                <div className={isMobile ? "w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 p-2.5 shadow-lg" : "w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 p-1.5"}>
+                  <Activity className="w-full h-full text-white" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xs font-semibold text-gray-800">Kalori</h3>
+                  <p className="text-[10px] text-gray-600">Tracker</p>
+                </div>
+              </Link>
+              <Link href="/deteksi-jantung" className={isMobile ? "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200 shadow-md" : "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200"}>
+                <div className={isMobile ? "w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-pink-500 p-2.5 shadow-lg" : "w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 p-1.5"}>
+                  <Heart className="w-full h-full text-white" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xs font-semibold text-gray-800">Skrining</h3>
+                  <p className="text-[10px] text-gray-600">Jantung</p>
+                </div>
+              </Link>
+              <Link href="/musik-relaksasi" className={isMobile ? "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200 shadow-md" : "flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200"}>
+                <div className={isMobile ? "w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 p-2.5 shadow-lg" : "w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 p-1.5"}>
+                  <PlayCircle className="w-full h-full text-white" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xs font-semibold text-gray-800">Musik</h3>
+                  <p className="text-[10px] text-gray-600">Relaksasi</p>
+                </div>
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
 

@@ -1,1 +1,0 @@
-self.__REACT_LOADABLE_MANIFEST="{\"app/complete-profile/page.tsx -> firebase/firestore\":{\"id\":\"app/complete-profile/page.tsx -> firebase/firestore\",\"files\":[]}}"

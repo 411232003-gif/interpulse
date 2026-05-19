@@ -47,7 +47,9 @@ interface AuthContextType {
   loading: boolean
   isAdmin: boolean
   login: (email: string, password: string) => Promise<void>
+  loginWithNIK: (nik: string, password: string) => Promise<void>
   register: (email: string, password: string, profile: Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>) => Promise<void>
+  createUserByAdmin: (nik: string, password: string, profile: Partial<Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>>) => Promise<void>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
@@ -135,6 +137,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password)
   }
 
+  const loginWithNIK = async (nik: string, password: string) => {
+    // Query Firestore to find user with this NIK
+    const nikQuery = query(collection(db, 'users'), where('nik', '==', nik))
+    const snapshot = await getDocs(nikQuery)
+    if (snapshot.empty) {
+      throw new Error('NIK tidak ditemukan. Hubungi admin.')
+    }
+    const userData = snapshot.docs[0].data() as UserProfile
+    const email = userData.email
+    await signInWithEmailAndPassword(auth, email, password)
+  }
+
+  const createUserByAdmin = async (
+    nik: string,
+    password: string,
+    profile: Partial<Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>>
+  ) => {
+    // Check if NIK already exists
+    const nikQuery = query(collection(db, 'users'), where('nik', '==', nik))
+    const nikSnapshot = await getDocs(nikQuery)
+    if (!nikSnapshot.empty) {
+      throw new Error('NIK sudah terdaftar.')
+    }
+    // Use NIK as internal email
+    const internalEmail = `${nik}@interpulse.local`
+    const { user: newUser } = await createUserWithEmailAndPassword(auth, internalEmail, password)
+    const userProfileData: UserProfile = {
+      uid: newUser.uid,
+      email: internalEmail,
+      role: 'user',
+      createdAt: new Date().toISOString(),
+      name: '',
+      phone: '',
+      birthDate: '',
+      height: 0,
+      weight: 0,
+      targetWeight: 0,
+      gender: '',
+      rt: '',
+      rw: '',
+      kelurahan: '',
+      nik,
+      ...profile,
+    }
+    await setDoc(doc(db, 'users', newUser.uid), userProfileData)
+    // Sign out immediately since admin is creating account for someone else
+    await signOut(auth)
+    // Re-login admin is handled externally
+  }
+
   const resetPassword = async (email: string) => {
     await sendPasswordResetEmail(auth, email)
   }
@@ -209,7 +261,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading, 
       isAdmin,
       login,
-      register, 
+      loginWithNIK,
+      register,
+      createUserByAdmin,
       logout,
       refreshProfile,
       resetPassword

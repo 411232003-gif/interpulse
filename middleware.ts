@@ -5,11 +5,13 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public paths yang tidak perlu login
-  const publicPaths = ['/', '/login', '/register', '/complete-profile', '/login-qr', '/_next', '/favicon.ico', '/logo-app.png', '/manifest.json', '/sw.js', '/icons', '/video']
+  const publicPaths = ['/', '/login', '/register', '/complete-profile', '/login-qr', '/_next', '/favicon.ico', '/logo-app.png', '/manifest.json', '/sw.js', '/icons', '/video',
+    '/video-edukasi', '/Fasca', '/kalori-tracker', '/deteksi-jantung', '/musik-relaksasi', '/sehat-sentosa', '/monitoring', '/partisipasi', '/FOTO'
+  ]
 
   // Cek kalau path saat ini adalah public path
   const isPublicPath = publicPaths.some(path =>
-    pathname === path || pathname.startsWith('/_next/') || pathname.startsWith('/icons/') || pathname.startsWith('/video/')
+    pathname === path || pathname.startsWith('/_next/') || pathname.startsWith('/icons/') || pathname.startsWith('/video/') || pathname.startsWith('/FOTO/')
   )
 
   // Ambil auth token dari cookie
