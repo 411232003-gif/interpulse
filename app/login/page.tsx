@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { Heart, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react'
-import ReCAPTCHA from 'react-google-recaptcha'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -16,37 +15,19 @@ export default function LoginPage() {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetSent, setResetSent] = useState(false)
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
-  const recaptchaRef = useRef<ReCAPTCHA>(null)
   const router = useRouter()
   const { login, resetPassword } = useAuth()
-
-  // reCAPTCHA site key - untuk production, ganti dengan key Anda sendiri dari https://www.google.com/recaptcha/admin
-  // Key test ini hanya untuk development
-  const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeCjvAsAAAAJimjdrQXBU97Anx8_cM54rBkONg'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    // Validasi reCAPTCHA
-    if (!recaptchaToken) {
-      setError('Silakan verifikasi reCAPTCHA terlebih dahulu.')
-      return
-    }
-
     setLoading(true)
 
     try {
       await login(email, password)
-      // Reset reCAPTCHA setelah login berhasil
-      recaptchaRef.current?.reset()
-      setRecaptchaToken(null)
       router.push('/')
     } catch (err: any) {
-      // Reset reCAPTCHA setelah login gagal
-      recaptchaRef.current?.reset()
-      setRecaptchaToken(null)
       setError(err.message || 'Login gagal. Periksa email dan password.')
     } finally {
       setLoading(false)
@@ -214,19 +195,9 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* reCAPTCHA Widget */}
-            <div className="flex justify-center">
-              <ReCAPTCHA
-                ref={recaptchaRef}
-                sitekey={RECAPTCHA_SITE_KEY}
-                onChange={(token) => setRecaptchaToken(token)}
-                onExpired={() => setRecaptchaToken(null)}
-              />
-            </div>
-
             <button
               type="submit"
-              disabled={loading || !recaptchaToken}
+              disabled={loading}
               className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-medium rounded-xl hover:from-teal-600 hover:to-cyan-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (

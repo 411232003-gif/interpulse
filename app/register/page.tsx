@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { Heart, Mail, Lock, Loader2, Eye, EyeOff, User, Calendar, Home, Badge } from 'lucide-react'
-import ReCAPTCHA from 'react-google-recaptcha'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -22,12 +21,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
-  const recaptchaRef = useRef<ReCAPTCHA>(null)
   const router = useRouter()
   const { register } = useAuth()
-
-  const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeCjvAsAAAAJimjdrQXBU97Anx8_cM54rBkONg'
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -69,11 +64,6 @@ export default function RegisterPage() {
       return
     }
 
-    if (!recaptchaToken) {
-      setError('Verifikasi reCAPTCHA diperlukan')
-      return
-    }
-
     setLoading(true)
 
     try {
@@ -92,12 +82,8 @@ export default function RegisterPage() {
         kelurahan: formData.kelurahan
       })
       console.log('Registration successful!')
-      recaptchaRef.current?.reset()
-      setRecaptchaToken(null)
       router.push('/')
     } catch (err: any) {
-      recaptchaRef.current?.reset()
-      setRecaptchaToken(null)
       console.error('Registration error:', err)
       console.error('Error code:', err.code)
       console.error('Error message:', err.message)
@@ -299,20 +285,9 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* reCAPTCHA */}
-            <div className="flex justify-center py-2">
-              <ReCAPTCHA
-                ref={recaptchaRef}
-                sitekey={RECAPTCHA_SITE_KEY}
-                onChange={(token) => setRecaptchaToken(token)}
-                onExpired={() => setRecaptchaToken(null)}
-                size="compact"
-              />
-            </div>
-
             <button
               type="submit"
-              disabled={loading || !recaptchaToken}
+              disabled={loading}
               className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-medium rounded-xl hover:from-teal-600 hover:to-cyan-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
