@@ -265,8 +265,7 @@ export default function CatatKesehatan() {
       const nilai = parseFloat(allData.nilai)
       newReading = { 
         type: 'asamurat', 
-        value: allData.nilai, 
-        gender: selectedResident.jenisKelamin === 'L' ? 'pria' : 'wanita', 
+        ...allData, 
         timestamp, 
         userId: userInfo.uid,
         userName: userInfo.name, 
