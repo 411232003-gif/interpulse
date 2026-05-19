@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Users, Target, Calendar, CheckCircle, AlertCircle, TrendingUp, Filter, UserPlus, Download, Plus, Edit, Trash2, X, History } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, getDocs } from 'firebase/firestore'
+import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle } from 'lucide-react'
 
 // Target PMT per RW
 const rwTargets = {
@@ -42,6 +43,7 @@ const mockAttendance = {
 }
 
 export default function PosbinduMonitoring() {
+  const router = useRouter()
   const { isAdmin } = useAuth()
   const [activeTab, setActiveTab] = useState<'datawarga' | 'riwayat' | 'absen'>(isAdmin ? 'datawarga' : 'absen')
   const [filterRW, setFilterRW] = useState<string>('')
@@ -637,8 +639,17 @@ export default function PosbinduMonitoring() {
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-b-3xl shadow-lg">
-        <h1 className="text-2xl font-bold mb-2">{isAdmin ? 'Monitoring Posbindu' : 'Absensi Posbindu'}</h1>
-        <p className="text-blue-100 text-sm">{isAdmin ? 'Pantau kesehatan warga dan partisipasi lansia' : 'Silakan isi form absensi saat datang ke Posbindu'}</p>
+        <div className="flex items-center gap-4 mb-2">
+          <button
+            onClick={() => router.push('/')}
+            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            title="Kembali ke Beranda"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-2xl font-bold">{isAdmin ? 'Monitoring Posbindu' : 'Absensi Posbindu'}</h1>
+        </div>
+        <p className="text-blue-100 text-sm ml-10">{isAdmin ? 'Pantau kesehatan warga dan partisipasi lansia' : 'Silakan isi form absensi saat datang ke Posbindu'}</p>
       </div>
 
       {/* Tab Navigation - Only for Admin */}
