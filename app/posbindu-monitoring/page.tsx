@@ -31,22 +31,6 @@ interface Resident {
   alamat: string
 }
 
-// Mock data for residents with health conditions (fallback)
-const mockResidents: Resident[] = [
-  { id: '1', nama: 'Budi Santoso', nik: '3175010101800001', rw: '01', rt: '01', umur: 45, jenisKelamin: 'L', tekananDarah: 140/90, gulaDarah: 180, kolesterol: 220, asamUrat: 8.5, alamat: 'Jl. Duri Selatan No. 1' },
-  { id: '2', nama: 'Siti Aminah', nik: '3175010201850002', rw: '01', rt: '02', umur: 52, jenisKelamin: 'P', tekananDarah: 130/85, gulaDarah: 150, kolesterol: 190, asamUrat: 6.0, alamat: 'Jl. Duri Selatan No. 2' },
-  { id: '3', nama: 'Ahmad Wijaya', nik: '3175010301900003', rw: '02', rt: '01', umur: 58, jenisKelamin: 'L', tekananDarah: 150/95, gulaDarah: 200, kolesterol: 250, asamUrat: 9.0, alamat: 'Jl. Duri Selatan No. 3' },
-  { id: '4', nama: 'Ratna Dewi', nik: '3175010401950004', rw: '02', rt: '03', umur: 35, jenisKelamin: 'P', tekananDarah: 120/80, gulaDarah: 95, kolesterol: 180, asamUrat: 5.0, alamat: 'Jl. Duri Selatan No. 4' },
-  { id: '5', nama: 'Joko Susilo', nik: '3175010501880005', rw: '03', rt: '02', umur: 48, jenisKelamin: 'L', tekananDarah: 135/88, gulaDarah: 160, kolesterol: 210, asamUrat: 7.5, alamat: 'Jl. Duri Selatan No. 5' },
-  { id: '6', nama: 'Maria Kartika', nik: '3175010601970006', rw: '03', rt: '01', umur: 28, jenisKelamin: 'P', tekananDarah: 115/75, gulaDarah: 90, kolesterol: 170, asamUrat: 4.5, alamat: 'Jl. Duri Selatan No. 6' },
-  { id: '7', nama: 'Supriyanto', nik: '3175010701950007', rw: '04', rt: '04', umur: 42, jenisKelamin: 'L', tekananDarah: 145/92, gulaDarah: 175, kolesterol: 230, asamUrat: 8.0, alamat: 'Jl. Duri Selatan No. 7' },
-  { id: '8', nama: 'Lestari', nik: '3175010801990008', rw: '04', rt: '02', umur: 26, jenisKelamin: 'P', tekananDarah: 118/78, gulaDarah: 88, kolesterol: 165, asamUrat: 4.2, alamat: 'Jl. Duri Selatan No. 8' },
-  { id: '9', nama: 'Hendra Gunawan', nik: '3175010901890009', rw: '05', rt: '01', umur: 55, jenisKelamin: 'L', tekananDarah: 155/98, gulaDarah: 220, kolesterol: 260, asamUrat: 9.5, alamat: 'Jl. Duri Selatan No. 9' },
-  { id: '10', nama: 'Wulan Sari', nik: '3175011001990010', rw: '05', rt: '03', umur: 26, jenisKelamin: 'P', tekananDarah: 120/80, gulaDarah: 92, kolesterol: 175, asamUrat: 4.8, alamat: 'Jl. Duri Selatan No. 10' },
-  { id: '11', nama: 'Darmawan', nik: '3175011101930011', rw: '06', rt: '02', umur: 50, jenisKelamin: 'L', tekananDarah: 148/94, gulaDarah: 190, kolesterol: 240, asamUrat: 8.8, alamat: 'Jl. Duri Selatan No. 11' },
-  { id: '12', nama: 'Sri Wahyuni', nik: '3175011202000012', rw: '06', rt: '01', umur: 25, jenisKelamin: 'P', tekananDarah: 117/77, gulaDarah: 89, kolesterol: 168, asamUrat: 4.3, alamat: 'Jl. Duri Selatan No. 12' },
-]
-
 // Mock data for elderly attendance
 const mockAttendance = {
   '01': { januari: 28, februari: 30, maret: 25, april: 32 },
@@ -60,12 +44,11 @@ const mockAttendance = {
 export default function PosbinduMonitoring() {
   const { isAdmin } = useAuth()
   const [activeTab, setActiveTab] = useState<'datawarga' | 'riwayat' | 'absen'>(isAdmin ? 'datawarga' : 'absen')
-  const [monitoringSubTab, setMonitoringSubTab] = useState<'pribadi' | 'posbindu'>('pribadi')
   const [filterRW, setFilterRW] = useState<string>('')
   const [filterRT, setFilterRT] = useState<string>('')
   const [filterUmur, setFilterUmur] = useState<string>('')
   const [searchNama, setSearchNama] = useState('')
-  const [residents, setResidents] = useState<Resident[]>(mockResidents)
+  const [residents, setResidents] = useState<Resident[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPosbinduModalOpen, setIsPosbinduModalOpen] = useState(false)
   const [editingResident, setEditingResident] = useState<Resident | null>(null)
@@ -157,10 +140,10 @@ export default function PosbinduMonitoring() {
         id: doc.id,
         ...doc.data()
       })) as Resident[]
-      setResidents(residentsData.length > 0 ? residentsData : mockResidents)
+      setResidents(residentsData)
     }, (error) => {
       console.error('Error fetching residents:', error)
-      setResidents(mockResidents)
+      setResidents([])
     })
     return () => unsubscribe()
   }, [])
@@ -603,26 +586,6 @@ export default function PosbinduMonitoring() {
     }
     return { label: 'Normal', color: 'bg-green-500' }
   }
-
-  // Calculate statistics from healthReadings
-  const getStats = () => {
-    const filteredReadings = healthReadings.filter(reading => {
-      if (filterRW && normalizeRTRW(reading.rw) !== normalizeRTRW(filterRW)) return false
-      if (filterRT && normalizeRTRW(reading.rt) !== normalizeRTRW(filterRT)) return false
-      if (reading.source !== monitoringSubTab) return false
-      if (searchNama && reading.userName && !reading.userName.toLowerCase().includes(searchNama.toLowerCase())) return false
-      return true
-    })
-
-    const hipertensi = filteredReadings.filter(r => r.type === 'tensi' && (parseInt(r.sistolik) > 140 || parseInt(r.diastolik) > 90)).length
-    const gulaTinggi = filteredReadings.filter(r => r.type === 'guladarah' && parseInt(r.value) > 160).length
-    const kolesterolTinggi = filteredReadings.filter(r => r.type === 'kolesterol' && parseInt(r.total) > 240).length
-    const asamUratTinggi = filteredReadings.filter(r => r.type === 'asamurat' && parseFloat(r.value) > 7).length
-    
-    return { hipertensi, gulaTinggi, kolesterolTinggi, asamUratTinggi }
-  }
-
-  const stats = getStats()
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault()
