@@ -33,7 +33,7 @@ export default function CatatKesehatan() {
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null)
   const [showFascaModal, setShowFascaModal] = useState(false)
   const [healthReadings, setHealthReadings] = useState<any[]>([])
-  const [todayReading, setTodayReading] = useState<any>(null)
+  const [todayReadingsForResident, setTodayReadingsForResident] = useState<any[]>([])
   const [isResetting, setIsResetting] = useState(false)
 
   // Fasca form state
@@ -105,15 +105,21 @@ export default function CatatKesehatan() {
     return () => unsubscribe()
   }, [])
 
-  // Check if resident has health data for today
-  const getTodayReading = (residentId: string) => {
+  // Check if resident has health data for today (all types)
+  const getTodayReadings = (residentId: string) => {
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
-    return healthReadings.find(reading => 
+    const todayReadings = healthReadings.filter(reading => 
       reading.userId === residentId && 
       reading.timestamp.startsWith(todayStr) &&
       reading.source === 'posbindu'
     )
+    return {
+      allTypes: ['tensi', 'kolesterol', 'asamurat', 'guladarah'].every(type => 
+        todayReadings.some(r => r.type === type)
+      ),
+      readings: todayReadings
+    }
   }
 
   // Filter residents
@@ -197,6 +203,7 @@ export default function CatatKesehatan() {
     if (healthType === 'tensi') {
       const sys = parseInt(allData.sistolik)
       const dia = parseInt(allData.diastolik)
+      const nadi = parseInt(allData.nadi)
       newReading = { 
         type: 'tensi', 
         ...allData, 
@@ -209,6 +216,11 @@ export default function CatatKesehatan() {
         source: 'posbindu'
       }
       validationResult = validateBloodPressure(sys, dia)
+      validationResult.values = [
+        { label: 'Sistolik', value: sys, unit: 'mmHg' },
+        { label: 'Diastolik', value: dia, unit: 'mmHg' },
+        { label: 'Nadi', value: nadi, unit: 'bpm' }
+      ]
     } else if (healthType === 'guladarah') {
       const nilai = parseInt(allData.nilai)
       newReading = { 
@@ -223,8 +235,14 @@ export default function CatatKesehatan() {
         source: 'posbindu'
       }
       validationResult = validateBloodSugar(nilai)
+      validationResult.values = [
+        { label: 'Gula Darah', value: nilai, unit: 'mg/dL' }
+      ]
     } else if (healthType === 'kolesterol') {
       const total = parseInt(allData.total)
+      const ldl = parseInt(allData.ldl)
+      const hdl = parseInt(allData.hdl)
+      const trigliserida = parseInt(allData.trigliserida)
       newReading = { 
         type: 'kolesterol', 
         ...allData, 
@@ -236,13 +254,15 @@ export default function CatatKesehatan() {
         kelurahan: userInfo.kelurahan,
         source: 'posbindu'
       }
-      
-      if (total < 200) validationResult = { status: 'normal', title: 'Kolesterol Normal', color: 'text-green-700', bgColor: 'bg-gradient-to-br from-green-100 to-green-200', icon: <CheckCircle className="w-24 h-24 text-green-600" />, message: `${total} mg/dL`, advice: 'Kolesterol normal. Pertahankan!' }
-      else if (total < 240) validationResult = { status: 'warning', title: 'Kolesterol Batas', color: 'text-yellow-700', bgColor: 'bg-gradient-to-br from-yellow-100 to-yellow-200', icon: <AlertCircle className="w-24 h-24 text-yellow-600" />, message: `${total} mg/dL`, advice: 'Kolesterol mendekati tinggi. Kurangi lemak.' }
-      else validationResult = { status: 'danger', title: 'Kolesterol Tinggi', color: 'text-red-700', bgColor: 'bg-gradient-to-br from-red-100 to-red-200', icon: <XCircle className="w-24 h-24 text-red-600" />, message: `${total} mg/dL`, advice: 'Kolesterol tinggi! Segera ke dokter.' }
-      
+      validationResult = validateCholesterol(total)
+      validationResult.values = [
+        { label: 'Total', value: total, unit: 'mg/dL' },
+        { label: 'LDL', value: ldl, unit: 'mg/dL' },
+        { label: 'HDL', value: hdl, unit: 'mg/dL' },
+        { label: 'Trigliserida', value: trigliserida, unit: 'mg/dL' }
+      ]
     } else if (healthType === 'asamurat') {
-      const val = parseFloat(allData.nilai)
+      const nilai = parseFloat(allData.nilai)
       newReading = { 
         type: 'asamurat', 
         value: allData.nilai, 
@@ -256,9 +276,12 @@ export default function CatatKesehatan() {
         source: 'posbindu'
       }
       
-      if (val <= (selectedResident.jenisKelamin === 'L' ? 7 : 6)) validationResult = { status: 'normal', title: 'Asam Urat Normal', color: 'text-green-700', bgColor: 'bg-gradient-to-br from-green-100 to-green-200', icon: <CheckCircle className="w-24 h-24 text-green-600" />, message: `${val} mg/dL`, advice: 'Asam urat normal. Pertahankan!' }
-      else if (val <= (selectedResident.jenisKelamin === 'L' ? 8 : 7)) validationResult = { status: 'warning', title: 'Asam Urat Batas', color: 'text-yellow-700', bgColor: 'bg-gradient-to-br from-yellow-100 to-yellow-200', icon: <AlertCircle className="w-24 h-24 text-yellow-600" />, message: `${val} mg/dL`, advice: 'Asam urat mendekati tinggi. Hindari jeroan.' }
-      else validationResult = { status: 'danger', title: 'Asam Urat Tinggi', color: 'text-red-700', bgColor: 'bg-gradient-to-br from-red-100 to-red-200', icon: <XCircle className="w-24 h-24 text-red-600" />, message: `${val} mg/dL`, advice: 'Asam urat tinggi! Segera ke dokter.' }
+      if (nilai <= (selectedResident.jenisKelamin === 'L' ? 7 : 6)) validationResult = { status: 'normal', title: 'Asam Urat Normal', color: 'text-green-700', bgColor: 'bg-gradient-to-br from-green-100 to-green-200', icon: <CheckCircle className="w-24 h-24 text-green-600" />, message: `${nilai} mg/dL`, advice: 'Asam urat normal. Pertahankan!' }
+      else if (nilai <= (selectedResident.jenisKelamin === 'L' ? 8 : 7)) validationResult = { status: 'warning', title: 'Asam Urat Batas', color: 'text-yellow-700', bgColor: 'bg-gradient-to-br from-yellow-100 to-yellow-200', icon: <AlertCircle className="w-24 h-24 text-yellow-600" />, message: `${nilai} mg/dL`, advice: 'Asam urat mendekati tinggi. Hindari jeroan.' }
+      else validationResult = { status: 'danger', title: 'Asam Urat Tinggi', color: 'text-red-700', bgColor: 'bg-gradient-to-br from-red-100 to-red-200', icon: <XCircle className="w-24 h-24 text-red-600" />, message: `${nilai} mg/dL`, advice: 'Asam urat tinggi! Segera ke dokter.' }
+      validationResult.values = [
+        { label: 'Asam Urat', value: nilai, unit: 'mg/dL' }
+      ]
       
     } else {
       const val = parseInt(allData.nilai)
@@ -284,8 +307,9 @@ export default function CatatKesehatan() {
       await addDoc(collection(db, 'healthReadings'), newReading)
       setResult(validationResult)
       setStep('result')
+      setTodayReadingsForResident(prev => [...prev, newReading])
     } catch (error) {
-      console.error('Error saving to Firestore:', error)
+      console.error('Error saving health reading:', error)
       alert('Gagal menyimpan data. Coba lagi.')
     } finally {
       setSaving(false)
@@ -320,21 +344,23 @@ export default function CatatKesehatan() {
 
   const openFascaModal = (resident: Resident) => {
     setSelectedResident(resident)
-    const todayData = getTodayReading(resident.id)
-    setTodayReading(todayData)
+    const todayData = getTodayReadings(resident.id)
     setShowFascaModal(true)
-    if (todayData) {
-      // Pre-fill data if exists for today
-      setData(todayData)
+    if (todayData.readings.length > 0) {
+      // Store all today's readings
+      setTodayReadingsForResident(todayData.readings)
     }
   }
 
   const handleResetTodayData = async () => {
-    if (!todayReading || !selectedResident) return
+    if (!selectedResident || todayReadingsForResident.length === 0) return
     setIsResetting(true)
     try {
-      await deleteDoc(doc(db, 'healthReadings', todayReading.id))
-      setTodayReading(null)
+      // Delete all today's readings for this resident
+      for (const reading of todayReadingsForResident) {
+        await deleteDoc(doc(db, 'healthReadings', reading.id))
+      }
+      setTodayReadingsForResident([])
       setData({})
       setCurrentInput('')
       setInputIndex(0)
@@ -402,7 +428,7 @@ export default function CatatKesehatan() {
                       <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
                     </tr>
                   ) : filteredResidents.map(r => {
-                    const todayData = getTodayReading(r.id)
+                    const todayData = getTodayReadings(r.id)
                     return (
                       <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
@@ -411,7 +437,7 @@ export default function CatatKesehatan() {
                         <td className="px-4 py-3 text-gray-600">{r.umur} th</td>
                         <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                         <td className="px-4 py-3 text-center">
-                          {todayData ? (
+                          {todayData.allTypes ? (
                             <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
                           ) : (
                             <XCircle className="w-5 h-5 text-gray-400 mx-auto" />
@@ -453,7 +479,7 @@ export default function CatatKesehatan() {
               <Activity className="w-8 h-8 text-white" />
             </div>
             <p className="text-gray-600">Pilih jenis pemeriksaan</p>
-            {todayReading && (
+            {todayReadingsForResident.length > 0 && (
               <p className="text-xs text-green-600 mt-2">Data hari ini sudah ada</p>
             )}
           </div>
@@ -468,11 +494,12 @@ export default function CatatKesehatan() {
                   setInputIndex(0); 
                   setCurrentInput('');
                   // Pre-fill data if exists for today
-                  if (todayReading && todayReading.type === type) {
+                  const existingReading = todayReadingsForResident.find(r => r.type === type)
+                  if (existingReading) {
                     const config = healthConfig[type]
                     const prefilledData: Record<string, string> = {}
-                    config.fields.forEach((field, idx) => {
-                      prefilledData[field.key] = todayReading[field.key] || ''
+                    config.fields.forEach((field) => {
+                      prefilledData[field.key] = existingReading[field.key] || ''
                     })
                     setData(prefilledData)
                     setInputIndex(config.fields.length - 1)
@@ -488,7 +515,7 @@ export default function CatatKesehatan() {
             ))}
           </div>
 
-          {todayReading && (
+          {todayReadingsForResident.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <button
                 onClick={handleResetTodayData}
@@ -510,10 +537,22 @@ export default function CatatKesehatan() {
         <div className="bg-white rounded-3xl shadow-2xl p-8 text-center w-full max-w-2xl">
           <div className="flex justify-center mb-6">{result.icon}</div>
           <h1 className={`text-4xl font-bold ${result.color} mb-4`}>{result.title}</h1>
-          <div className="bg-gray-100 rounded-2xl p-6 mb-6">
-            <p className="text-gray-600 text-xl mb-2">Hasil:</p>
-            <p className={`text-5xl font-bold ${result.color}`}>{result.message}</p>
-          </div>
+          
+          {/* Display actual input values */}
+          {result.values && (
+            <div className="bg-gray-100 rounded-2xl p-6 mb-6">
+              <p className="text-gray-600 text-xl mb-4">Nilai Input:</p>
+              <div className="grid grid-cols-2 gap-4">
+                {result.values.map((val: any, idx: number) => (
+                  <div key={idx} className="bg-white rounded-xl p-4 shadow-sm">
+                    <p className="text-sm text-gray-500">{val.label}</p>
+                    <p className={`text-2xl font-bold ${result.color}`}>{val.value} {val.unit}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 mb-8">
             <p className="text-lg text-gray-800 leading-relaxed">{result.advice}</p>
           </div>
@@ -539,7 +578,7 @@ export default function CatatKesehatan() {
           <h2 className="text-2xl font-bold text-gray-800 mb-1">{currentField?.label}</h2>
           <p className="text-gray-600">{config?.title} - Step {inputIndex + 1}</p>
           <p className="text-sm text-gray-500 mt-1">Warga: {selectedResident?.nama}</p>
-          {todayReading && todayReading.type === healthType && (
+          {todayReadingsForResident.length > 0 && (
             <p className="text-xs text-green-600 mt-1">Data hari ini tersimpan</p>
           )}
         </div>
@@ -547,7 +586,7 @@ export default function CatatKesehatan() {
         <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl p-6 mb-4 border-2 border-blue-300">
           <div className="text-center">
             <p className="text-6xl font-bold text-blue-700 min-h-[80px] flex items-center justify-center">
-              {currentInput || (todayReading && todayReading.type === healthType && currentField?.key && data[currentField.key] ? data[currentField.key] : '---')}
+              {currentInput || (todayReadingsForResident.length > 0 && currentField?.key && data[currentField.key] ? data[currentField.key] : '---')}
             </p>
             <p className="text-xl text-gray-600 mt-4">{currentField?.unit}</p>
           </div>
