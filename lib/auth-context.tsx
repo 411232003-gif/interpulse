@@ -115,9 +115,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           
           // Fetch user profile from Firestore
-          const profileDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
-          if (profileDoc.exists()) {
-            setUserProfile(profileDoc.data() as UserProfile)
+          try {
+            const profileDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
+            if (profileDoc.exists()) {
+              setUserProfile(profileDoc.data() as UserProfile)
+            } else {
+              console.warn('User profile not found in Firestore for uid:', firebaseUser.uid)
+            }
+          } catch (err: any) {
+            console.error('Error fetching user profile from Firestore:', err)
+            console.error('Error code:', err.code)
+            console.error('Error message:', err.message)
           }
         } else {
           setUserProfile(null)
