@@ -45,6 +45,13 @@ export default function MonitoringPage() {
 
   const filteredReadings = (source: string) => healthReadings.filter(r => {
     if (r.source !== source) return false
+    // Filter 1 minggu untuk monitoring pribadi
+    if (source === 'pribadi') {
+      const oneWeekAgo = new Date()
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+      const readingDate = new Date(r.timestamp)
+      if (readingDate < oneWeekAgo) return false
+    }
     if (filterRW && normalizeRTRW(r.rw) !== normalizeRTRW(filterRW)) return false
     if (filterRT && normalizeRTRW(r.rt) !== normalizeRTRW(filterRT)) return false
     if (searchNama && r.userName && !r.userName.toLowerCase().includes(searchNama.toLowerCase())) return false

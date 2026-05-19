@@ -25,8 +25,9 @@ export default function PartisipasiPage() {
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
 
   useEffect(() => {
-    const attendanceRef = collection(db, 'attendance')
-    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
+    // Sinkronkan dengan monitoring posbindu: ambil data dari healthReadings dengan source 'posbindu'
+    const healthReadingsRef = collection(db, 'healthReadings')
+    const unsubscribe = onSnapshot(healthReadingsRef, (snapshot) => {
       const data: Record<string, Record<string, number>> = {}
       Object.keys(rwTargets).forEach(rw => {
         data[rw] = {}
@@ -34,10 +35,13 @@ export default function PartisipasiPage() {
       })
       snapshot.docs.forEach(doc => {
         const d = doc.data()
-        const rw = d.rw
-        if (rw && data[rw]) {
-          const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-          if (data[rw][month] !== undefined) data[rw][month]++
+        // Hanya ambil data dari monitoring posbindu
+        if (d.source === 'posbindu') {
+          const rw = d.rw
+          if (rw && data[rw]) {
+            const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+            if (data[rw][month] !== undefined) data[rw][month]++
+          }
         }
       })
       setElderlyAttendance(data)
