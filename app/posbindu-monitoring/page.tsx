@@ -44,8 +44,9 @@ const mockAttendance = {
 
 export default function PosbinduMonitoring() {
   const router = useRouter()
-  const { isAdmin } = useAuth()
+  const { isAdmin, userProfile } = useAuth()
   const [activeTab, setActiveTab] = useState<'datawarga' | 'riwayat' | 'absen'>(isAdmin ? 'datawarga' : 'absen')
+  const [autoFillFromProfile, setAutoFillFromProfile] = useState(false)
   const [filterRW, setFilterRW] = useState<string>('')
   const [filterRT, setFilterRT] = useState<string>('')
   const [filterUmur, setFilterUmur] = useState<string>('')
@@ -149,6 +150,11 @@ export default function PosbinduMonitoring() {
     })
     return () => unsubscribe()
   }, [])
+
+  // Auto-fill form when checkbox is checked
+  useEffect(() => {
+    handleAutoFillFromProfile()
+  }, [autoFillFromProfile])
 
   // Fetch elderly attendance from Firestore - REAL TIME SYNC
   useEffect(() => {
@@ -587,6 +593,30 @@ export default function PosbinduMonitoring() {
       return { label: 'Normal', color: 'bg-green-500' }
     }
     return { label: 'Normal', color: 'bg-green-500' }
+  }
+
+  const handleAutoFillFromProfile = () => {
+    if (autoFillFromProfile && userProfile) {
+      // Calculate age from birthDate
+      let age = 0
+      if (userProfile.birthDate) {
+        const birthDate = new Date(userProfile.birthDate)
+        const today = new Date()
+        age = today.getFullYear() - birthDate.getFullYear()
+      }
+
+      setCheckInForm({
+        nama: userProfile.name || '',
+        nik: userProfile.nik || '',
+        umur: age.toString(),
+        rt: userProfile.rt || '',
+        rw: userProfile.rw || '',
+        alamat: userProfile.kelurahan || '',
+      })
+    } else {
+      // Clear form if checkbox is unchecked
+      setCheckInForm({ nama: '', nik: '', umur: '', rt: '', rw: '', alamat: '' })
+    }
   }
 
   const handleCheckIn = async (e: React.FormEvent) => {
@@ -1218,6 +1248,20 @@ export default function PosbinduMonitoring() {
                 <h3 className="font-semibold text-gray-800">Form Absensi Posbindu</h3>
               </div>
               <form onSubmit={handleCheckIn} className="space-y-4">
+                {/* Auto-fill from profile checkbox */}
+                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <input
+                    type="checkbox"
+                    id="autoFill"
+                    checked={autoFillFromProfile}
+                    onChange={(e) => setAutoFillFromProfile(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="autoFill" className="text-sm text-blue-800 font-medium cursor-pointer">
+                    Isi data otomatis dari profil saya
+                  </label>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap</label>
                   <input
