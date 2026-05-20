@@ -109,11 +109,22 @@ export default function CatatKesehatan() {
   const getTodayReadings = (residentId: string) => {
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
-    const todayReadings = healthReadings.filter(reading => 
-      reading.userId === residentId && 
+    console.log('[Fasca] Getting today readings for resident:', residentId)
+    console.log('[Fasca] All health readings:', healthReadings)
+    const todayReadings = healthReadings.filter(reading => {
+      const match = reading.userId === residentId && 
       reading.timestamp.startsWith(todayStr) &&
       reading.source === 'posbindu'
-    )
+      console.log('[Fasca] Reading check:', { 
+        readingId: reading.id, 
+        readingUserId: reading.userId, 
+        residentId, 
+        match,
+        type: reading.type 
+      })
+      return match
+    })
+    console.log('[Fasca] Filtered today readings:', todayReadings)
     return {
       allTypes: ['tensi', 'kolesterol', 'asamurat', 'guladarah'].every(type => 
         todayReadings.some(r => r.type === type)
@@ -196,6 +207,9 @@ export default function CatatKesehatan() {
       rw: selectedResident.rw,
       kelurahan: userProfile?.kelurahan || '-'
     }
+    
+    console.log('[Fasca] Saving data for resident:', selectedResident.nama, 'ID:', selectedResident.id)
+    console.log('[Fasca] userInfo:', userInfo)
     
     let newReading: any
     let validationResult: any
@@ -342,12 +356,18 @@ export default function CatatKesehatan() {
   }
 
   const openFascaModal = (resident: Resident) => {
+    console.log('[Fasca] Opening modal for resident:', resident.nama, 'ID:', resident.id)
     setSelectedResident(resident)
+    // Clear previous readings first
+    setTodayReadingsForResident([])
     const todayData = getTodayReadings(resident.id)
     setShowFascaModal(true)
     if (todayData.readings.length > 0) {
-      // Store all today's readings
+      // Store all today's readings for THIS resident only
+      console.log('[Fasca] Setting today readings for resident:', resident.id, todayData.readings)
       setTodayReadingsForResident(todayData.readings)
+    } else {
+      console.log('[Fasca] No today readings for resident:', resident.id)
     }
   }
 

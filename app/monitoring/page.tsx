@@ -9,235 +9,68 @@ import Link from 'next/link'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-
-// ── Kategorisasi Kesehatan ─────────────────────────────────────────
-const getTensiCategory = (sistolik: number, diastolik: number) => {
-  if (sistolik < 90 || diastolik < 60) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-300' }
-  if (sistolik <= 119 && diastolik <= 79) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100', border: 'border-green-300' }
-  if (sistolik <= 139 || diastolik <= 89) return { label: 'Pre-Hipertensi', color: 'text-yellow-600', bg: 'bg-yellow-100', border: 'border-yellow-300' }
-  return { label: 'Hipertensi', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-300' }
-}
-
-const getGulaCategory = (value: number) => {
-  if (value < 70) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100' }
-  if (value <= 99) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100' }
-  if (value <= 160) return { label: 'Pre-Diabetes', color: 'text-yellow-600', bg: 'bg-yellow-100' }
-  return { label: 'Diabetes', color: 'text-red-600', bg: 'bg-red-100' }
-}
-
-const getKolesterolCategory = (total: number) => {
-  if (total < 150) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100' }
-  if (total <= 199) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100' }
-  if (total <= 239) return { label: 'Batas Tinggi', color: 'text-yellow-600', bg: 'bg-yellow-100' }
-  return { label: 'Tinggi', color: 'text-red-600', bg: 'bg-red-100' }
-}
-
-const getAsamUratCategory = (value: number, gender: string) => {
-  const max = gender === 'pria' ? 7.0 : 6.0
-  if (value < 2.5) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100' }
-  if (value <= max) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100' }
-  if (value <= max + 1) return { label: 'Batas Tinggi', color: 'text-yellow-600', bg: 'bg-yellow-100' }
-  return { label: 'Tinggi', color: 'text-red-600', bg: 'bg-red-100' }
-}
-
-const get4GAdvice = (reading: any): string[] => {
-  const advice: string[] = []
-  if (reading.type === 'tensi') {
-    const cat = getTensiCategory(parseInt(reading.sistolik), parseInt(reading.diastolik))
-    if (cat.label === 'Hipertensi' || cat.label === 'Pre-Hipertensi') {
-      advice.push('🧂 Batasi Garam', '🍳 Batasi Gorengan', '🥩 Batasi Gajih (Lemak)')
-    }
-  } else if (reading.type === 'guladarah') {
-    const cat = getGulaCategory(parseInt(reading.value))
-    if (cat.label === 'Diabetes' || cat.label === 'Pre-Diabetes') {
-      advice.push('🍬 Batasi Gula', '🍳 Batasi Gorengan', '🥩 Batasi Gajih (Lemak)')
-    }
-  } else if (reading.type === 'kolesterol') {
-    const cat = getKolesterolCategory(parseInt(reading.total))
-    if (cat.label === 'Tinggi' || cat.label === 'Batas Tinggi') {
-      advice.push('🥩 Batasi Gajih (Lemak)', '🍳 Batasi Gorengan')
-    }
-  } else if (reading.type === 'asamurat') {
-    const cat = getAsamUratCategory(parseFloat(reading.value), reading.gender || 'pria')
-    if (cat.label === 'Tinggi' || cat.label === 'Batas Tinggi') {
-      advice.push('🥩 Batasi Gajih (Lemak)', '🍳 Batasi Gorengan', '🍬 Batasi Gula')
-    }
-  }
-  return advice
-}
-
-const getReadingCategory = (reading: any) => {
-  if (reading.type === 'tensi') return getTensiCategory(parseInt(reading.sistolik), parseInt(reading.diastolik))
-  if (reading.type === 'guladarah') return getGulaCategory(parseInt(reading.value))
-  if (reading.type === 'kolesterol') return getKolesterolCategory(parseInt(reading.total))
-  if (reading.type === 'asamurat') return getAsamUratCategory(parseFloat(reading.value), reading.gender || 'pria')
-  return { label: '-', color: 'text-gray-600', bg: 'bg-gray-100' }
-}
 
 export default function MonitoringPage() {
   const { isAdmin } = useAuth()
   const [pribadiOpen, setPribadiOpen] = useState(false)
   const [posbinduOpen, setPosbinduOpen] = useState(false)
-  const [healthReadings, setHealthReadings] = useState<any[]>([])
+  const [attendanceList, setAttendanceList] = useState<any[]>([])
   const [filterRW, setFilterRW] = useState('')
   const [filterRT, setFilterRT] = useState('')
   const [searchNama, setSearchNama] = useState('')
-  const [isPosbinduModalOpen, setIsPosbinduModalOpen] = useState(false)
-  const [isHealthEditModalOpen, setIsHealthEditModalOpen] = useState(false)
-  const [editingHealth, setEditingHealth] = useState<any>(null)
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
-  const [showGrafikGula, setShowGrafikGula] = useState(false)
-  const [grafikFilterNama, setGrafikFilterNama] = useState('')
-  const [posbinduForm, setPosbinduForm] = useState({
-    type: 'tensi', userName: '', rt: '', rw: '', kelurahan: '',
-    sistolik: '', diastolik: '', nadi: '', total: '', ldl: '', hdl: '',
-    trigliserida: '', value: '', gender: 'pria'
-  })
-  const [healthEditForm, setHealthEditForm] = useState({
-    type: 'tensi', userName: '', rt: '', rw: '',
-    sistolik: '', diastolik: '', nadi: '', total: '', ldl: '', hdl: '',
-    trigliserida: '', value: ''
-  })
 
   const normalizeRTRW = (value: string) => value ? value.toString().padStart(2, '0') : ''
 
   useEffect(() => {
-    const readingsRef = collection(db, 'healthReadings')
-    const unsubscribe = onSnapshot(readingsRef, (snapshot) => {
-      setHealthReadings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+    const attendanceRef = collection(db, 'attendance')
+    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setAttendanceList(data)
     })
     return () => unsubscribe()
   }, [])
 
-  const filteredReadings = (source: string) => healthReadings.filter(r => {
-    if (r.source !== source) return false
-    // Filter 1 minggu untuk monitoring pribadi
-    if (source === 'pribadi') {
-      const oneWeekAgo = new Date()
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-      const readingDate = new Date(r.timestamp)
-      if (readingDate < oneWeekAgo) return false
-    }
+  const filteredAttendance = attendanceList.filter(r => {
     if (filterRW && normalizeRTRW(r.rw) !== normalizeRTRW(filterRW)) return false
     if (filterRT && normalizeRTRW(r.rt) !== normalizeRTRW(filterRT)) return false
-    if (searchNama && r.userName && !r.userName.toLowerCase().includes(searchNama.toLowerCase())) return false
+    if (searchNama && r.nama && !r.nama.toLowerCase().includes(searchNama.toLowerCase())) return false
     return true
   })
 
-  const getStats = (source: string) => {
-    const readings = filteredReadings(source)
-    return {
-      hipertensi: readings.filter(r => {
-        if (r.type !== 'tensi') return false
-        const cat = getTensiCategory(parseInt(r.sistolik), parseInt(r.diastolik))
-        return cat.label === 'Hipertensi' || cat.label === 'Pre-Hipertensi'
-      }).length,
-      gulaTinggi: readings.filter(r => {
-        if (r.type !== 'guladarah') return false
-        const cat = getGulaCategory(parseInt(r.value))
-        return cat.label === 'Diabetes' || cat.label === 'Pre-Diabetes'
-      }).length,
-      kolesterolTinggi: readings.filter(r => {
-        if (r.type !== 'kolesterol') return false
-        const cat = getKolesterolCategory(parseInt(r.total))
-        return cat.label === 'Tinggi' || cat.label === 'Batas Tinggi'
-      }).length,
-      asamUratTinggi: readings.filter(r => {
-        if (r.type !== 'asamurat') return false
-        const cat = getAsamUratCategory(parseFloat(r.value), r.gender || 'pria')
-        return cat.label === 'Tinggi' || cat.label === 'Batas Tinggi'
-      }).length,
-    }
-  }
-
-  const getGulaChartData = (nama: string) => {
-    return healthReadings
-      .filter(r => r.type === 'guladarah' && (!nama || (r.userName || '').toLowerCase().includes(nama.toLowerCase())))
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      .map(r => ({
-        tanggal: new Date(r.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
-        nilai: parseInt(r.value),
-        nama: r.userName || 'Unknown',
-      }))
-  }
-
-  const getRecordNumber = async (rw: string) => {
-    const q = query(collection(db, 'healthReadings'), where('rw', '==', rw))
-    const snap = await getDocs(q)
-    return `${snap.size + 1}/${rw}`
-  }
-
-  const handlePosbinduSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const recordNum = await getRecordNumber(posbinduForm.rw)
-      const newReading: any = {
-        type: posbinduForm.type, source: 'posbindu',
-        userName: posbinduForm.userName, rt: posbinduForm.rt, rw: posbinduForm.rw,
-        kelurahan: posbinduForm.kelurahan, timestamp: new Date().toISOString(),
-        recordNumber: recordNum
-      }
-      if (posbinduForm.type === 'tensi') Object.assign(newReading, { sistolik: posbinduForm.sistolik, diastolik: posbinduForm.diastolik, nadi: posbinduForm.nadi })
-      else if (posbinduForm.type === 'kolesterol') Object.assign(newReading, { total: posbinduForm.total, ldl: posbinduForm.ldl, hdl: posbinduForm.hdl, trigliserida: posbinduForm.trigliserida })
-      else Object.assign(newReading, { value: posbinduForm.value })
-      await addDoc(collection(db, 'healthReadings'), newReading)
-      setIsPosbinduModalOpen(false)
-      setPosbinduForm({ type: 'tensi', userName: '', rt: '', rw: '', kelurahan: '', sistolik: '', diastolik: '', nadi: '', total: '', ldl: '', hdl: '', trigliserida: '', value: '', gender: 'pria' })
-      alert('Data posbindu berhasil disimpan!')
-    } catch { alert('Gagal menyimpan data.') }
-  }
-
-  const openEditHealthModal = (reading: any) => {
-    setEditingHealth(reading)
-    setHealthEditForm({ type: reading.type, userName: reading.userName || '', rt: reading.rt || '', rw: reading.rw || '', sistolik: reading.sistolik || '', diastolik: reading.diastolik || '', nadi: reading.nadi || '', total: reading.total || '', ldl: reading.ldl || '', hdl: reading.hdl || '', trigliserida: reading.trigliserida || '', value: reading.value || '' })
-    setIsHealthEditModalOpen(true)
-  }
-
-  const handleEditHealth = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingHealth) return
-    try {
-      const updated: any = { type: healthEditForm.type, userName: healthEditForm.userName, rt: healthEditForm.rt, rw: healthEditForm.rw }
-      if (healthEditForm.type === 'tensi') Object.assign(updated, { sistolik: healthEditForm.sistolik, diastolik: healthEditForm.diastolik, nadi: healthEditForm.nadi })
-      else if (healthEditForm.type === 'kolesterol') Object.assign(updated, { total: healthEditForm.total, ldl: healthEditForm.ldl, hdl: healthEditForm.hdl, trigliserida: healthEditForm.trigliserida })
-      else Object.assign(updated, { value: healthEditForm.value })
-      await updateDoc(doc(db, 'healthReadings', editingHealth.id), updated)
-      setIsHealthEditModalOpen(false)
-      setEditingHealth(null)
-    } catch { alert('Gagal memperbarui data.') }
-  }
-
-  const exportMonitoringToPDF = (source: string) => {
+  const exportAttendanceToPDF = () => {
     const doc = new jsPDF()
-    const readings = filteredReadings(source)
-    const sourceName = source === 'pribadi' ? 'Pribadi' : 'Posbindu'
     
     doc.setFillColor(37, 99, 235)
     doc.rect(0, 0, 210, 40, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
-    doc.text(`Monitoring Kesehatan ${sourceName}`, 105, 20, { align: 'center' })
+    doc.text('Absensi Warga', 105, 20, { align: 'center' })
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
     doc.text(`Kelurahan Duris Selatan - ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 105, 30, { align: 'center' })
     
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(10)
-    doc.text(`Total Data: ${readings.length}`, 14, 50)
+    doc.text(`Total Absensi: ${filteredAttendance.length}`, 14, 50)
     
-    const tableData = readings.map(r => [
-      r.userName || 'Unknown',
+    const tableData = filteredAttendance.map(r => [
+      r.nama || 'Unknown',
+      r.nik || '-',
       `RW ${r.rw || '-'}/RT ${r.rt || '-'}`,
-      r.type,
-      r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}` : r.type === 'kolesterol' ? r.total : r.value || '-',
-      new Date(r.timestamp).toLocaleDateString('id-ID')
+      r.umur || '-',
+      r.alamat || '-',
+      new Date(r.timestamp).toLocaleDateString('id-ID'),
+      new Date(r.timestamp).toLocaleTimeString('id-ID')
     ])
     
     autoTable(doc, {
       startY: 55,
-      head: [['Nama', 'RW/RT', 'Jenis', 'Nilai', 'Tanggal']],
+      head: [['Nama', 'NIK', 'RW/RT', 'Umur', 'Alamat', 'Tanggal', 'Waktu']],
       body: tableData,
       styles: {
         fontSize: 8,
@@ -253,59 +86,56 @@ export default function MonitoringPage() {
       },
     })
     
-    doc.save(`monitoring-${source}.pdf`)
+    doc.save('absensi.pdf')
   }
 
-  const exportMonitoringToExcel = (source: string) => {
-    const readings = filteredReadings(source)
-    const sourceName = source === 'pribadi' ? 'Pribadi' : 'Posbindu'
-    
-    const data = readings.map(r => ({
-      'Nama': r.userName || 'Unknown',
+  const exportAttendanceToExcel = () => {
+    const data = filteredAttendance.map(r => ({
+      'Nama': r.nama || 'Unknown',
+      'NIK': r.nik || '-',
       'RW': r.rw || '-',
       'RT': r.rt || '-',
-      'Jenis Pemeriksaan': r.type,
-      'Nilai': r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}` : r.type === 'kolesterol' ? r.total : r.value || '-',
+      'Umur': r.umur || '-',
+      'Alamat': r.alamat || '-',
       'Tanggal': new Date(r.timestamp).toLocaleDateString('id-ID'),
       'Waktu': new Date(r.timestamp).toLocaleTimeString('id-ID'),
     }))
     
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, `Monitoring ${sourceName}`)
+    XLSX.utils.book_append_sheet(wb, ws, 'Absensi')
     
     ws['!cols'] = [
       { wch: 20 },
+      { wch: 18 },
       { wch: 5 },
       { wch: 5 },
-      { wch: 15 },
-      { wch: 10 },
+      { wch: 8 },
+      { wch: 30 },
       { wch: 15 },
       { wch: 10 },
     ]
     
-    XLSX.writeFile(wb, `monitoring-${source}.xlsx`)
+    XLSX.writeFile(wb, 'absensi.xlsx')
   }
 
-  const exportMonitoringToWhatsApp = (source: string) => {
-    const readings = filteredReadings(source)
-    const sourceName = source === 'pribadi' ? 'Pribadi' : 'Posbindu'
-    
-    let message = `📊 *MONITORING KESEHATAN ${sourceName.toUpperCase()}*\n`
+  const exportAttendanceToWhatsApp = () => {
+    let message = `📊 *ABSENSI WARGA*\n`
     message += `🏥 Kelurahan Duris Selatan\n`
     message += `📅 ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
-    message += `• Total Data: ${readings.length}\n\n`
+    message += `• Total Absensi: ${filteredAttendance.length}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📋 *DATA DETAIL*\n\n`
     
-    readings.forEach((r, index) => {
-      message += `${index + 1}. ${r.userName || 'Unknown'}\n`
-      message += `   RW/RT: ${r.rw || '-'}/${r.rt || '-'}\n`
-      message += `   Jenis: ${r.type}\n`
-      message += `   Nilai: ${r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}` : r.type === 'kolesterol' ? r.total : r.value || '-'}\n`
-      message += `   Tanggal: ${new Date(r.timestamp).toLocaleDateString('id-ID')}\n\n`
+    filteredAttendance.forEach((r, index) => {
+      message += `${index + 1}. ${r.nama || 'Unknown'}\n`
+      message += `   NIK: ${r.nik || '-'}\n`
+      message += `   RW/RT: ${r.rw || '-'}/${r.rt || '-'} | Umur: ${r.umur || '-'}\n`
+      message += `   Alamat: ${r.alamat || '-'}\n`
+      message += `   Tanggal: ${new Date(r.timestamp).toLocaleDateString('id-ID')}\n`
+      message += `   Waktu: ${new Date(r.timestamp).toLocaleTimeString('id-ID')}\n\n`
     })
     
     message += `━━━━━━━━━━━━━━━━━━━━\n`
@@ -315,39 +145,12 @@ export default function MonitoringPage() {
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
   }
 
-  const handleDeleteHealth = async (id: string) => {
-    if (!confirm('Hapus data ini?')) return
-    try { await deleteDoc(doc(db, 'healthReadings', id)) } catch { alert('Gagal menghapus.') }
-  }
-
-  const ReadingsList = ({ source }: { source: string }) => {
-    const readings = filteredReadings(source)
-    const stats = getStats(source)
+  const AttendanceList = () => {
     return (
       <div className="space-y-4">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: 'Hipertensi', value: stats.hipertensi, color: 'text-red-600', bg: 'bg-red-50' },
-            { label: 'Gula Tinggi', value: stats.gulaTinggi, color: 'text-orange-600', bg: 'bg-orange-50' },
-            { label: 'Kolesterol Tinggi', value: stats.kolesterolTinggi, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-            { label: 'Asam Urat Tinggi', value: stats.asamUratTinggi, color: 'text-purple-600', bg: 'bg-purple-50' },
-          ].map(s => (
-            <div key={s.label} className={`${s.bg} rounded-xl p-3`}>
-              <div className="flex items-center gap-2 mb-1">
-                <AlertCircle className={`w-4 h-4 ${s.color}`} />
-                <span className="text-gray-600 text-xs">{s.label}</span>
-              </div>
-              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-gray-500">Orang</p>
-            </div>
-          ))}
-        </div>
-
-        {/* List */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between p-4 border-b border-gray-100">
-            <h4 className="font-semibold text-gray-800">Data Kesehatan ({readings.length})</h4>
+            <h4 className="font-semibold text-gray-800">Data Absensi ({filteredAttendance.length})</h4>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button
@@ -359,7 +162,7 @@ export default function MonitoringPage() {
                 {exportDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
                     <button
-                      onClick={() => { exportMonitoringToPDF(source); setExportDropdownOpen(false); }}
+                      onClick={() => { exportAttendanceToPDF(); setExportDropdownOpen(false); }}
                       className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl"
                     >
                       <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
@@ -368,7 +171,7 @@ export default function MonitoringPage() {
                       <span className="text-sm text-gray-700">Export PDF</span>
                     </button>
                     <button
-                      onClick={() => { exportMonitoringToExcel(source); setExportDropdownOpen(false); }}
+                      onClick={() => { exportAttendanceToExcel(); setExportDropdownOpen(false); }}
                       className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                     >
                       <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
@@ -377,7 +180,7 @@ export default function MonitoringPage() {
                       <span className="text-sm text-gray-700">Export Excel</span>
                     </button>
                     <button
-                      onClick={() => { exportMonitoringToWhatsApp(source); setExportDropdownOpen(false); }}
+                      onClick={() => { exportAttendanceToWhatsApp(); setExportDropdownOpen(false); }}
                       className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
                     >
                       <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="currentColor">
@@ -388,64 +191,36 @@ export default function MonitoringPage() {
                   </div>
                 )}
               </div>
-              {isAdmin && source === 'posbindu' && (
-                <button onClick={() => setIsPosbinduModalOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">
-                  <Plus className="w-3 h-3" /> Tambah
-                </button>
-              )}
             </div>
           </div>
-            <div className="divide-y divide-gray-50">
-            {readings.length === 0 ? (
-              <p className="text-center py-8 text-gray-400 text-sm">Belum ada data</p>
-            ) : readings.map((reading) => {
-              const cat = getReadingCategory(reading)
-              const advice = get4GAdvice(reading)
-              return (
-              <div key={reading.id} className="p-4">
+          <div className="divide-y divide-gray-50">
+            {filteredAttendance.length === 0 ? (
+              <p className="text-center py-8 text-gray-400 text-sm">Belum ada data absensi</p>
+            ) : filteredAttendance.map((attendance) => (
+              <div key={attendance.id} className="p-4">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-gray-800">{reading.userName || 'Unknown'}</p>
-                      {reading.recordNumber && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">#{reading.recordNumber}</span>}
-                    </div>
-                    <p className="text-xs text-gray-500">RW {reading.rw || '-'} / RT {reading.rt || '-'}</p>
-                    <p className="text-xs text-gray-400">{new Date(reading.timestamp).toLocaleDateString('id-ID')}</p>
+                    <p className="font-medium text-gray-800">{attendance.nama || 'Unknown'}</p>
+                    <p className="text-xs text-gray-500">NIK: {attendance.nik || '-'}</p>
+                    <p className="text-xs text-gray-500">RW {attendance.rw || '-'} / RT {attendance.rt || '-'}</p>
+                    <p className="text-xs text-gray-500">Umur: {attendance.umur || '-'}</p>
+                    <p className="text-xs text-gray-400">{new Date(attendance.timestamp).toLocaleDateString('id-ID')} {new Date(attendance.timestamp).toLocaleTimeString('id-ID')}</p>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${cat.bg} ${cat.color}`}>{cat.label}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${reading.type === 'tensi' ? 'bg-red-100 text-red-700' : reading.type === 'kolesterol' ? 'bg-yellow-100 text-yellow-700' : reading.type === 'asamurat' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {reading.type === 'tensi' ? 'Tensi' : reading.type === 'kolesterol' ? 'Kolesterol' : reading.type === 'asamurat' ? 'Asam Urat' : 'Gula'}
-                    </span>
-                    {isAdmin && (
-                      <div className="flex gap-1">
-                        <button onClick={() => openEditHealthModal(reading)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDeleteHealth(reading.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
-                      </div>
-                    )}
-                  </div>
+                  {isAdmin && (
+                    <button onClick={() => handleDeleteHealth(attendance.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                  )}
                 </div>
-                <div className="mt-2 text-xs text-gray-600">
-                  {reading.type === 'tensi' && <span>{reading.sistolik}/{reading.diastolik} mmHg • Nadi: {reading.nadi} bpm</span>}
-                  {reading.type === 'kolesterol' && <span>Total: {reading.total} • LDL: {reading.ldl} • HDL: {reading.hdl} mg/dL</span>}
-                  {(reading.type === 'asamurat' || reading.type === 'guladarah') && <span>Nilai: {reading.value} mg/dL</span>}
-                </div>
-                {advice.length > 0 && (
-                  <div className="mt-2 bg-orange-50 border border-orange-200 rounded-lg p-2">
-                    <p className="text-xs font-semibold text-orange-700 mb-1">⚠️ Anjuran Batasi 4G:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {advice.map((a, i) => (
-                        <span key={i} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{a}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-            )})}
+            ))}
           </div>
         </div>
       </div>
     )
+  }
+
+  const handleDeleteHealth = async (id: string) => {
+    if (!confirm('Hapus data ini?')) return
+    try { await deleteDoc(doc(db, 'attendance', id)) } catch { alert('Gagal menghapus.') }
   }
 
   return (
@@ -460,66 +235,6 @@ export default function MonitoringPage() {
       </div>
 
       <div className="px-4 mt-6 space-y-4">
-        {/* Grafik Tren Gula Darah */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <button
-            onClick={() => setShowGrafikGula(!showGrafikGula)}
-            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-blue-600" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-gray-800">Grafik Tren Gula Darah</p>
-                <p className="text-xs text-gray-500">Visualisasi perkembangan kadar gula</p>
-              </div>
-            </div>
-            {showGrafikGula ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-          </button>
-          {showGrafikGula && (
-            <div className="p-4 border-t border-gray-100 bg-gray-50 space-y-3">
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Filter nama warga..."
-                  value={grafikFilterNama}
-                  onChange={e => setGrafikFilterNama(e.target.value)}
-                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              {/* Legenda zona warna */}
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full">&lt; 100 Normal</span>
-                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">100–160 Pre-Diabetes</span>
-                <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full">&gt; 160 Diabetes</span>
-              </div>
-              {getGulaChartData(grafikFilterNama).length === 0 ? (
-                <p className="text-center py-6 text-gray-400 text-sm">Belum ada data gula darah</p>
-              ) : (
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={getGulaChartData(grafikFilterNama)} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="tanggal" tick={{ fontSize: 10 }} />
-                      <YAxis domain={[0, 300]} tick={{ fontSize: 10 }} />
-                      <Tooltip
-                        contentStyle={{ fontSize: 11, borderRadius: 8 }}
-                        formatter={(v: any) => [`${v} mg/dL`, 'Gula Darah']}
-                      />
-                      {/* Zona warna */}
-                      <ReferenceLine y={100} stroke="#22c55e" strokeDasharray="4 4" label={{ value: '100', position: 'right', fontSize: 9, fill: '#22c55e' }} />
-                      <ReferenceLine y={160} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: '160', position: 'right', fontSize: 9, fill: '#f59e0b' }} />
-                      <Line type="monotone" dataKey="nilai" stroke="#6366f1" strokeWidth={2} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
         {/* Filter */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 mb-3">
@@ -542,125 +257,9 @@ export default function MonitoringPage() {
           </div>
         </div>
 
-        {/* Accordion: Monitoring Pribadi */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <button
-            onClick={() => setPribadiOpen(!pribadiOpen)}
-            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-                <Activity className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-gray-800">Monitoring Pribadi</p>
-                <p className="text-xs text-gray-500">{filteredReadings('pribadi').length} data</p>
-              </div>
-            </div>
-            {pribadiOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-          </button>
-          {pribadiOpen && (
-            <div className="p-4 border-t border-gray-100 bg-gray-50">
-              <ReadingsList source="pribadi" />
-            </div>
-          )}
-        </div>
-
-        {/* Accordion: Monitoring Posbindu */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <button
-            onClick={() => setPosbinduOpen(!posbinduOpen)}
-            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                <Users className="w-5 h-5 text-purple-600" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-gray-800">Monitoring Posbindu</p>
-                <p className="text-xs text-gray-500">{filteredReadings('posbindu').length} data</p>
-              </div>
-            </div>
-            {posbinduOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-          </button>
-          {posbinduOpen && (
-            <div className="p-4 border-t border-gray-100 bg-gray-50">
-              <ReadingsList source="posbindu" />
-            </div>
-          )}
-        </div>
+        {/* Absensi List */}
+        <AttendanceList />
       </div>
-
-      {/* Tambah Data Posbindu Modal */}
-      {isPosbinduModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
-          <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4">Tambah Data Posbindu</h3>
-            <form onSubmit={handlePosbinduSubmit} className="space-y-3">
-              <select value={posbinduForm.type} onChange={e => setPosbinduForm(p => ({ ...p, type: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
-                <option value="tensi">Tekanan Darah</option>
-                <option value="kolesterol">Kolesterol</option>
-                <option value="asamurat">Asam Urat</option>
-                <option value="guladarah">Gula Darah</option>
-              </select>
-              <input placeholder="Nama warga" value={posbinduForm.userName} onChange={e => setPosbinduForm(p => ({ ...p, userName: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
-              <div className="grid grid-cols-3 gap-2">
-                <input placeholder="RT" value={posbinduForm.rt} onChange={e => setPosbinduForm(p => ({ ...p, rt: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                <input placeholder="RW" value={posbinduForm.rw} onChange={e => setPosbinduForm(p => ({ ...p, rw: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                <input placeholder="Kelurahan" value={posbinduForm.kelurahan} onChange={e => setPosbinduForm(p => ({ ...p, kelurahan: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-              </div>
-              {posbinduForm.type === 'tensi' && (
-                <div className="grid grid-cols-3 gap-2">
-                  <input placeholder="Sistolik" value={posbinduForm.sistolik} onChange={e => setPosbinduForm(p => ({ ...p, sistolik: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
-                  <input placeholder="Diastolik" value={posbinduForm.diastolik} onChange={e => setPosbinduForm(p => ({ ...p, diastolik: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
-                  <input placeholder="Nadi" value={posbinduForm.nadi} onChange={e => setPosbinduForm(p => ({ ...p, nadi: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                </div>
-              )}
-              {posbinduForm.type === 'kolesterol' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <input placeholder="Total" value={posbinduForm.total} onChange={e => setPosbinduForm(p => ({ ...p, total: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
-                  <input placeholder="LDL" value={posbinduForm.ldl} onChange={e => setPosbinduForm(p => ({ ...p, ldl: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                  <input placeholder="HDL" value={posbinduForm.hdl} onChange={e => setPosbinduForm(p => ({ ...p, hdl: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                  <input placeholder="Trigliserida" value={posbinduForm.trigliserida} onChange={e => setPosbinduForm(p => ({ ...p, trigliserida: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                </div>
-              )}
-              {(posbinduForm.type === 'asamurat' || posbinduForm.type === 'guladarah') && (
-                <input placeholder="Nilai (mg/dL)" value={posbinduForm.value} onChange={e => setPosbinduForm(p => ({ ...p, value: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
-              )}
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setIsPosbinduModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm">Batal</button>
-                <button type="submit" className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium">Simpan</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Health Modal */}
-      {isHealthEditModalOpen && editingHealth && (
-        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
-          <div className="bg-white rounded-t-3xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-bold mb-4">Edit Data Kesehatan</h3>
-            <form onSubmit={handleEditHealth} className="space-y-3">
-              <input placeholder="Nama" value={healthEditForm.userName} onChange={e => setHealthEditForm(h => ({ ...h, userName: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-              {healthEditForm.type === 'tensi' && (
-                <div className="grid grid-cols-3 gap-2">
-                  <input placeholder="Sistolik" value={healthEditForm.sistolik} onChange={e => setHealthEditForm(h => ({ ...h, sistolik: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                  <input placeholder="Diastolik" value={healthEditForm.diastolik} onChange={e => setHealthEditForm(h => ({ ...h, diastolik: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                  <input placeholder="Nadi" value={healthEditForm.nadi} onChange={e => setHealthEditForm(h => ({ ...h, nadi: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-                </div>
-              )}
-              {(healthEditForm.type === 'asamurat' || healthEditForm.type === 'guladarah') && (
-                <input placeholder="Nilai" value={healthEditForm.value} onChange={e => setHealthEditForm(h => ({ ...h, value: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-              )}
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setIsHealthEditModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm">Batal</button>
-                <button type="submit" className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium">Simpan</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

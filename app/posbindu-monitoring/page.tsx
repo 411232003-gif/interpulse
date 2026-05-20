@@ -20,6 +20,70 @@ const rwTargets = {
   '06': 33
 }
 
+// ── Kategorisasi Kesehatan ─────────────────────────────────────────
+const getTensiCategory = (sistolik: number, diastolik: number) => {
+  if (sistolik < 90 || diastolik < 60) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-300' }
+  if (sistolik <= 119 && diastolik <= 79) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100', border: 'border-green-300' }
+  if (sistolik <= 139 || diastolik <= 89) return { label: 'Pre-Hipertensi', color: 'text-yellow-600', bg: 'bg-yellow-100', border: 'border-yellow-300' }
+  return { label: 'Hipertensi', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-300' }
+}
+
+const getGulaCategory = (value: number) => {
+  if (value < 70) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-300' }
+  if (value <= 99) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100', border: 'border-green-300' }
+  if (value <= 160) return { label: 'Pre-Diabetes', color: 'text-yellow-600', bg: 'bg-yellow-100', border: 'border-yellow-300' }
+  return { label: 'Diabetes', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-300' }
+}
+
+const getKolesterolCategory = (total: number) => {
+  if (total < 150) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-300' }
+  if (total <= 199) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100', border: 'border-green-300' }
+  if (total <= 239) return { label: 'Batas Tinggi', color: 'text-yellow-600', bg: 'bg-yellow-100', border: 'border-yellow-300' }
+  return { label: 'Tinggi', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-300' }
+}
+
+const getAsamUratCategory = (value: number, gender: string) => {
+  const max = gender === 'pria' || gender === 'L' ? 7.0 : 6.0
+  if (value < 2.5) return { label: 'Rendah', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-300' }
+  if (value <= max) return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-100', border: 'border-green-300' }
+  if (value <= max + 1) return { label: 'Batas Tinggi', color: 'text-yellow-600', bg: 'bg-yellow-100', border: 'border-yellow-300' }
+  return { label: 'Tinggi', color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-300' }
+}
+
+const get4GAdvice = (reading: any): string[] => {
+  const advice: string[] = []
+  if (reading.type === 'tensi') {
+    const cat = getTensiCategory(parseInt(reading.sistolik), parseInt(reading.diastolik))
+    if (cat.label === 'Hipertensi' || cat.label === 'Pre-Hipertensi') {
+      advice.push('🧂 Batasi Garam', '🍳 Batasi Gorengan', '🥩 Batasi Gajih (Lemak)')
+    }
+  } else if (reading.type === 'guladarah') {
+    const cat = getGulaCategory(parseInt(reading.value))
+    if (cat.label === 'Diabetes' || cat.label === 'Pre-Diabetes') {
+      advice.push('🍬 Batasi Gula', '🍳 Batasi Gorengan', '🥩 Batasi Gajih (Lemak)')
+    }
+  } else if (reading.type === 'kolesterol') {
+    const cat = getKolesterolCategory(parseInt(reading.total))
+    if (cat.label === 'Tinggi' || cat.label === 'Batas Tinggi') {
+      advice.push('🥩 Batasi Gajih (Lemak)', '🍳 Batasi Gorengan')
+    }
+  } else if (reading.type === 'asamurat') {
+    const cat = getAsamUratCategory(parseFloat(reading.value), reading.gender || 'pria')
+    if (cat.label === 'Tinggi' || cat.label === 'Batas Tinggi') {
+      advice.push('🥩 Batasi Gajih (Lemak)', '🍳 Batasi Gorengan', '🍬 Batasi Gula')
+    }
+  }
+  return advice
+}
+
+const getReadingCategory = (reading: any) => {
+  if (reading.type === 'tensi') return getTensiCategory(parseInt(reading.sistolik), parseInt(reading.diastolik))
+  if (reading.type === 'guladarah') return getGulaCategory(parseInt(reading.value))
+  if (reading.type === 'kolesterol') return getKolesterolCategory(parseInt(reading.total))
+  if (reading.type === 'asamurat') return getAsamUratCategory(parseFloat(reading.value), reading.gender || 'pria')
+  return { label: '-', color: 'text-gray-600', bg: 'bg-gray-100', border: 'border-gray-300' }
+}
+
 interface Resident {
   id: string
   nama: string
@@ -1138,29 +1202,80 @@ export default function PosbinduMonitoring() {
                   <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Belum ada data warga</p>
                 </div>
-              ) : filteredResidents.map(resident => (
-                <div key={resident.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-800">{resident.nama}</p>
-                      <p className="text-xs text-gray-500">NIK: {resident.nik}</p>
-                      <div className="flex gap-3 mt-1 text-xs text-gray-600">
-                        <span>RW {resident.rw} / RT {resident.rt}</span>
-                        <span>{resident.umur} tahun</span>
-                        <span>{resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span>
+              ) : filteredResidents.map(resident => {
+                // Get health readings for this resident
+                const residentHealthReadings = healthReadings.filter(r => r.userId === resident.id && r.source === 'posbindu')
+                const today = new Date()
+                const todayStr = today.toISOString().split('T')[0]
+                const todayReadings = residentHealthReadings.filter(r => r.timestamp.startsWith(todayStr))
+                
+                return (
+                  <div key={resident.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-semibold text-gray-800">{resident.nama}</p>
+                        <p className="text-xs text-gray-500">NIK: {resident.nik}</p>
+                        <div className="flex gap-3 mt-1 text-xs text-gray-600">
+                          <span>RW {resident.rw} / RT {resident.rt}</span>
+                          <span>{resident.umur} tahun</span>
+                          <span>{resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => openEditModal(resident)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDeleteResident(resident.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => openEditModal(resident)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeleteResident(resident.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    
+                    {/* Health Readings Display */}
+                    {todayReadings.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-xs font-semibold text-gray-700 mb-2">Data Kesehatan Hari Ini:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {todayReadings.map((reading, idx) => {
+                            const cat = getReadingCategory(reading)
+                            const advice = get4GAdvice(reading)
+                            return (
+                              <div key={idx} className={`p-2 rounded-lg ${cat.bg} border ${cat.border || 'border-transparent'}`}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={`text-xs font-bold ${cat.color}`}>{cat.label}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                    reading.type === 'tensi' ? 'bg-red-100 text-red-700' : 
+                                    reading.type === 'kolesterol' ? 'bg-yellow-100 text-yellow-700' : 
+                                    reading.type === 'asamurat' ? 'bg-purple-100 text-purple-700' : 
+                                    'bg-blue-100 text-blue-700'
+                                  }`}>
+                                    {reading.type === 'tensi' ? 'Tensi' : reading.type === 'kolesterol' ? 'Kolesterol' : reading.type === 'asamurat' ? 'Asam Urat' : 'Gula'}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-700">
+                                  {reading.type === 'tensi' && <span>{reading.sistolik}/{reading.diastolik} mmHg</span>}
+                                  {reading.type === 'kolesterol' && <span>Total: {reading.total} mg/dL</span>}
+                                  {(reading.type === 'asamurat' || reading.type === 'guladarah') && <span>{reading.value} mg/dL</span>}
+                                </div>
+                                {advice.length > 0 && (
+                                  <div className="mt-1">
+                                    <p className="text-[9px] font-semibold text-orange-700">⚠️ 4G:</p>
+                                    <div className="flex flex-wrap gap-0.5">
+                                      {advice.map((a, i) => (
+                                        <span key={i} className="text-[9px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full">{a}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
           </div>

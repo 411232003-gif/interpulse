@@ -40,8 +40,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     }
   }, [user, userProfile, loading, pathname, router])
 
-  // Show loading state
-  if (loading) {
+  // Show loading state only on initial load, not on navigation
+  if (loading && pathname === '/') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
@@ -54,9 +54,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route))
 
-  // For public routes (login/register), don't show navigation
+  // For public routes (login/register), don't show navigation but wrap with audio provider
   if (isPublicRoute) {
-    return <>{children}</>
+    return (
+      <GlobalAudioProvider>
+        {children}
+      </GlobalAudioProvider>
+    )
   }
 
   // For protected routes, require auth
