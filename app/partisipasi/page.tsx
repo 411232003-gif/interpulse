@@ -21,13 +21,14 @@ const monthLabels: Record<string, string> = {
 
 export default function PartisipasiPage() {
   const [elderlyAttendance, setElderlyAttendance] = useState<Record<string, Record<string, number>>>({})
+  const [residentsPerRW, setResidentsPerRW] = useState<Record<string, number>>({})
   const [selectedMonth, setSelectedMonth] = useState('april')
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
 
+  // Fetch attendance data from attendance collection
   useEffect(() => {
-    // Sinkronkan dengan monitoring posbindu: ambil data dari healthReadings dengan source 'posbindu'
-    const healthReadingsRef = collection(db, 'healthReadings')
-    const unsubscribe = onSnapshot(healthReadingsRef, (snapshot) => {
+    const attendanceRef = collection(db, 'attendance')
+    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
       const data: Record<string, Record<string, number>> = {}
       Object.keys(rwTargets).forEach(rw => {
         data[rw] = {}
@@ -35,13 +36,10 @@ export default function PartisipasiPage() {
       })
       snapshot.docs.forEach(doc => {
         const d = doc.data()
-        // Hanya ambil data dari monitoring posbindu
-        if (d.source === 'posbindu') {
-          const rw = d.rw
-          if (rw && data[rw]) {
-            const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-            if (data[rw][month] !== undefined) data[rw][month]++
-          }
+        const rw = d.rw
+        if (rw && data[rw]) {
+          const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+          if (data[rw][month] !== undefined) data[rw][month]++
         }
       })
       setElderlyAttendance(data)
@@ -49,7 +47,27 @@ export default function PartisipasiPage() {
     return () => unsubscribe()
   }, [])
 
-  const totalTarget = Object.values(rwTargets).reduce((a, b) => a + b, 0)
+  // Fetch residents count per RW from residents collection
+  useEffect(() => {
+    const residentsRef = collection(db, 'residents')
+    const unsubscribe = onSnapshot(residentsRef, (snapshot) => {
+      const counts: Record<string, number> = {}
+      Object.keys(rwTargets).forEach(rw => {
+        counts[rw] = 0
+      })
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        const rw = d.rw
+        if (rw && counts[rw] !== undefined) {
+          counts[rw]++
+        }
+      })
+      setResidentsPerRW(counts)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  const totalTarget = Object.values(residentsPerRW).reduce((a, b) => a + b, 0)
   const totalAttendance = Object.entries(elderlyAttendance).reduce((sum, [rw, months_data]) => {
     return sum + (months_data[selectedMonth] || 0)
   }, 0)
@@ -57,7 +75,7 @@ export default function PartisipasiPage() {
 
   const exportToPDF = () => {
     const doc = new jsPDF()
-    
+
     doc.setFillColor(37, 99, 235)
     doc.rect(0, 0, 210, 40, 'F')
     doc.setTextColor(255, 255, 255)
@@ -67,28 +85,29 @@ export default function PartisipasiPage() {
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
     doc.text(`Kelurahan Duris Selatan - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
-    
+
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(10)
-    doc.text(`Total Target: ${totalTarget} PMT`, 14, 50)
-    doc.text(`Total Tercapai: ${totalAttendance} PMT (${overallPct}%)`, 14, 58)
-    
-    const tableData = Object.entries(rwTargets).map(([rw, target]) => {
+    doc.text(`Total Warga: ${totalTarget}`, 14, 50)
+    doc.text(`Total Hadir: ${totalAttendance} (${overallPct}%)`, 14, 58)
+
+    const tableData = Object.entries(rwTargets).map(([rw, _]) => {
       const attendance = elderlyAttendance[rw] || {}
       const count = attendance[selectedMonth] || 0
-      const pct = target > 0 ? Math.round((count / target) * 100) : 0
+      const totalResidents = residentsPerRW[rw] || 0
+      const pct = totalResidents > 0 ? Math.round((count / totalResidents) * 100) : 0
       return [
         `RW ${rw}`,
-        target,
+        totalResidents,
         count,
         `${pct}%`,
         pct >= 100 ? 'Terpenuhi' : pct >= 80 ? 'Hampir' : 'Belum'
       ]
     })
-    
+
     autoTable(doc, {
       startY: 65,
-      head: [['RW', 'Target PMT', 'Tercapai', 'Persentase', 'Status']],
+      head: [['RW', 'Total Warga', 'Hadir', 'Persentase', 'Status']],
       body: tableData,
       styles: {
         fontSize: 10,
@@ -103,28 +122,29 @@ export default function PartisipasiPage() {
         fillColor: [240, 249, 255],
       },
     })
-    
+
     doc.save(`partisipasi-${selectedMonth}.pdf`)
   }
 
   const exportToExcel = () => {
-    const data = Object.entries(rwTargets).map(([rw, target]) => {
+    const data = Object.entries(rwTargets).map(([rw, _]) => {
       const attendance = elderlyAttendance[rw] || {}
       const count = attendance[selectedMonth] || 0
-      const pct = target > 0 ? Math.round((count / target) * 100) : 0
+      const totalResidents = residentsPerRW[rw] || 0
+      const pct = totalResidents > 0 ? Math.round((count / totalResidents) * 100) : 0
       return {
         'RW': rw,
-        'Target PMT': target,
-        'Tercapai': count,
+        'Total Warga': totalResidents,
+        'Hadir': count,
         'Persentase': `${pct}%`,
         'Status': pct >= 100 ? 'Terpenuhi' : pct >= 80 ? 'Hampir' : 'Belum'
       }
     })
-    
+
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Partisipasi')
-    
+
     ws['!cols'] = [
       { wch: 10 },
       { wch: 12 },
@@ -132,7 +152,7 @@ export default function PartisipasiPage() {
       { wch: 12 },
       { wch: 12 },
     ]
-    
+
     XLSX.writeFile(wb, `partisipasi-${selectedMonth}.xlsx`)
   }
 
@@ -142,24 +162,25 @@ export default function PartisipasiPage() {
     message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
-    message += `• Total Target: ${totalTarget} PMT\n`
-    message += `• Total Tercapai: ${totalAttendance} PMT\n`
+    message += `• Total Warga: ${totalTarget}\n`
+    message += `• Total Hadir: ${totalAttendance}\n`
     message += `• Capaian: ${overallPct}%\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📋 *DATA DETAIL PER RW*\n\n`
-    
-    Object.entries(rwTargets).forEach(([rw, target]) => {
+
+    Object.entries(rwTargets).forEach(([rw, _]) => {
       const attendance = elderlyAttendance[rw] || {}
       const count = attendance[selectedMonth] || 0
-      const pct = target > 0 ? Math.round((count / target) * 100) : 0
+      const totalResidents = residentsPerRW[rw] || 0
+      const pct = totalResidents > 0 ? Math.round((count / totalResidents) * 100) : 0
       message += `RW ${rw}:\n`
-      message += `   Target: ${target} PMT | Tercapai: ${count} PMT\n`
+      message += `   Total Warga: ${totalResidents} | Hadir: ${count}\n`
       message += `   Capaian: ${pct}%\n\n`
     })
-    
+
     message += `━━━━━━━━━━━━━━━━━━━━\n`
     message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
-    
+
     const encodedMessage = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
   }
@@ -176,77 +197,77 @@ export default function PartisipasiPage() {
       </div>
 
       <div className="px-4 mt-6 space-y-4">
-        {/* Month Filter + Export */}
-        <div className="flex gap-2">
-          <div className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-4 h-4 text-green-600" />
-              <span className="font-semibold text-gray-800 text-sm">Pilih Bulan</span>
-            </div>
-            <div className="grid grid-cols-6 gap-1.5">
-              {months.map(m => (
-                <button
-                  key={m}
-                  onClick={() => setSelectedMonth(m)}
-                  className={`py-1.5 rounded-lg text-xs font-medium transition-all ${selectedMonth === m ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                >
-                  {monthLabels[m]}
-                </button>
-              ))}
-            </div>
+        {/* Month Filter */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-4 h-4 text-green-600" />
+            <span className="font-semibold text-gray-800 text-sm">Pilih Bulan</span>
           </div>
-          <div className="relative">
-            <button
-              onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-            {exportDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-                <button
-                  onClick={() => { exportToPDF(); setExportDropdownOpen(false); }}
-                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl"
-                >
-                  <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
-                  </svg>
-                  <span className="text-sm text-gray-700">Export PDF</span>
-                </button>
-                <button
-                  onClick={() => { exportToExcel(); setExportDropdownOpen(false); }}
-                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
-                  </svg>
-                  <span className="text-sm text-gray-700">Export Excel</span>
-                </button>
-                <button
-                  onClick={() => { exportToWhatsApp(); setExportDropdownOpen(false); }}
-                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
-                >
-                  <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                  </svg>
-                  <span className="text-sm text-gray-700">Export WhatsApp</span>
-                </button>
-              </div>
-            )}
+          <div className="grid grid-cols-6 gap-1.5">
+            {months.map(m => (
+              <button
+                key={m}
+                onClick={() => setSelectedMonth(m)}
+                className={`py-1.5 rounded-lg text-xs font-medium transition-all ${selectedMonth === m ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                {monthLabels[m]}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Summary */}
         <div className="bg-gradient-to-r from-green-600 to-teal-600 rounded-2xl p-4 text-white">
-          <h3 className="font-semibold mb-3">Ringkasan - {selectedMonth.charAt(0).toUpperCase() + selectedMonth.slice(1)}</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">Ringkasan - {selectedMonth.charAt(0).toUpperCase() + selectedMonth.slice(1)}</h3>
+            <div className="relative">
+              <button
+                onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              {exportDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                  <button
+                    onClick={() => { exportToPDF(); setExportDropdownOpen(false); }}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl"
+                  >
+                    <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+                    </svg>
+                    <span className="text-sm text-gray-700">Export PDF</span>
+                  </button>
+                  <button
+                    onClick={() => { exportToExcel(); setExportDropdownOpen(false); }}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
+                    </svg>
+                    <span className="text-sm text-gray-700">Export Excel</span>
+                  </button>
+                  <button
+                    onClick={() => { exportToWhatsApp(); setExportDropdownOpen(false); }}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
+                  >
+                    <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                    </svg>
+                    <span className="text-sm text-gray-700">Export WhatsApp</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-green-100 text-xs">Total Hadir</p>
               <p className="text-2xl font-bold">{totalAttendance}</p>
             </div>
             <div>
-              <p className="text-green-100 text-xs">Target</p>
+              <p className="text-green-100 text-xs">Total Warga</p>
               <p className="text-2xl font-bold">{totalTarget}</p>
             </div>
             <div>
@@ -271,9 +292,10 @@ export default function PartisipasiPage() {
             <Users className="w-4 h-4 text-green-600" />
             Partisipasi per RW
           </h3>
-          {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, target]) => {
+          {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, _]) => {
             const hadir = elderlyAttendance[rw]?.[selectedMonth] || 0
-            const pct = target > 0 ? Math.round((hadir / target) * 100) : 0
+            const totalResidents = residentsPerRW[rw] || 0
+            const pct = totalResidents > 0 ? Math.round((hadir / totalResidents) * 100) : 0
             const barColor = pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-500' : 'bg-red-500'
             const badgeColor = pct >= 80 ? 'bg-green-100 text-green-700' : pct >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
             return (
@@ -285,7 +307,7 @@ export default function PartisipasiPage() {
                     </div>
                     <div>
                       <p className="font-semibold text-gray-800">RW {rw}</p>
-                      <p className="text-xs text-gray-500">{hadir} / {target} warga</p>
+                      <p className="text-xs text-gray-500">{hadir} / {totalResidents} warga</p>
                     </div>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${badgeColor}`}>{pct}%</span>

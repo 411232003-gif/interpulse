@@ -108,8 +108,8 @@ export default function Home() {
   // Admin feature cards - Bottom row
   const adminBottomCards = [
     {
-      title: 'Monitoring',
-      description: 'Pantau data kesehatan warga',
+      title: 'Trafik',
+      description: 'Export Laporan',
       href: '/monitoring',
       icon: Activity,
       gradient: 'from-indigo-500 to-purple-500',

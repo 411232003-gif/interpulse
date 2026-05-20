@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle, Download, FileText, MessageSquare } from 'lucide-react'
+import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle, Download, FileText, MessageSquare, ChevronDown } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
@@ -115,6 +115,8 @@ export default function PosbinduMonitoring() {
   const [filterRT, setFilterRT] = useState<string>('')
   const [filterUmur, setFilterUmur] = useState<string>('')
   const [searchNama, setSearchNama] = useState('')
+  const [healthFilter, setHealthFilter] = useState<string>('')
+  const [healthFilterDropdownOpen, setHealthFilterDropdownOpen] = useState(false)
   const [residents, setResidents] = useState<Resident[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPosbinduModalOpen, setIsPosbinduModalOpen] = useState(false)
@@ -626,12 +628,18 @@ export default function PosbinduMonitoring() {
     if (filterRW && normalizeRTRW(resident.rw) !== normalizeRTRW(filterRW)) return false
     if (filterRT && normalizeRTRW(resident.rt) !== normalizeRTRW(filterRT)) return false
     if (filterUmur) {
-      if (filterUmur === '0-20' && resident.umur > 20) return false
-      if (filterUmur === '21-50' && (resident.umur < 21 || resident.umur > 50)) return false
-      if (filterUmur === '51-60' && (resident.umur < 51 || resident.umur > 60)) return false
-      if (filterUmur === '60+' && resident.umur < 60) return false
+      const age = resident.umur
+      if (filterUmur === '0-20' && (age < 0 || age > 20)) return false
+      if (filterUmur === '21-50' && (age < 21 || age > 50)) return false
+      if (filterUmur === '51-60' && (age < 51 || age > 60)) return false
+      if (filterUmur === '60+' && age < 60) return false
     }
-    if (searchNama && !resident.nama.toLowerCase().includes(searchNama.toLowerCase())) return false
+    if (searchNama && resident.nama && !resident.nama.toLowerCase().includes(searchNama.toLowerCase())) return false
+    if (healthFilter) {
+      const residentHealthReadings = healthReadings.filter(r => r.userId === resident.id && r.source === 'posbindu')
+      const hasHealthType = residentHealthReadings.some(r => r.type === healthFilter)
+      if (!hasHealthType) return false
+    }
     return true
   })
 
@@ -1114,19 +1122,25 @@ export default function PosbinduMonitoring() {
         {activeTab === 'datawarga' && (
           <div className="space-y-4">
             {/* Summary + Export + Add Button */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="bg-blue-50 rounded-xl px-4 py-2">
-                <span className="text-blue-700 font-semibold text-sm">{filteredResidents.length} warga ditemukan</span>
+            <div className="flex items-center justify-between gap-3">
+              <div className="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl px-4 py-3 shadow-md flex-1">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-white" />
+                  <div>
+                    <span className="text-white font-bold text-lg">{filteredResidents.length}</span>
+                    <span className="text-blue-100 text-xs ml-1">warga ditemukan</span>
+                  </div>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {/* Export Dropdown */}
                 <div className="relative">
                   <button
                     onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition-colors"
+                    className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-2xl shadow-md hover:from-gray-700 hover:to-gray-800 transition-all"
+                    title="Export Data"
                   >
-                    <Download className="w-4 h-4" />
-                    <span className="hidden sm:inline">Export</span>
+                    <Download className="w-5 h-5" />
                   </button>
                   {exportDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
@@ -1162,10 +1176,10 @@ export default function PosbinduMonitoring() {
                 </div>
                 <button
                   onClick={openAddModal}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+                  className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-md hover:from-blue-600 hover:to-indigo-700 transition-all"
+                  title="Tambah Warga"
                 >
-                  <Plus className="w-4 h-4" />
-                  Tambah Warga
+                  <Plus className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -1193,6 +1207,90 @@ export default function PosbinduMonitoring() {
                   <input type="text" placeholder="Cari nama..." value={searchNama} onChange={e => setSearchNama(e.target.value)} className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
+            </div>
+
+            {/* Health Type Filter Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setHealthFilterDropdownOpen(!healthFilterDropdownOpen)}
+                className={`w-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl px-4 py-3 shadow-md flex items-center justify-between transition-all ${
+                  healthFilter ? 'ring-2 ring-blue-400' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-white" />
+                  <span className="text-white font-semibold text-sm">
+                    {healthFilter
+                      ? `Filter: ${healthFilter === 'tensi' ? 'Tekanan Darah' : healthFilter === 'kolesterol' ? 'Kolesterol' : healthFilter === 'asamurat' ? 'Asam Urat' : 'Gula Darah'}`
+                      : 'Filter Berdasarkan Riwayat Kesehatan'
+                    }
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {healthFilter && (
+                    <div
+                      onClick={(e) => { e.stopPropagation(); setHealthFilter(''); }}
+                      className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </div>
+                  )}
+                  {!healthFilter && (
+                    <ChevronDown className={`w-5 h-5 text-white transition-transform ${healthFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                  )}
+                </div>
+              </button>
+
+              {healthFilterDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+                  <div className="grid grid-cols-2 gap-0">
+                    <button
+                      onClick={() => { setHealthFilter(healthFilter === 'tensi' ? '' : 'tensi'); setHealthFilterDropdownOpen(false); }}
+                      className={`flex flex-col items-center justify-center gap-2 px-4 py-4 text-sm font-medium transition-all hover:scale-105 ${
+                        healthFilter === 'tensi'
+                          ? 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 text-white'
+                          : 'bg-gradient-to-br from-red-50 to-red-100 text-red-700 hover:from-red-100 hover:to-red-200'
+                      }`}
+                    >
+                      <Activity className="w-6 h-6" />
+                      <span>Tekanan Darah</span>
+                    </button>
+                    <button
+                      onClick={() => { setHealthFilter(healthFilter === 'kolesterol' ? '' : 'kolesterol'); setHealthFilterDropdownOpen(false); }}
+                      className={`flex flex-col items-center justify-center gap-2 px-4 py-4 text-sm font-medium transition-all hover:scale-105 ${
+                        healthFilter === 'kolesterol'
+                          ? 'bg-gradient-to-br from-yellow-500 via-yellow-600 to-yellow-700 text-white'
+                          : 'bg-gradient-to-br from-yellow-50 to-yellow-100 text-yellow-700 hover:from-yellow-100 hover:to-yellow-200'
+                      }`}
+                    >
+                      <Activity className="w-6 h-6" />
+                      <span>Kolesterol</span>
+                    </button>
+                    <button
+                      onClick={() => { setHealthFilter(healthFilter === 'asamurat' ? '' : 'asamurat'); setHealthFilterDropdownOpen(false); }}
+                      className={`flex flex-col items-center justify-center gap-2 px-4 py-4 text-sm font-medium transition-all hover:scale-105 ${
+                        healthFilter === 'asamurat'
+                          ? 'bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 text-white'
+                          : 'bg-gradient-to-br from-purple-50 to-purple-100 text-purple-700 hover:from-purple-100 hover:to-purple-200'
+                      }`}
+                    >
+                      <Activity className="w-6 h-6" />
+                      <span>Asam Urat</span>
+                    </button>
+                    <button
+                      onClick={() => { setHealthFilter(healthFilter === 'guladarah' ? '' : 'guladarah'); setHealthFilterDropdownOpen(false); }}
+                      className={`flex flex-col items-center justify-center gap-2 px-4 py-4 text-sm font-medium transition-all hover:scale-105 ${
+                        healthFilter === 'guladarah'
+                          ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white'
+                          : 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 hover:from-blue-100 hover:to-blue-200'
+                      }`}
+                    >
+                      <Activity className="w-6 h-6" />
+                      <span>Gula Darah</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Resident Cards */}
@@ -1240,7 +1338,12 @@ export default function PosbinduMonitoring() {
                             const cat = getReadingCategory(reading)
                             const advice = get4GAdvice(reading)
                             return (
-                              <div key={idx} className={`p-2 rounded-lg ${cat.bg} border ${cat.border || 'border-transparent'}`}>
+                              <div 
+                                key={idx} 
+                                className={`p-2 rounded-lg ${cat.bg} border ${cat.border || 'border-transparent'} cursor-pointer hover:opacity-80 transition-opacity`}
+                                onClick={() => setHealthFilter(reading.type === healthFilter ? '' : reading.type)}
+                                title="Klik untuk filter warga dengan jenis kesehatan ini"
+                              >
                                 <div className="flex items-center justify-between mb-1">
                                   <span className={`text-xs font-bold ${cat.color}`}>{cat.label}</span>
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
