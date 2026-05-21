@@ -88,6 +88,7 @@ export default function MonitoringPage() {
   const exportToPDF = () => {
     const doc = new jsPDF()
 
+    // Header
     doc.setFillColor(79, 70, 229)
     doc.rect(0, 0, 210, 40, 'F')
     doc.setTextColor(255, 255, 255)
@@ -102,19 +103,96 @@ export default function MonitoringPage() {
     doc.setFontSize(10)
     doc.text(`Total Pemeriksaan: ${totalReadings}`, 14, 50)
 
-    const tableData = Object.entries(rwTargets).map(([rw, _]) => {
+    // Health Type Distribution
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Distribusi Jenis Pemeriksaan', 14, 60)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    
+    const typeDistData = Object.entries(healthTypeDistribution).map(([type, count]) => {
+      const labels: Record<string, string> = {
+        tensi: 'Tekanan Darah',
+        kolesterol: 'Kolesterol',
+        asamurat: 'Asam Urat',
+        guladarah: 'Gula Darah'
+      }
+      return [labels[type] || type, count]
+    })
+
+    autoTable(doc, {
+      startY: 65,
+      head: [['Jenis Pemeriksaan', 'Jumlah']],
+      body: typeDistData,
+      styles: {
+        fontSize: 10,
+        cellPadding: 4,
+      },
+      headStyles: {
+        fillColor: [79, 70, 229],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [238, 242, 255],
+      },
+    })
+
+    // Per-RW Data
+    const finalY = (doc as any).lastAutoTable.finalY + 10
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Pemeriksaan per RW', 14, finalY)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+
+    const tableData = Object.entries(rwTargets).map(([rw, target]) => {
       const readings = healthReadings[rw] || {}
       const count = readings[selectedMonth] || 0
+      const percentage = target > 0 ? ((count / target) * 100).toFixed(1) : '0'
       return [
         `RW ${rw}`,
         count,
+        target,
+        `${percentage}%`,
       ]
     })
 
     autoTable(doc, {
-      startY: 55,
-      head: [['RW', 'Jumlah Pemeriksaan']],
+      startY: finalY + 5,
+      head: [['RW', 'Jumlah Pemeriksaan', 'Target', 'Persentase']],
       body: tableData,
+      styles: {
+        fontSize: 10,
+        cellPadding: 4,
+      },
+      headStyles: {
+        fillColor: [79, 70, 229],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [238, 242, 255],
+      },
+    })
+
+    // Monthly Trend Data
+    const finalY2 = (doc as any).lastAutoTable.finalY + 10
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Trafik Pemeriksaan Bulanan', 14, finalY2)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+
+    const monthlyData = months.map(m => {
+      const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
+      return [monthLabels[m], total]
+    })
+
+    autoTable(doc, {
+      startY: finalY2 + 5,
+      head: [['Bulan', 'Total Pemeriksaan']],
+      body: monthlyData,
       styles: {
         fontSize: 10,
         cellPadding: 4,
@@ -133,23 +211,81 @@ export default function MonitoringPage() {
   }
 
   const exportToExcel = () => {
-    const data = Object.entries(rwTargets).map(([rw, _]) => {
+    // Sheet 1: Per-RW Data for Selected Month
+    const rwData = Object.entries(rwTargets).map(([rw, target]) => {
       const readings = healthReadings[rw] || {}
       const count = readings[selectedMonth] || 0
+      const percentage = target > 0 ? ((count / target) * 100).toFixed(2) : '0'
       return {
         'RW': rw,
         'Jumlah Pemeriksaan': count,
+        'Target': target,
+        'Persentase (%)': parseFloat(percentage),
+        'Status': count >= target ? 'Tercapai' : 'Belum Tercapai'
       }
     })
 
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Monitoring')
+    // Sheet 2: Monthly Trend Data
+    const monthlyData = months.map(m => {
+      const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
+      const totalTarget = Object.values(rwTargets).reduce((s, t) => s + t, 0)
+      const percentage = totalTarget > 0 ? ((total / totalTarget) * 100).toFixed(2) : '0'
+      return {
+        'Bulan': monthLabels[m],
+        'Total Pemeriksaan': total,
+        'Total Target': totalTarget,
+        'Persentase (%)': parseFloat(percentage)
+      }
+    })
 
-    ws['!cols'] = [
+    // Sheet 3: Health Type Distribution
+    const typeDistData = Object.entries(healthTypeDistribution).map(([type, count]) => {
+      const labels: Record<string, string> = {
+        tensi: 'Tekanan Darah',
+        kolesterol: 'Kolesterol',
+        asamurat: 'Asam Urat',
+        guladarah: 'Gula Darah'
+      }
+      const percentage = totalReadings > 0 ? ((count / totalReadings) * 100).toFixed(2) : '0'
+      return {
+        'Jenis Pemeriksaan': labels[type] || type,
+        'Jumlah': count,
+        'Persentase (%)': parseFloat(percentage)
+      }
+    })
+
+    // Create workbook with multiple sheets
+    const wb = XLSX.utils.book_new()
+
+    // Sheet 1: Per-RW
+    const ws1 = XLSX.utils.json_to_sheet(rwData)
+    ws1['!cols'] = [
+      { wch: 10 },
+      { wch: 18 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 15 },
+    ]
+    XLSX.utils.book_append_sheet(wb, ws1, 'Per RW')
+
+    // Sheet 2: Monthly Trend
+    const ws2 = XLSX.utils.json_to_sheet(monthlyData)
+    ws2['!cols'] = [
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 15 },
+    ]
+    XLSX.utils.book_append_sheet(wb, ws2, 'Tren Bulanan')
+
+    // Sheet 3: Health Type Distribution
+    const ws3 = XLSX.utils.json_to_sheet(typeDistData)
+    ws3['!cols'] = [
+      { wch: 20 },
       { wch: 10 },
       { wch: 15 },
     ]
+    XLSX.utils.book_append_sheet(wb, ws3, 'Jenis Pemeriksaan')
 
     XLSX.writeFile(wb, `monitoring-kesehatan-${selectedMonth}.xlsx`)
   }
@@ -161,21 +297,41 @@ export default function MonitoringPage() {
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
     message += `• Total Pemeriksaan: ${totalReadings}\n\n`
+    
+    // Health Type Distribution
     message += `📋 *DISTRIBUSI JENIS PEMERIKSAAN*\n\n`
-    message += `• Tekanan Darah: ${healthTypeDistribution.tensi}\n`
-    message += `• Kolesterol: ${healthTypeDistribution.kolesterol}\n`
-    message += `• Asam Urat: ${healthTypeDistribution.asamurat}\n`
-    message += `• Gula Darah: ${healthTypeDistribution.guladarah}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    const typeLabels: Record<string, string> = {
+      tensi: 'Tekanan Darah',
+      kolesterol: 'Kolesterol',
+      asamurat: 'Asam Urat',
+      guladarah: 'Gula Darah'
+    }
+    Object.entries(healthTypeDistribution).forEach(([type, count]) => {
+      const percentage = totalReadings > 0 ? ((count / totalReadings) * 100).toFixed(1) : '0'
+      message += `• ${typeLabels[type] || type}: ${count} (${percentage}%)\n`
+    })
+    message += `\n`
+    
+    // Per-RW Data with Targets
     message += `📋 *DATA PER RW*\n\n`
-
-    Object.entries(rwTargets).forEach(([rw, _]) => {
+    Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).forEach(([rw, target]) => {
       const readings = healthReadings[rw] || {}
       const count = readings[selectedMonth] || 0
-      message += `RW ${rw}: ${count} pemeriksaan\n`
+      const percentage = target > 0 ? ((count / target) * 100).toFixed(1) : '0'
+      const status = count >= target ? '✅ Tercapai' : '❌ Belum'
+      message += `RW ${rw}: ${count}/${target} (${percentage}%) ${status}\n`
     })
-
-    message += `━━━━━━━━━━━━━━━━━━━━\n`
+    message += `\n`
+    
+    // Monthly Trend Summary
+    message += `📈 *TREN BULANAN TAHUN INI*\n\n`
+    months.forEach(m => {
+      const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
+      const icon = m === selectedMonth ? '👉' : '  '
+      message += `${icon} ${monthLabels[m]}: ${total} pemeriksaan\n`
+    })
+    
+    message += `\n━━━━━━━━━━━━━━━━━━━━\n`
     message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
 
     const encodedMessage = encodeURIComponent(message)
