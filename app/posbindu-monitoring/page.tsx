@@ -341,6 +341,9 @@ export default function PosbinduMonitoring() {
     return age
   }
 
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+
   const handleAddResident = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -358,7 +361,9 @@ export default function PosbinduMonitoring() {
       await addDoc(collection(db, 'residents'), newResident)
       setIsModalOpen(false)
       resetResidentForm()
-      alert('Data warga berhasil ditambahkan')
+      setSuccessMessage('Data warga berhasil ditambahkan')
+      setShowSuccessNotification(true)
+      setTimeout(() => setShowSuccessNotification(false), 3000)
     } catch (error) {
       console.error('Error adding resident:', error)
       alert('Gagal menambahkan data warga')
@@ -384,7 +389,9 @@ export default function PosbinduMonitoring() {
       setIsModalOpen(false)
       setEditingResident(null)
       resetResidentForm()
-      alert('Data warga berhasil diperbarui')
+      setSuccessMessage('Data warga berhasil diperbarui')
+      setShowSuccessNotification(true)
+      setTimeout(() => setShowSuccessNotification(false), 3000)
     } catch (error) {
       console.error('Error updating resident:', error)
       alert('Gagal memperbarui data warga')
@@ -1076,6 +1083,20 @@ export default function PosbinduMonitoring() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      {/* Success Notification */}
+      {showSuccessNotification && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
+          <div className="bg-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 border-l-4 border-green-500">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800">{successMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-b-3xl shadow-lg">
         <div className="flex items-center gap-4 mb-2">
@@ -2104,7 +2125,7 @@ export default function PosbinduMonitoring() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">RT *</label>
                     <select
@@ -2112,7 +2133,7 @@ export default function PosbinduMonitoring() {
                       value={residentForm.rt}
                       onChange={(e) => setResidentForm({ ...residentForm, rt: e.target.value })}
                       aria-label="Pilih RT"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]"
                     >
                       <option value="">Pilih RT</option>
                       {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rt => (
@@ -2127,7 +2148,7 @@ export default function PosbinduMonitoring() {
                       value={residentForm.rw}
                       onChange={(e) => setResidentForm({ ...residentForm, rw: e.target.value })}
                       aria-label="Pilih RW"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]"
                     >
                       <option value="">Pilih RW</option>
                       {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rw => (
@@ -2137,23 +2158,20 @@ export default function PosbinduMonitoring() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Tanggal Lahir *</label>
-                    <input
-                      type="date"
-                      required
-                      value={residentForm.birthDate}
-                      onChange={(e) => setResidentForm({ ...residentForm, birthDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Umur (Tahun)</label>
-                    <input
-                      type="text"
-                      value={residentForm.birthDate ? calculateAge(residentForm.birthDate).toString() : ''}
-                      readOnly
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
-                      placeholder="Otomatis"
-                    />
+                    <div className="relative">
+                      <input
+                        type="date"
+                        required
+                        value={residentForm.birthDate}
+                        onChange={(e) => setResidentForm({ ...residentForm, birthDate: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {residentForm.birthDate && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-white px-2 rounded">
+                          {calculateAge(residentForm.birthDate)} th
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
