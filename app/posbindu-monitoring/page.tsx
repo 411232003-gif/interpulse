@@ -2125,15 +2125,15 @@ export default function PosbinduMonitoring() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">RT *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">RT *</label>
                     <select
                       required
                       value={residentForm.rt}
                       onChange={(e) => setResidentForm({ ...residentForm, rt: e.target.value })}
                       aria-label="Pilih RT"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Pilih RT</option>
                       {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rt => (
@@ -2142,13 +2142,13 @@ export default function PosbinduMonitoring() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">RW *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">RW *</label>
                     <select
                       required
                       value={residentForm.rw}
                       onChange={(e) => setResidentForm({ ...residentForm, rw: e.target.value })}
                       aria-label="Pilih RW"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Pilih RW</option>
                       {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rw => (
@@ -2157,17 +2157,17 @@ export default function PosbinduMonitoring() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tanggal Lahir *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Tanggal Lahir *</label>
                     <div className="relative">
                       <input
                         type="date"
                         required
                         value={residentForm.birthDate}
                         onChange={(e) => setResidentForm({ ...residentForm, birthDate: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       {residentForm.birthDate && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-white px-2 rounded">
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
                           {calculateAge(residentForm.birthDate)} th
                         </div>
                       )}
