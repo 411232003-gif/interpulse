@@ -43,6 +43,7 @@ export default function InputTBBBPage() {
   const [bb, setBb] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
 
   // Calculate age from birthDate
   const calculateAge = (birthDate: string): number => {
@@ -100,8 +101,14 @@ export default function InputTBBBPage() {
   // Open modal for input
   const openModal = (resident: AttendanceRecord) => {
     setSelectedResident(resident)
-    setTb('')
-    setBb('')
+    const todayTBBB = getTodayTBBB(resident.nik)
+    if (todayTBBB) {
+      setTb(todayTBBB.tinggiBadan.toString())
+      setBb(todayTBBB.beratBadan.toString())
+    } else {
+      setTb('')
+      setBb('')
+    }
     setShowModal(true)
   }
 
@@ -158,8 +165,9 @@ export default function InputTBBBPage() {
         await addDoc(collection(db, 'tb-bb'), tbData)
       }
 
-      alert('Data tinggi badan dan berat badan berhasil disimpan!')
       closeModal()
+      setShowSuccessBanner(true)
+      setTimeout(() => setShowSuccessBanner(false), 4000)
     } catch (error) {
       console.error('Error saving TB/BB:', error)
       alert('Gagal menyimpan data')
@@ -181,6 +189,28 @@ export default function InputTBBBPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 p-4 pb-24">
+      {/* Success Banner */}
+      {showSuccessBanner && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
+          <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              <CheckCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="font-bold text-lg">Berhasil!</p>
+              <p className="text-sm text-white/90">Data tinggi badan dan berat badan tersimpan</p>
+            </div>
+            <button 
+              onClick={() => setShowSuccessBanner(false)}
+              aria-label="Tutup banner"
+              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
@@ -230,25 +260,33 @@ export default function InputTBBBPage() {
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang hadir hari ini</td>
                   </tr>
-                ) : filteredAttendance.map(att => (
-                  <tr key={att.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{att.nama}</td>
-                    <td className="px-4 py-3 text-gray-600">{att.nik}</td>
-                    <td className="px-4 py-3 text-gray-600">RW {att.rw} / RT {att.rt}</td>
-                    <td className="px-4 py-3 text-gray-600">-</td>
-                    <td className="px-4 py-3 text-gray-600">{att.umur} tahun</td>
-                    <td className="px-4 py-3 text-center">
-                      <button 
-                        onClick={() => openModal(att)}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
-                      >
-                        <Ruler className="w-3.5 h-3.5" />
-                        <Scale className="w-3.5 h-3.5" />
-                        Input TB/BB
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                ) : filteredAttendance.map(att => {
+                  const todayTBBB = getTodayTBBB(att.nik)
+                  const hasTBBB = todayTBBB !== undefined
+                  return (
+                    <tr key={att.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-800">{att.nama}</td>
+                      <td className="px-4 py-3 text-gray-600">{att.nik}</td>
+                      <td className="px-4 py-3 text-gray-600">RW {att.rw} / RT {att.rt}</td>
+                      <td className="px-4 py-3 text-gray-600">-</td>
+                      <td className="px-4 py-3 text-gray-600">{att.umur} tahun</td>
+                      <td className="px-4 py-3 text-center">
+                        <button 
+                          onClick={() => openModal(att)}
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
+                            hasTBBB 
+                              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
+                        >
+                          <Ruler className="w-3.5 h-3.5" />
+                          <Scale className="w-3.5 h-3.5" />
+                          {hasTBBB ? 'Edit' : 'Input TB/BB'}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
