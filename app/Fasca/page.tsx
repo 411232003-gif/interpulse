@@ -77,6 +77,7 @@ export default function CatatKesehatan() {
     const q = collection(db, 'residents')
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Resident[]
+      console.log('[Fasca] Residents loaded:', data.length, 'items')
       setResidents(data)
     })
     return () => unsubscribe()
@@ -303,14 +304,18 @@ export default function CatatKesehatan() {
   const filteredResidents = residents.filter(r => {
     const rwMatch = !filterRW || r.rw === filterRW
     const rtMatch = !filterRT || r.rt === filterRT
-    const searchMatch = !searchQuery || 
-      r.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const searchMatch = !searchQuery ||
+      r.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.nik.includes(searchQuery)
     const hasTBBB = getTodayTBBB(r.nik) !== undefined
     const hasAttendance = attendanceToday.has(r.nik)
-    console.log('[Fasca] Filter check for', r.nama, 'NIK:', r.nik, '- hasTBBB:', hasTBBB, 'hasAttendance:', hasAttendance, 'attendanceToday size:', attendanceToday.size)
+    console.log('[Fasca] Filter check for', r.nama, 'NIK:', r.nik, '- rwMatch:', rwMatch, 'rtMatch:', rtMatch, 'searchMatch:', searchMatch, 'hasTBBB:', hasTBBB, 'hasAttendance:', hasAttendance, 'filterRW:', filterRW, 'filterRT:', filterRT, 'searchQuery:', searchQuery)
     return rwMatch && rtMatch && searchMatch && hasTBBB && hasAttendance
-  }).sort((a, b) => {
+  })
+
+  console.log('[Fasca] Total residents:', residents.length, 'Filtered residents:', filteredResidents.length)
+
+  const sortedResidents = filteredResidents.sort((a, b) => {
     // Get latest health reading timestamp for each resident
     const getLatestHealthTimestamp = (nik: string) => {
       const residentReadings = healthReadings.filter(r => r.userId === nik && r.source === 'posbindu')
@@ -671,11 +676,11 @@ export default function CatatKesehatan() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredResidents.length === 0 ? (
+                    {sortedResidents.length === 0 ? (
                       <tr>
                         <td colSpan={9} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi dan input TB/BB hari ini</td>
                       </tr>
-                    ) : filteredResidents.map(r => {
+                    ) : sortedResidents.map(r => {
                       const todayTBBB = getTodayTBBB(r.nik)
                       const todayData = getTodayReadings(r.id)
                       return (
