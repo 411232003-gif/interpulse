@@ -53,7 +53,6 @@ export default function PartisipasiPage() {
     const healthReadingsRef = collection(db, 'healthReadings')
     
     const counts: Record<string, number> = {}
-    const nikSet = new Set<string>() // Track unique NIKs to avoid duplicates
     
     Object.keys(rwTargets).forEach(rw => {
       counts[rw] = 0
@@ -64,13 +63,11 @@ export default function PartisipasiPage() {
       attendanceSnapshot.docs.forEach(doc => {
         const d = doc.data()
         const rw = d.rw
-        const nik = d.nik
         const timestamp = d.timestamp
-        if (rw && counts[rw] !== undefined && nik && !nikSet.has(nik) && timestamp) {
+        if (rw && counts[rw] !== undefined && timestamp) {
           const month = new Date(timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
           if (month === selectedMonth) {
             counts[rw]++
-            nikSet.add(nik)
           }
         }
       })
@@ -80,13 +77,11 @@ export default function PartisipasiPage() {
         healthSnapshot.docs.forEach(doc => {
           const d = doc.data()
           const rw = d.rw
-          const nik = d.nik
           const timestamp = d.timestamp
-          if (rw && counts[rw] !== undefined && nik && !nikSet.has(nik) && timestamp) {
+          if (rw && counts[rw] !== undefined && timestamp) {
             const month = new Date(timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
             if (month === selectedMonth) {
               counts[rw]++
-              nikSet.add(nik)
             }
           }
         })

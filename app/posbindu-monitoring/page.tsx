@@ -669,7 +669,26 @@ export default function PosbinduMonitoring() {
       const age = parseInt(checkInForm.umur)
       const isElderly = age >= 60
       
-      // Save check-in data to Firestore
+      const currentMonth = new Date().toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+      const currentYear = new Date().getFullYear()
+      
+      // Check if attendance record exists for this NIK in current month
+      const existingAttendanceQuery = query(
+        collection(db, 'attendance'),
+        where('nik', '==', checkInForm.nik)
+      )
+      const existingSnapshot = await getDocs(existingAttendanceQuery)
+      
+      let existingDocId = null
+      existingSnapshot.docs.forEach(doc => {
+        const d = doc.data()
+        const docMonth = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+        const docYear = new Date(d.timestamp).getFullYear()
+        if (docMonth === currentMonth && docYear === currentYear) {
+          existingDocId = doc.id
+        }
+      })
+      
       const checkInData = {
         nama: checkInForm.nama,
         nik: checkInForm.nik,
@@ -681,11 +700,38 @@ export default function PosbinduMonitoring() {
         date: new Date().toLocaleDateString('id-ID'),
         time: new Date().toLocaleTimeString('id-ID'),
       }
-      await addDoc(collection(db, 'attendance'), checkInData)
       
-      // If elderly, also save to elderly-attendance collection for participation tracking
+      if (existingDocId) {
+        // Update existing record
+        await updateDoc(doc(db, 'attendance', existingDocId), checkInData)
+      } else {
+        // Create new record
+        await addDoc(collection(db, 'attendance'), checkInData)
+      }
+      
+      // If elderly, also save/update to elderly-attendance collection for participation tracking
       if (isElderly) {
-        await addDoc(collection(db, 'elderly-attendance'), checkInData)
+        const existingElderlyQuery = query(
+          collection(db, 'elderly-attendance'),
+          where('nik', '==', checkInForm.nik)
+        )
+        const existingElderlySnapshot = await getDocs(existingElderlyQuery)
+        
+        let existingElderlyDocId = null
+        existingElderlySnapshot.docs.forEach(doc => {
+          const d = doc.data()
+          const docMonth = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+          const docYear = new Date(d.timestamp).getFullYear()
+          if (docMonth === currentMonth && docYear === currentYear) {
+            existingElderlyDocId = doc.id
+          }
+        })
+        
+        if (existingElderlyDocId) {
+          await updateDoc(doc(db, 'elderly-attendance', existingElderlyDocId), checkInData)
+        } else {
+          await addDoc(collection(db, 'elderly-attendance'), checkInData)
+        }
       }
       
       // Fetch user's attendance history
