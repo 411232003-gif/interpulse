@@ -892,13 +892,33 @@ export default function RiwayatKesehatan() {
             </button>
 
             {isSelectionMode && selectedItems.size > 0 && (
-              <button
-                onClick={deleteSelected}
-                className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Hapus ({selectedItems.size})
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    // Edit functionality - only allow editing single item
+                    if (selectedItems.size === 1) {
+                      const selectedId = Array.from(selectedItems)[0]
+                      const reading = readings.find(r => r.id === selectedId)
+                      if (reading) {
+                        // TODO: Implement edit modal/functionality
+                        alert('Fitur edit akan ditambahkan')
+                      }
+                    } else {
+                      alert('Pilih hanya satu data untuk diedit')
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={deleteSelected}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Hapus ({selectedItems.size})
+                </button>
+              </>
             )}
 
             <div className="relative">
@@ -1148,23 +1168,6 @@ export default function RiwayatKesehatan() {
                           })}
                         </div>
 
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => exportToWhatsApp([reading])}
-                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl text-sm font-medium transition-colors"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            Share WA
-                          </button>
-                          <button
-                            onClick={() => deleteReading(reading.id)}
-                            title="Hapus data"
-                            aria-label="Hapus data"
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-sm font-medium transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
                       </div>
                     )}
                   </div>
