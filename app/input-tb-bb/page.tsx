@@ -258,6 +258,9 @@ export default function InputTBBBPage() {
               <button onClick={() => router.push('/')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
               <h1 className="text-2xl font-bold text-gray-800">Input Tinggi Badan & Berat Badan</h1>
             </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
           </div>
 
           {/* Filters */}

@@ -29,6 +29,7 @@ interface TBBBData {
   nik: string
   tinggiBadan: number
   beratBadan: number
+  lingkarPinggang: number
   timestamp: string
 }
 
@@ -216,6 +217,7 @@ export default function CatatKesehatan() {
         nik: doc.data().nik,
         tinggiBadan: doc.data().tinggiBadan,
         beratBadan: doc.data().beratBadan,
+        lingkarPinggang: doc.data().lingkarPinggang || 0,
         timestamp: doc.data().timestamp
       })) as TBBBData[]
       setTbbbData(data)
@@ -281,7 +283,7 @@ export default function CatatKesehatan() {
     return todayTBBB
   }
 
-  // Filter residents - only show those with attendance AND TB/BB data for today
+  // Filter residents - only show those with attendance, TB/BB, AND health input for today
   const filteredResidents = residents.filter(r => {
     const rwMatch = !filterRW || r.rw === filterRW
     const rtMatch = !filterRT || r.rt === filterRT
@@ -290,7 +292,9 @@ export default function CatatKesehatan() {
       r.nik.includes(searchQuery)
     const hasTBBB = getTodayTBBB(r.nik) !== undefined
     const hasAttendance = attendanceToday.has(r.nik)
-    return rwMatch && rtMatch && searchMatch && hasTBBB && hasAttendance
+    const todayData = getTodayReadings(r.id)
+    const hasHealthInput = todayData.readings.length > 0
+    return rwMatch && rtMatch && searchMatch && hasTBBB && hasAttendance && hasHealthInput
   }).sort((a, b) => {
     // Get latest health reading timestamp for each resident
     const getLatestHealthTimestamp = (nik: string) => {
@@ -592,6 +596,9 @@ export default function CatatKesehatan() {
                 <button onClick={() => router.push('/')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
                 <h1 className="text-2xl font-bold text-gray-800">{isAdmin ? 'Input Kesehatan Warga' : 'Input Kesehatan Saya'}</h1>
               </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              </div>
             </div>
 
             {/* Filters - only for admin */}
@@ -631,13 +638,14 @@ export default function CatatKesehatan() {
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Usia</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">TB (cm)</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">BB (kg)</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">LP (cm)</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredResidents.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah input TB/BB hari ini</td>
+                        <td colSpan={9} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi, input TB/BB, dan input kesehatan hari ini</td>
                       </tr>
                     ) : filteredResidents.map(r => {
                       const todayTBBB = getTodayTBBB(r.nik)
@@ -651,6 +659,7 @@ export default function CatatKesehatan() {
                           <td className="px-4 py-3 text-gray-600">{r.umur} tahun</td>
                           <td className="px-4 py-3 text-gray-600">{todayTBBB?.tinggiBadan || '-'}</td>
                           <td className="px-4 py-3 text-gray-600">{todayTBBB?.beratBadan || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600">{todayTBBB?.lingkarPinggang || '-'}</td>
                           <td className="px-4 py-3 text-center">
                             <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
                               <Stethoscope className="w-3.5 h-3.5" />
