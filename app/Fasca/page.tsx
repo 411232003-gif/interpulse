@@ -624,6 +624,8 @@ export default function CatatKesehatan() {
   }
 
   // Main table view
+  console.log('[Fasca] showFascaModal:', showFascaModal, 'sortedResidents.length:', sortedResidents.length)
+  console.log('[Fasca] About to render table, sortedResidents:', sortedResidents.map(r => ({ nama: r.nama, nik: r.nik })))
   if (!showFascaModal) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pb-24">
