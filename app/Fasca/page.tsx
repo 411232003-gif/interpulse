@@ -269,6 +269,19 @@ export default function CatatKesehatan() {
       r.nik.includes(searchQuery)
     const hasTBBB = getTodayTBBB(r.nik) !== undefined
     return rwMatch && rtMatch && searchMatch && hasTBBB
+  }).sort((a, b) => {
+    // Get latest health reading timestamp for each resident
+    const getLatestHealthTimestamp = (nik: string) => {
+      const residentReadings = healthReadings.filter(r => r.userId === nik && r.source === 'posbindu')
+      if (residentReadings.length === 0) return 0
+      return Math.max(...residentReadings.map(r => new Date(r.timestamp).getTime()))
+    }
+    
+    const aTimestamp = getLatestHealthTimestamp(a.nik)
+    const bTimestamp = getLatestHealthTimestamp(b.nik)
+    
+    // Sort by latest health input (newest first)
+    return bTimestamp - aTimestamp
   })
 
   // Validation functions
