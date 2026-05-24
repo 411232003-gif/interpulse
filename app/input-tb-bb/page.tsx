@@ -56,6 +56,65 @@ export default function InputTBBBPage() {
   const [showSuccessBanner, setShowSuccessBanner] = useState(false)
   const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
 
+  // Calculate age from birthDate
+  const calculateAge = (birthDate: string): number => {
+    if (!birthDate) return 0
+    const birth = new Date(birthDate)
+    const today = new Date()
+    let age = today.getFullYear() - birth.getFullYear()
+    const monthDiff = today.getMonth() - birth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--
+    }
+    return age
+  }
+
+  // Load today's attendance
+  useEffect(() => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+
+    const attendanceRef = collection(db, 'attendance')
+    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
+      const todayAttendance: AttendanceRecord[] = []
+      snapshot.docs.forEach(doc => {
+        const data = doc.data()
+        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
+          todayAttendance.push({
+            id: doc.id,
+            nama: data.nama,
+            nik: data.nik,
+            umur: data.umur,
+            rt: data.rt,
+            rw: data.rw,
+            alamat: data.alamat,
+            timestamp: data.timestamp
+          })
+        }
+      })
+      setAttendanceToday(todayAttendance)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  // Load TB/BB data from database
+  useEffect(() => {
+    const q = collection(db, 'tb-bb')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        nik: doc.data().nik,
+        tinggiBadan: doc.data().tinggiBadan,
+        beratBadan: doc.data().beratBadan,
+        lingkarPinggang: doc.data().lingkarPinggang || 0,
+        timestamp: doc.data().timestamp
+      })) as TBBBData[]
+      setTbbbData(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
   // Show loading while auth state is being determined
   if (authLoading) {
     return (
@@ -83,65 +142,6 @@ export default function InputTBBBPage() {
       </div>
     )
   }
-
-  // Calculate age from birthDate
-  const calculateAge = (birthDate: string): number => {
-    if (!birthDate) return 0
-    const birth = new Date(birthDate)
-    const today = new Date()
-    let age = today.getFullYear() - birth.getFullYear()
-    const monthDiff = today.getMonth() - birth.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--
-    }
-    return age
-  }
-
-  // Load today's attendance
-  useEffect(() => {
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    
-    const attendanceRef = collection(db, 'attendance')
-    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
-      const todayAttendance: AttendanceRecord[] = []
-      snapshot.docs.forEach(doc => {
-        const data = doc.data()
-        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
-          todayAttendance.push({
-            id: doc.id,
-            nama: data.nama,
-            nik: data.nik,
-            umur: data.umur,
-            rt: data.rt,
-            rw: data.rw,
-            alamat: data.alamat,
-            timestamp: data.timestamp
-          })
-        }
-      })
-      setAttendanceToday(todayAttendance)
-      setLoading(false)
-    })
-    
-    return () => unsubscribe()
-  }, [])
-
-  // Load TB/BB data from database
-  useEffect(() => {
-    const q = collection(db, 'tb-bb')
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        nik: doc.data().nik,
-        tinggiBadan: doc.data().tinggiBadan,
-        beratBadan: doc.data().beratBadan,
-        lingkarPinggang: doc.data().lingkarPinggang || 0,
-        timestamp: doc.data().timestamp
-      })) as TBBBData[]
-      setTbbbData(data)
-    })
-    return () => unsubscribe()
-  }, [])
 
   // Check if resident has TB/BB data for today
   const getTodayTBBB = (nik: string) => {

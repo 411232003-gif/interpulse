@@ -31,6 +31,94 @@ export default function AbsensiPage() {
   const [loading, setLoading] = useState(true)
   const [showSuccessBanner, setShowSuccessBanner] = useState(false)
 
+  // Calculate age from birthDate
+  const calculateAge = (birthDate: string): number => {
+    if (!birthDate) return 0
+    const birth = new Date(birthDate)
+    const today = new Date()
+    let age = today.getFullYear() - birth.getFullYear()
+    const monthDiff = today.getMonth() - birth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--
+    }
+    return age
+  }
+
+  // Load residents from database
+  useEffect(() => {
+    const residentsRef = collection(db, 'residents')
+    const usersRef = collection(db, 'users')
+
+    const unsubscribeResidents = onSnapshot(residentsRef, (residentsSnapshot) => {
+      const residentsData = residentsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Resident[]
+
+      // Fetch users and merge with residents
+      const unsubscribeUsers = onSnapshot(usersRef, (usersSnapshot) => {
+        const usersData = usersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as any[]
+
+        // Merge residents and users, avoiding duplicates by NIK
+        const mergedData = [...residentsData]
+        usersData.forEach(user => {
+          if (user.nik && !mergedData.find(r => r.nik === user.nik)) {
+            const age = user.birthDate ? calculateAge(user.birthDate) : 0
+            mergedData.push({
+              id: user.uid,
+              nama: user.name,
+              nik: user.nik,
+              rw: user.rw,
+              rt: user.rt,
+              birthDate: user.birthDate,
+              umur: age,
+              jenisKelamin: user.gender,
+              alamat: user.kelurahan,
+            } as Resident)
+          }
+        })
+
+        setResidents(mergedData)
+        setLoading(false)
+      }, (error) => {
+        console.error('Error fetching users:', error)
+        setResidents(residentsData)
+        setLoading(false)
+      })
+
+      return () => unsubscribeUsers()
+    }, (error) => {
+      console.error('Error fetching residents:', error)
+      setResidents([])
+      setLoading(false)
+    })
+
+    return () => unsubscribeResidents()
+  }, [])
+
+  // Load today's attendance
+  useEffect(() => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+
+    const attendanceRef = collection(db, 'attendance')
+    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
+      const todayAttendance = new Set<string>()
+      snapshot.docs.forEach(doc => {
+        const data = doc.data()
+        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
+          todayAttendance.add(data.nik)
+        }
+      })
+      setAttendanceToday(todayAttendance)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
   // Show loading while auth state is being determined
   if (authLoading) {
     return (
@@ -58,94 +146,6 @@ export default function AbsensiPage() {
       </div>
     )
   }
-
-  // Calculate age from birthDate
-  const calculateAge = (birthDate: string): number => {
-    if (!birthDate) return 0
-    const birth = new Date(birthDate)
-    const today = new Date()
-    let age = today.getFullYear() - birth.getFullYear()
-    const monthDiff = today.getMonth() - birth.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--
-    }
-    return age
-  }
-
-  // Load residents from database
-  useEffect(() => {
-    const residentsRef = collection(db, 'residents')
-    const usersRef = collection(db, 'users')
-    
-    const unsubscribeResidents = onSnapshot(residentsRef, (residentsSnapshot) => {
-      const residentsData = residentsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Resident[]
-      
-      // Fetch users and merge with residents
-      const unsubscribeUsers = onSnapshot(usersRef, (usersSnapshot) => {
-        const usersData = usersSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as any[]
-        
-        // Merge residents and users, avoiding duplicates by NIK
-        const mergedData = [...residentsData]
-        usersData.forEach(user => {
-          if (user.nik && !mergedData.find(r => r.nik === user.nik)) {
-            const age = user.birthDate ? calculateAge(user.birthDate) : 0
-            mergedData.push({
-              id: user.uid,
-              nama: user.name,
-              nik: user.nik,
-              rw: user.rw,
-              rt: user.rt,
-              birthDate: user.birthDate,
-              umur: age,
-              jenisKelamin: user.gender,
-              alamat: user.kelurahan,
-            } as Resident)
-          }
-        })
-        
-        setResidents(mergedData)
-        setLoading(false)
-      }, (error) => {
-        console.error('Error fetching users:', error)
-        setResidents(residentsData)
-        setLoading(false)
-      })
-      
-      return () => unsubscribeUsers()
-    }, (error) => {
-      console.error('Error fetching residents:', error)
-      setResidents([])
-      setLoading(false)
-    })
-    
-    return () => unsubscribeResidents()
-  }, [])
-
-  // Load today's attendance
-  useEffect(() => {
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    
-    const attendanceRef = collection(db, 'attendance')
-    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
-      const todayAttendance = new Set<string>()
-      snapshot.docs.forEach(doc => {
-        const data = doc.data()
-        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
-          todayAttendance.add(data.nik)
-        }
-      })
-      setAttendanceToday(todayAttendance)
-    })
-    
-    return () => unsubscribe()
-  }, [])
 
   // Filter residents
   const filteredResidents = residents.filter(r => {
