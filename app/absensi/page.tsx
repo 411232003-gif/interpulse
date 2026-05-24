@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, Search, Filter, ArrowLeft, CheckCircle, Calendar } from 'lucide-react'
+import { Users, Search, Filter, ArrowLeft, CheckCircle, Calendar, X } from 'lucide-react'
 
 interface Resident {
   id: string
@@ -28,6 +28,7 @@ export default function AbsensiPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [attendanceToday, setAttendanceToday] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
 
   // Calculate age from birthDate
   const calculateAge = (birthDate: string): number => {
@@ -197,7 +198,8 @@ export default function AbsensiPage() {
         }
       }
       
-      alert(`Absensi ${resident.nama} berhasil dicatat!`)
+      setShowSuccessBanner(true)
+      setTimeout(() => setShowSuccessBanner(false), 4000)
     } catch (error) {
       console.error('Error saving attendance:', error)
       alert('Gagal menyimpan absensi')
@@ -217,6 +219,28 @@ export default function AbsensiPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pb-24">
+      {/* Success Banner */}
+      {showSuccessBanner && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
+          <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              <CheckCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="font-bold text-lg">Berhasil!</p>
+              <p className="text-sm text-white/90">Absensi berhasil dicatat</p>
+            </div>
+            <button 
+              onClick={() => setShowSuccessBanner(false)}
+              aria-label="Tutup banner"
+              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-6">

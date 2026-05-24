@@ -34,6 +34,7 @@ interface TBBBData {
   nik: string
   tinggiBadan: number
   beratBadan: number
+  lingkarPinggang: number
   timestamp: string
 }
 
@@ -48,6 +49,7 @@ export default function InputTBBBPage() {
   const [showModal, setShowModal] = useState(false)
   const [tb, setTb] = useState('')
   const [bb, setBb] = useState('')
+  const [lingkarPinggang, setLingkarPinggang] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showSuccessBanner, setShowSuccessBanner] = useState(false)
@@ -104,6 +106,7 @@ export default function InputTBBBPage() {
         nik: doc.data().nik,
         tinggiBadan: doc.data().tinggiBadan,
         beratBadan: doc.data().beratBadan,
+        lingkarPinggang: doc.data().lingkarPinggang || 0,
         timestamp: doc.data().timestamp
       })) as TBBBData[]
       setTbbbData(data)
@@ -129,7 +132,7 @@ export default function InputTBBBPage() {
       att.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
       att.nik.includes(searchQuery)
     return rwMatch && rtMatch && searchMatch
-  })
+  }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
   // Open modal for input
   const openModal = (resident: AttendanceRecord) => {
@@ -138,9 +141,11 @@ export default function InputTBBBPage() {
     if (todayTBBB) {
       setTb(todayTBBB.tinggiBadan.toString())
       setBb(todayTBBB.beratBadan.toString())
+      setLingkarPinggang(todayTBBB.lingkarPinggang?.toString() || '')
     } else {
       setTb('')
       setBb('')
+      setLingkarPinggang('')
     }
     setShowModal(true)
   }
@@ -151,6 +156,7 @@ export default function InputTBBBPage() {
     setSelectedResident(null)
     setTb('')
     setBb('')
+    setLingkarPinggang('')
   }
 
   // Save TB/BB data
@@ -167,6 +173,7 @@ export default function InputTBBBPage() {
         nama: selectedResident.nama,
         tinggiBadan: parseInt(tb),
         beratBadan: parseInt(bb),
+        lingkarPinggang: lingkarPinggang ? parseInt(lingkarPinggang) : 0,
         rt: selectedResident.rt,
         rw: selectedResident.rw,
         timestamp: new Date().toISOString(),
@@ -360,6 +367,16 @@ export default function InputTBBBPage() {
                   value={bb}
                   onChange={e => setBb(e.target.value)}
                   placeholder="Contoh: 65"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Lingkar Pinggang (cm)</label>
+                <input
+                  type="number"
+                  value={lingkarPinggang}
+                  onChange={e => setLingkarPinggang(e.target.value)}
+                  placeholder="Contoh: 80"
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
