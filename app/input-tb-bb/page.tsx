@@ -42,6 +42,20 @@ export default function InputTBBBPage() {
   const router = useRouter()
   const { isAdmin, userProfile, loading: authLoading } = useAuth()
 
+  const [attendanceToday, setAttendanceToday] = useState<AttendanceRecord[]>([])
+  const [filterRW, setFilterRW] = useState('')
+  const [filterRT, setFilterRT] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedResident, setSelectedResident] = useState<AttendanceRecord | null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [tb, setTb] = useState('')
+  const [bb, setBb] = useState('')
+  const [lingkarPinggang, setLingkarPinggang] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
+  const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
+
   // Show loading while auth state is being determined
   if (authLoading) {
     return (
@@ -69,20 +83,6 @@ export default function InputTBBBPage() {
       </div>
     )
   }
-
-  const [attendanceToday, setAttendanceToday] = useState<AttendanceRecord[]>([])
-  const [filterRW, setFilterRW] = useState('')
-  const [filterRT, setFilterRT] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedResident, setSelectedResident] = useState<AttendanceRecord | null>(null)
-  const [showModal, setShowModal] = useState(false)
-  const [tb, setTb] = useState('')
-  const [bb, setBb] = useState('')
-  const [lingkarPinggang, setLingkarPinggang] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
-  const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
 
   // Calculate age from birthDate
   const calculateAge = (birthDate: string): number => {

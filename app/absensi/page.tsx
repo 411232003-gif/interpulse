@@ -23,6 +23,14 @@ export default function AbsensiPage() {
   const router = useRouter()
   const { isAdmin, userProfile, loading: authLoading } = useAuth()
 
+  const [residents, setResidents] = useState<Resident[]>([])
+  const [filterRW, setFilterRW] = useState('')
+  const [filterRT, setFilterRT] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [attendanceToday, setAttendanceToday] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
+
   // Show loading while auth state is being determined
   if (authLoading) {
     return (
@@ -50,14 +58,6 @@ export default function AbsensiPage() {
       </div>
     )
   }
-
-  const [residents, setResidents] = useState<Resident[]>([])
-  const [filterRW, setFilterRW] = useState('')
-  const [filterRT, setFilterRT] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [attendanceToday, setAttendanceToday] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
 
   // Calculate age from birthDate
   const calculateAge = (birthDate: string): number => {
