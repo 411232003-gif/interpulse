@@ -50,21 +50,43 @@ export default function PartisipasiPage() {
   // Fetch residents count per RW from residents collection
   useEffect(() => {
     const residentsRef = collection(db, 'residents')
-    const unsubscribe = onSnapshot(residentsRef, (snapshot) => {
+    const usersRef = collection(db, 'users')
+    
+    const unsubscribeResidents = onSnapshot(residentsRef, (residentsSnapshot) => {
       const counts: Record<string, number> = {}
       Object.keys(rwTargets).forEach(rw => {
         counts[rw] = 0
       })
-      snapshot.docs.forEach(doc => {
+      residentsSnapshot.docs.forEach(doc => {
         const d = doc.data()
         const rw = d.rw
         if (rw && counts[rw] !== undefined) {
           counts[rw]++
         }
       })
+      
+      // Fetch users and merge with residents count per RW
+      const unsubscribeUsers = onSnapshot(usersRef, (usersSnapshot) => {
+        usersSnapshot.docs.forEach(doc => {
+          const d = doc.data()
+          const rw = d.rw
+          if (rw && counts[rw] !== undefined) {
+            counts[rw]++
+          }
+        })
+        setResidentsPerRW(counts)
+      }, (error) => {
+        console.error('Error fetching users:', error)
+        setResidentsPerRW(counts)
+      })
+      
+      return () => unsubscribeUsers()
+    }, (error) => {
+      console.error('Error fetching residents:', error)
       setResidentsPerRW(counts)
     })
-    return () => unsubscribe()
+    
+    return () => unsubscribeResidents()
   }, [])
 
   const totalTarget = Object.values(residentsPerRW).reduce((a, b) => a + b, 0)
