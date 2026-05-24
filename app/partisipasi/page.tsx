@@ -47,24 +47,92 @@ export default function PartisipasiPage() {
     return () => unsubscribe()
   }, [])
 
-  // Fetch residents count per RW from residents collection
+  // Fetch residents count per RW from residents, attendance, healthReadings, and users collections
   useEffect(() => {
     const residentsRef = collection(db, 'residents')
-    const unsubscribe = onSnapshot(residentsRef, (snapshot) => {
+    const attendanceRef = collection(db, 'attendance')
+    const healthReadingsRef = collection(db, 'healthReadings')
+    const usersRef = collection(db, 'users')
+    
+    const unsubscribeResidents = onSnapshot(residentsRef, (residentsSnapshot) => {
       const counts: Record<string, number> = {}
+      const nikSet = new Set<string>() // Track unique NIKs to avoid duplicates
+      
       Object.keys(rwTargets).forEach(rw => {
         counts[rw] = 0
       })
-      snapshot.docs.forEach(doc => {
+      
+      // Count from residents
+      residentsSnapshot.docs.forEach(doc => {
         const d = doc.data()
         const rw = d.rw
-        if (rw && counts[rw] !== undefined) {
+        const nik = d.nik
+        if (rw && counts[rw] !== undefined && nik && !nikSet.has(nik)) {
           counts[rw]++
+          nikSet.add(nik)
         }
       })
+      
+      // Fetch and count from attendance
+      const unsubscribeAttendance = onSnapshot(attendanceRef, (attendanceSnapshot) => {
+        attendanceSnapshot.docs.forEach(doc => {
+          const d = doc.data()
+          const rw = d.rw
+          const nik = d.nik
+          if (rw && counts[rw] !== undefined && nik && !nikSet.has(nik)) {
+            counts[rw]++
+            nikSet.add(nik)
+          }
+        })
+        
+        // Fetch and count from healthReadings
+        const unsubscribeHealth = onSnapshot(healthReadingsRef, (healthSnapshot) => {
+          healthSnapshot.docs.forEach(doc => {
+            const d = doc.data()
+            const rw = d.rw
+            const nik = d.nik
+            if (rw && counts[rw] !== undefined && nik && !nikSet.has(nik)) {
+              counts[rw]++
+              nikSet.add(nik)
+            }
+          })
+          
+          // Fetch and count from users
+          const unsubscribeUsers = onSnapshot(usersRef, (usersSnapshot) => {
+            usersSnapshot.docs.forEach(doc => {
+              const d = doc.data()
+              const rw = d.rw
+              const nik = d.nik
+              if (rw && counts[rw] !== undefined && nik && !nikSet.has(nik)) {
+                counts[rw]++
+                nikSet.add(nik)
+              }
+            })
+            setResidentsPerRW(counts)
+          }, (error) => {
+            console.error('Error fetching users:', error)
+            setResidentsPerRW(counts)
+          })
+          
+          return () => unsubscribeUsers()
+        }, (error) => {
+          console.error('Error fetching healthReadings:', error)
+          setResidentsPerRW(counts)
+        })
+        
+        return () => unsubscribeHealth()
+      }, (error) => {
+        console.error('Error fetching attendance:', error)
+        setResidentsPerRW(counts)
+      })
+      
+      return () => unsubscribeAttendance()
+    }, (error) => {
+      console.error('Error fetching residents:', error)
       setResidentsPerRW(counts)
     })
-    return () => unsubscribe()
+    
+    return () => unsubscribeResidents()
   }, [])
 
   const totalTarget = Object.values(residentsPerRW).reduce((a, b) => a + b, 0)
