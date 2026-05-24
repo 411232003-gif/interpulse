@@ -133,7 +133,7 @@ export default function PartisipasiPage() {
     })
     
     return () => unsubscribeResidents()
-  }, [counts])
+  }, [])
 
   const totalTarget = Object.values(residentsPerRW).reduce((a, b) => a + b, 0)
   const totalAttendance = Object.entries(elderlyAttendance).reduce((sum, [rw, months_data]) => {
@@ -350,7 +350,7 @@ export default function PartisipasiPage() {
             <div className="h-2 bg-white/30 rounded-full overflow-hidden">
               <div
                 className="h-full bg-white rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(overallPct, 100)}%` }}
+                style={{ width: `${Math.min(overallPctNum, 100)}%` }}
               />
             </div>
           </div>
