@@ -49,6 +49,8 @@ interface AuthContextType {
   isAdmin: boolean
   isOperatorRW: boolean
   operatorRW: string | null
+  isGuest: boolean
+  setGuest: (guest: boolean) => void
   login: (email: string, password: string) => Promise<void>
   loginWithNIK: (nik: string, password: string) => Promise<void>
   register: (email: string, password: string, profile: Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>) => Promise<void>
@@ -64,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isGuest, setIsGuest] = useState(false)
 
   useEffect(() => {
     // Check for QR code login first
@@ -300,13 +303,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const operatorRW = userProfile?.operatorRW || null
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      userProfile, 
-      loading, 
+    <AuthContext.Provider value={{
+      user,
+      userProfile,
+      loading,
       isAdmin,
       isOperatorRW,
       operatorRW,
+      isGuest,
+      setGuest: setIsGuest,
       login,
       loginWithNIK,
       register,

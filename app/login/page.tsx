@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [guestLoading, setGuestLoading] = useState(false)
   const router = useRouter()
-  const { loginWithNIK } = useAuth()
+  const { loginWithNIK, setGuest } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,6 +33,7 @@ export default function LoginPage() {
 
   const handleGuestAccess = () => {
     setGuestLoading(true)
+    setGuest(true)
     setTimeout(() => {
       router.push('/')
     }, 300)
@@ -138,11 +139,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-2">
             <p className="text-gray-400 text-sm">
               Hubungi admin untuk mendapatkan akun
             </p>
-            <Link href="/register" className="text-teal-600 text-sm font-medium hover:text-teal-700 mt-2 inline-block">
+            <Link href="/register" className="text-teal-600 text-sm font-medium hover:text-teal-700 hover:underline">
               Daftar akun baru
             </Link>
           </div>
