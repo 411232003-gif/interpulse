@@ -54,14 +54,14 @@ export default function PartisipasiPage() {
     const healthReadingsRef = collection(db, 'healthReadings')
     const usersRef = collection(db, 'users')
     
+    const counts: Record<string, number> = {}
+    const nikSet = new Set<string>() // Track unique NIKs to avoid duplicates
+    
+    Object.keys(rwTargets).forEach(rw => {
+      counts[rw] = 0
+    })
+    
     const unsubscribeResidents = onSnapshot(residentsRef, (residentsSnapshot) => {
-      const counts: Record<string, number> = {}
-      const nikSet = new Set<string>() // Track unique NIKs to avoid duplicates
-      
-      Object.keys(rwTargets).forEach(rw => {
-        counts[rw] = 0
-      })
-      
       // Count from residents
       residentsSnapshot.docs.forEach(doc => {
         const d = doc.data()
@@ -133,13 +133,14 @@ export default function PartisipasiPage() {
     })
     
     return () => unsubscribeResidents()
-  }, [])
+  }, [counts])
 
   const totalTarget = Object.values(residentsPerRW).reduce((a, b) => a + b, 0)
   const totalAttendance = Object.entries(elderlyAttendance).reduce((sum, [rw, months_data]) => {
     return sum + (months_data[selectedMonth] || 0)
   }, 0)
-  const overallPct = totalTarget > 0 ? Math.round((totalAttendance / totalTarget) * 100) : 0
+  const overallPctNum = totalTarget > 0 ? (totalAttendance / totalTarget) * 100 : 0
+  const overallPct = Math.min(overallPctNum, 100).toFixed(1)
 
   const exportToPDF = () => {
     const doc = new jsPDF()
@@ -163,13 +164,14 @@ export default function PartisipasiPage() {
       const attendance = elderlyAttendance[rw] || {}
       const count = attendance[selectedMonth] || 0
       const totalResidents = residentsPerRW[rw] || 0
-      const pct = totalResidents > 0 ? Math.round((count / totalResidents) * 100) : 0
+      const pctNum = totalResidents > 0 ? Math.min((count / totalResidents) * 100, 100) : 0
+      const pct = pctNum.toFixed(1)
       return [
         `RW ${rw}`,
         totalResidents,
         count,
         `${pct}%`,
-        pct >= 100 ? 'Terpenuhi' : pct >= 80 ? 'Hampir' : 'Belum'
+        pctNum >= 100 ? 'Terpenuhi' : pctNum >= 80 ? 'Hampir' : 'Belum'
       ]
     })
 
@@ -363,9 +365,10 @@ export default function PartisipasiPage() {
           {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, _]) => {
             const hadir = elderlyAttendance[rw]?.[selectedMonth] || 0
             const totalResidents = residentsPerRW[rw] || 0
-            const pct = totalResidents > 0 ? Math.round((hadir / totalResidents) * 100) : 0
-            const barColor = pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-            const badgeColor = pct >= 80 ? 'bg-green-100 text-green-700' : pct >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+            const pctNum = totalResidents > 0 ? Math.min((hadir / totalResidents) * 100, 100) : 0
+            const pct = pctNum.toFixed(1)
+            const barColor = pctNum >= 80 ? 'bg-green-500' : pctNum >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+            const badgeColor = pctNum >= 80 ? 'bg-green-100 text-green-700' : pctNum >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
             return (
               <div key={rw} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between mb-2">
@@ -383,7 +386,7 @@ export default function PartisipasiPage() {
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full ${barColor} rounded-full transition-all duration-500`}
-                    style={{ width: `${Math.min(pct, 100)}%` }}
+                    style={{ width: `${Math.min(pctNum, 100)}%` }}
                   />
                 </div>
               </div>
