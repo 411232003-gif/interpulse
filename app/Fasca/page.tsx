@@ -678,13 +678,11 @@ export default function CatatKesehatan() {
                     </tr>
                   </thead>
                   <tbody>
-                    {console.log('[Fasca] Rendering table body, sortedResidents.length:', sortedResidents.length)}
                     {sortedResidents.length === 0 ? (
                       <tr>
                         <td colSpan={9} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi dan input TB/BB hari ini</td>
                       </tr>
                     ) : sortedResidents.map(r => {
-                      console.log('[Fasca] Rendering row for:', r.nama, 'NIK:', r.nik)
                       const todayTBBB = getTodayTBBB(r.nik)
                       const todayData = getTodayReadings(r.id)
                       return (
