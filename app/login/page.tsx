@@ -139,13 +139,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center space-y-2">
+          <div className="mt-6 text-center">
             <p className="text-gray-400 text-sm">
               Hubungi admin untuk mendapatkan akun
             </p>
-            <Link href="/register" className="text-teal-600 text-sm font-medium hover:text-teal-700 hover:underline">
-              Daftar akun baru
-            </Link>
           </div>
         </div>
 

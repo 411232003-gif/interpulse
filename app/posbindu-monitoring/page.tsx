@@ -103,17 +103,54 @@ export default function PosbinduMonitoring() {
   // Fetch residents from Firestore
   useEffect(() => {
     const residentsRef = collection(db, 'residents')
-    const unsubscribe = onSnapshot(residentsRef, (snapshot) => {
-      const residentsData = snapshot.docs.map(doc => ({
+    const usersRef = collection(db, 'users')
+    
+    const unsubscribeResidents = onSnapshot(residentsRef, (residentsSnapshot) => {
+      const residentsData = residentsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Resident[]
-      setResidents(residentsData)
+      
+      // Fetch users and merge with residents
+      const unsubscribeUsers = onSnapshot(usersRef, (usersSnapshot) => {
+        const usersData = usersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as any[]
+        
+        // Merge residents and users, avoiding duplicates by NIK
+        const mergedData = [...residentsData]
+        usersData.forEach(user => {
+          if (user.nik && !mergedData.find(r => r.nik === user.nik)) {
+            // Add user as resident if not already exists
+            const age = user.birthDate ? calculateAge(user.birthDate) : 0
+            mergedData.push({
+              id: user.uid,
+              nama: user.name,
+              nik: user.nik,
+              rw: user.rw,
+              rt: user.rt,
+              birthDate: user.birthDate,
+              umur: age,
+              jenisKelamin: user.gender,
+              alamat: user.kelurahan,
+            } as Resident)
+          }
+        })
+        
+        setResidents(mergedData)
+      }, (error) => {
+        console.error('Error fetching users:', error)
+        setResidents(residentsData)
+      })
+      
+      return () => unsubscribeUsers()
     }, (error) => {
       console.error('Error fetching residents:', error)
       setResidents([])
     })
-    return () => unsubscribe()
+    
+    return () => unsubscribeResidents()
   }, [])
 
   const handleAutoFillFromProfile = () => {
@@ -143,7 +180,7 @@ export default function PosbinduMonitoring() {
   // Auto-fill form when checkbox is checked
   useEffect(() => {
     handleAutoFillFromProfile()
-  }, [autoFillFromProfile])
+  }, [autoFillFromProfile, userProfile])
 
   // Fetch elderly attendance from Firestore - REAL TIME SYNC
   useEffect(() => {

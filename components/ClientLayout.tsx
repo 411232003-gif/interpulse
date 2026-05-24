@@ -8,12 +8,12 @@ import { GlobalAudioProvider } from '@/contexts/GlobalAudioContext'
 import { useAuth } from '@/lib/auth-context'
 
 const publicRoutes = [
-  '/login', '/register', '/complete-profile',
+  '/login', '/register', '/complete-profile', '/login-qr',
   '/video-edukasi', '/Fasca', '/kalori-tracker', '/deteksi-jantung', '/musik-relaksasi', '/sehat-sentosa', '/monitoring', '/partisipasi'
 ]
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  const { user, userProfile, loading } = useAuth()
+  const { user, userProfile, loading, isGuest } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -21,7 +21,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     if (!loading) {
       const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route))
       
-      if (!user && !isPublicRoute) {
+      if (!user && !isGuest && !isPublicRoute) {
         router.push('/login')
         return
       }
@@ -38,7 +38,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         return
       }
     }
-  }, [user, userProfile, loading, pathname, router])
+  }, [user, userProfile, loading, pathname, router, isGuest])
 
   // Show loading state only on initial load, not on navigation
   if (loading && pathname === '/') {
@@ -63,8 +63,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     )
   }
 
-  // For protected routes, require auth
-  if (!user) {
+  // For protected routes, require auth (guest can access homepage)
+  if (!user && !isGuest) {
     return null // Will redirect in useEffect
   }
 
