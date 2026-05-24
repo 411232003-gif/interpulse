@@ -22,6 +22,14 @@ interface Resident {
   rt: string
   umur: number
   jenisKelamin: 'L' | 'P'
+  birthDate?: string
+}
+
+interface TBBBData {
+  nik: string
+  tinggiBadan: number
+  beratBadan: number
+  timestamp: string
 }
 
 export default function CatatKesehatan() {
@@ -38,6 +46,7 @@ export default function CatatKesehatan() {
   const [healthReadings, setHealthReadings] = useState<any[]>([])
   const [todayReadingsForResident, setTodayReadingsForResident] = useState<any[]>([])
   const [isResetting, setIsResetting] = useState(false)
+  const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
 
   // Fasca form state
   const [healthType, setHealthType] = useState<HealthType | null>(null)
@@ -198,6 +207,21 @@ export default function CatatKesehatan() {
     return () => unsubscribe()
   }, [userProfile])
 
+  // Load TB/BB data from database
+  useEffect(() => {
+    const q = collection(db, 'tb-bb')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        nik: doc.data().nik,
+        tinggiBadan: doc.data().tinggiBadan,
+        beratBadan: doc.data().beratBadan,
+        timestamp: doc.data().timestamp
+      })) as TBBBData[]
+      setTbbbData(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
   // Check if resident has health data for today (all types)
   const getTodayReadings = (residentId: string) => {
     const today = new Date()
@@ -226,14 +250,25 @@ export default function CatatKesehatan() {
     }
   }
 
-  // Filter residents
+  // Check if resident has TB/BB data for today
+  const getTodayTBBB = (nik: string) => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    const todayTBBB = tbbbData.find(tb => 
+      tb.nik === nik && tb.timestamp.startsWith(todayStr)
+    )
+    return todayTBBB
+  }
+
+  // Filter residents - only show those with TB/BB data for today
   const filteredResidents = residents.filter(r => {
     const rwMatch = !filterRW || r.rw === filterRW
     const rtMatch = !filterRT || r.rt === filterRT
     const searchMatch = !searchQuery || 
       r.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
       r.nik.includes(searchQuery)
-    return rwMatch && rtMatch && searchMatch
+    const hasTBBB = getTodayTBBB(r.nik) !== undefined
+    return rwMatch && rtMatch && searchMatch && hasTBBB
   })
 
   // Validation functions
@@ -557,33 +592,30 @@ export default function CatatKesehatan() {
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">NIK</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">RW/RT</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Umur</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Jenis Kelamin</th>
-                      <th className="px-4 py-3 text-center font-semibold text-gray-700">Status Input</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Usia</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">TB (cm)</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">BB (kg)</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredResidents.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
+                        <td colSpan={8} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah input TB/BB hari ini</td>
                       </tr>
                     ) : filteredResidents.map(r => {
+                      const todayTBBB = getTodayTBBB(r.nik)
                       const todayData = getTodayReadings(r.id)
                       return (
                         <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
                           <td className="px-4 py-3 text-gray-600">{r.nik}</td>
                           <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
-                          <td className="px-4 py-3 text-gray-600">{r.umur} th</td>
                           <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-                          <td className="px-4 py-3 text-center">
-                            {todayData.allTypes ? (
-                              <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-gray-400 mx-auto" />
-                            )}
-                          </td>
+                          <td className="px-4 py-3 text-gray-600">{r.umur} tahun</td>
+                          <td className="px-4 py-3 text-gray-600">{todayTBBB?.tinggiBadan || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600">{todayTBBB?.beratBadan || '-'}</td>
                           <td className="px-4 py-3 text-center">
                             <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
                               <Stethoscope className="w-3.5 h-3.5" />

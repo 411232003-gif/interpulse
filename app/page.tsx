@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight, Users, TrendingUp, LogIn, CheckCircle, AlertCircle, XCircle, PlusCircle } from 'lucide-react'
+import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight, Users, TrendingUp, LogIn, CheckCircle, AlertCircle, XCircle, PlusCircle, Calendar, Ruler, Scale } from 'lucide-react'
 import BigNumpad from '@/components/BigNumpad'
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -402,6 +402,26 @@ export default function Home() {
     }
   ]
 
+  // Admin feature cards - Middle row
+  const adminMiddleCards: FeatureCard[] = [
+    {
+      title: 'Absensi',
+      description: 'Catat kehadiran warga',
+      href: '/absensi',
+      icon: Calendar,
+      gradient: 'from-teal-500 to-green-500',
+      bgColor: 'bg-teal-50'
+    },
+    {
+      title: 'Input TB/BB',
+      description: 'Input tinggi badan dan berat badan',
+      href: '/input-tb-bb',
+      icon: Scale,
+      gradient: 'from-purple-500 to-pink-500',
+      bgColor: 'bg-purple-50'
+    }
+  ]
+
   // Admin feature cards - Bottom row
   const adminBottomCards: FeatureCard[] = [
     {
@@ -451,7 +471,7 @@ export default function Home() {
     }] : [])
   ]
 
-  const featureCards: FeatureCard[] = isAdmin ? [...adminTopCards, ...adminBottomCards] : userCards
+  const featureCards: FeatureCard[] = isAdmin ? [...adminTopCards, ...adminMiddleCards, ...adminBottomCards] : userCards
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20 flex flex-col">
