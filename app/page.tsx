@@ -454,8 +454,8 @@ export default function Home() {
   const featureCards: FeatureCard[] = isAdmin ? [...adminTopCards, ...adminBottomCards] : userCards
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20 flex flex-col">
-      <div className="max-w-7xl mx-auto px-4 py-2 flex-1 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20 flex flex-col overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 py-2 flex-1 flex flex-col overflow-y-auto">
         {/* Header */}
         <div className="mb-3 mt-2">
           <div className="text-center">
