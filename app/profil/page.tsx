@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import BackButton from '@/components/BackButton'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { User, Mail, Phone, Calendar, Ruler, Weight, Target, Settings, X, Save, Plus, Trash2, Edit3, Trophy, QrCode, Share2, LogOut } from 'lucide-react'
+import { User, Mail, Phone, Calendar, Ruler, Weight, Target, Settings, X, Save, Plus, Trash2, Edit3, Trophy, QrCode, Share2, LogOut, Eye, EyeOff } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth, UserProfile } from '@/lib/auth-context'
 import { doc, updateDoc } from 'firebase/firestore'
@@ -98,25 +98,89 @@ export default function Profil() {
 
   // Admin: Create User state
   const [showCreateUserModal, setShowCreateUserModal] = useState(false)
-  const [createUserForm, setCreateUserForm] = useState({ nik: '', password: '', name: '', rt: '', rw: '', kelurahan: '' })
+  const [createUserForm, setCreateUserForm] = useState({ 
+    nik: '', 
+    password: '', 
+    name: '', 
+    phone: '',
+    birthDate: '',
+    height: 170,
+    weight: 65,
+    gender: 'Laki-laki',
+    rt: '', 
+    rw: '', 
+    kelurahan: '' 
+  })
   const [creatingUser, setCreatingUser] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(createUserForm.nik)) {
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'error',
+          title: 'Format ID Salah',
+          message: 'Interpulse ID harus berupa email yang valid (contoh: undira@interpulse.com)'
+        })
+      }
+      return
+    }
+    
+    setShowConfirmModal(true)
+  }
 
+  const confirmCreateUser = async () => {
     setCreatingUser(true)
     try {
       await createUserByAdmin(createUserForm.nik, createUserForm.password, {
         name: createUserForm.name,
+        phone: createUserForm.phone,
+        birthDate: createUserForm.birthDate,
+        height: createUserForm.height,
+        weight: createUserForm.weight,
+        gender: createUserForm.gender,
         rt: createUserForm.rt,
         rw: createUserForm.rw,
         kelurahan: createUserForm.kelurahan,
       })
-      alert(`Akun berhasil dibuat untuk Interpulse ID: ${createUserForm.nik}`)
-      setCreateUserForm({ nik: '', password: '', name: '', rt: '', rw: '', kelurahan: '' })
+      
+      // Show success notification
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'success',
+          title: 'Akun Berhasil Dibuat',
+          message: `Akun untuk ${createUserForm.name} telah berhasil dibuat dengan ID: ${createUserForm.nik}`
+        })
+      }
+      
+      setCreateUserForm({ 
+        nik: '', 
+        password: '', 
+        name: '', 
+        phone: '',
+        birthDate: '',
+        height: 170,
+        weight: 65,
+        gender: 'Laki-laki',
+        rt: '', 
+        rw: '', 
+        kelurahan: '' 
+      })
       setShowCreateUserModal(false)
+      setShowConfirmModal(false)
     } catch (err: any) {
-      alert(`Gagal membuat akun: ${err.message}`)
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'error',
+          title: 'Gagal Membuat Akun',
+          message: err.message || 'Terjadi kesalahan saat membuat akun'
+        })
+      }
     } finally {
       setCreatingUser(false)
     }
@@ -201,10 +265,23 @@ export default function Profil() {
       setProfile({ ...editedProfile })
       setIsEditing(false)
       await refreshProfile()
-      alert('Profil berhasil disimpan!')
+      
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'success',
+          title: 'Profil Berhasil Disimpan',
+          message: 'Perubahan profil Anda telah berhasil disimpan'
+        })
+      }
     } catch (error) {
       console.error('Error saving profile:', error)
-      alert('Gagal menyimpan profil. Coba lagi.')
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'error',
+          title: 'Gagal Menyimpan Profil',
+          message: 'Terjadi kesalahan saat menyimpan profil. Coba lagi.'
+        })
+      }
     } finally {
       setSaving(false)
     }
@@ -232,8 +309,22 @@ export default function Profil() {
   const handleSaveHealth = () => {
     if (editingHealth) {
       setHealthData(prev => prev.map(h => h.id === editingHealth.id ? { ...h, ...healthForm } : h))
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'success',
+          title: 'Data Berhasil Diupdate',
+          message: `Data ${healthForm.type} telah berhasil diupdate`
+        })
+      }
     } else {
       setHealthData(prev => [...prev, { ...healthForm, id: Date.now().toString() }])
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'success',
+          title: 'Data Berhasil Ditambahkan',
+          message: `Data ${healthForm.type} baru telah berhasil ditambahkan`
+        })
+      }
     }
     setShowHealthModal(false)
     setEditingHealth(null)
@@ -242,6 +333,13 @@ export default function Profil() {
 
   const handleDeleteHealth = (id: string) => {
     setHealthData(prev => prev.filter(h => h.id !== id))
+    if ((window as any).showNotification) {
+      (window as any).showNotification({
+        type: 'success',
+        title: 'Data Berhasil Dihapus',
+        message: 'Data kesehatan telah berhasil dihapus'
+      })
+    }
   }
 
   const handleAddHealth = () => {
@@ -266,6 +364,13 @@ export default function Profil() {
         earned,
         earnedDate: earned && !a.earnedDate ? new Date().toISOString().split('T')[0] : a.earnedDate
       } : a))
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'success',
+          title: 'Pencapaian Berhasil Diupdate',
+          message: `Pencapaian ${achievementForm.title} telah berhasil diupdate`
+        })
+      }
     } else {
       setAchievements(prev => [...prev, { 
         ...achievementForm, 
@@ -273,6 +378,13 @@ export default function Profil() {
         earned,
         earnedDate: earned ? new Date().toISOString().split('T')[0] : undefined
       }])
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'success',
+          title: 'Pencapaian Berhasil Ditambahkan',
+          message: `Pencapaian ${achievementForm.title} baru telah berhasil ditambahkan`
+        })
+      }
     }
     setShowAchievementModal(false)
     setEditingAchievement(null)
@@ -281,6 +393,13 @@ export default function Profil() {
 
   const handleDeleteAchievement = (id: string) => {
     setAchievements(prev => prev.filter(a => a.id !== id))
+    if ((window as any).showNotification) {
+      (window as any).showNotification({
+        type: 'success',
+        title: 'Pencapaian Berhasil Dihapus',
+        message: 'Pencapaian telah berhasil dihapus'
+      })
+    }
   }
 
   const handleAddAchievement = () => {
@@ -305,8 +424,22 @@ export default function Profil() {
   const handleSaveTarget = () => {
     if (editingTarget) {
       setProgressTargets(prev => prev.map(t => t.id === editingTarget.id ? { ...t, ...targetForm } : t))
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'success',
+          title: 'Target Berhasil Diupdate',
+          message: `Target ${targetForm.title} telah berhasil diupdate`
+        })
+      }
     } else {
       setProgressTargets(prev => [...prev, { ...targetForm, id: Date.now().toString() }])
+      if ((window as any).showNotification) {
+        (window as any).showNotification({
+          type: 'success',
+          title: 'Target Berhasil Ditambahkan',
+          message: `Target ${targetForm.title} baru telah berhasil ditambahkan`
+        })
+      }
     }
     setShowTargetModal(false)
     setEditingTarget(null)
@@ -315,6 +448,13 @@ export default function Profil() {
 
   const handleDeleteTarget = (id: string) => {
     setProgressTargets(prev => prev.filter(t => t.id !== id))
+    if ((window as any).showNotification) {
+      (window as any).showNotification({
+        type: 'success',
+        title: 'Target Berhasil Dihapus',
+        message: 'Target telah berhasil dihapus'
+      })
+    }
   }
 
   const handleAddTarget = () => {
@@ -388,11 +528,27 @@ export default function Profil() {
                 <p className="text-blue-100 text-sm mt-0.5">Buat akun baru untuk warga</p>
               </div>
               <button
-                onClick={() => setShowCreateUserModal(true)}
+                onClick={() => {
+                  setCreateUserForm({ 
+                    nik: '', 
+                    password: '', 
+                    name: '', 
+                    phone: '',
+                    birthDate: '',
+                    height: 170,
+                    weight: 65,
+                    gender: 'Laki-laki',
+                    rt: '', 
+                    rw: '', 
+                    kelurahan: '' 
+                  })
+                  setShowPassword(false)
+                  setShowCreateUserModal(true)
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                Buat Akun User
+                Buat Akun Warga
               </button>
             </div>
           </div>
@@ -712,37 +868,48 @@ export default function Profil() {
       )}
       {/* Admin: Create User Modal */}
       {showCreateUserModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
-          <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50">
+          <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto pb-24">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-bold text-gray-800">Buat Akun User Baru</h3>
-              <button onClick={() => setShowCreateUserModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+              <h3 className="text-lg font-bold text-gray-800">Buat Akun Warga Baru</h3>
+              <button onClick={() => setShowCreateUserModal(false)} className="p-2 hover:bg-gray-100 rounded-lg" title="Tutup modal">
                 <X className="w-5 h-5 text-gray-600" />
               </button>
             </div>
-            <form onSubmit={handleCreateUser} className="space-y-3">
+            <form onSubmit={handleCreateUser} className="space-y-3" autoComplete="off">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Interpulse ID *</label>
                 <input
                   type="text"
                   value={createUserForm.nik}
                   onChange={e => setCreateUserForm(f => ({ ...f, nik: e.target.value }))}
-                  placeholder="Masukkan email"
+                  placeholder="Contoh: undira@interpulse.com"
                   required
+                  autoComplete="off"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                <input
-                  type="password"
-                  value={createUserForm.password}
-                  onChange={e => setCreateUserForm(f => ({ ...f, password: e.target.value }))}
-                  placeholder="Minimal 6 karakter"
-                  minLength={6}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={createUserForm.password}
+                    onChange={e => setCreateUserForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="Masukkan password"
+                    minLength={6}
+                    required
+                    autoComplete="new-password"
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
@@ -755,39 +922,101 @@ export default function Profil() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">No. Telepon</label>
+                <input
+                  type="tel"
+                  value={createUserForm.phone}
+                  onChange={e => setCreateUserForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="+62 812 3456 7890"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+                <input
+                  type="date"
+                  value={createUserForm.birthDate}
+                  onChange={e => setCreateUserForm(f => ({ ...f, birthDate: e.target.value }))}
+                  title="Tanggal Lahir"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Kelamin</label>
+                <select
+                  value={createUserForm.gender}
+                  onChange={e => setCreateUserForm(f => ({ ...f, gender: e.target.value }))}
+                  title="Jenis Kelamin"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                >
+                  <option value="Laki-laki">Laki-laki</option>
+                  <option value="Perempuan">Perempuan</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">RT</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tinggi (cm)</label>
                   <input
-                    type="text"
-                    value={createUserForm.rt}
-                    onChange={e => setCreateUserForm(f => ({ ...f, rt: e.target.value }))}
-                    placeholder="01"
-                    className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    type="number"
+                    value={createUserForm.height}
+                    onChange={e => setCreateUserForm(f => ({ ...f, height: parseInt(e.target.value) || 170 }))}
+                    title="Tinggi Badan"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">RW</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Berat (kg)</label>
                   <input
-                    type="text"
-                    value={createUserForm.rw}
-                    onChange={e => setCreateUserForm(f => ({ ...f, rw: e.target.value }))}
-                    placeholder="01"
-                    className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Kelurahan</label>
-                  <input
-                    type="text"
-                    value={createUserForm.kelurahan}
-                    onChange={e => setCreateUserForm(f => ({ ...f, kelurahan: e.target.value }))}
-                    placeholder="Duri Selatan"
-                    className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    type="number"
+                    value={createUserForm.weight}
+                    onChange={e => setCreateUserForm(f => ({ ...f, weight: parseInt(e.target.value) || 65 }))}
+                    title="Berat Badan"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
               </div>
-              <div className="flex gap-3 pt-2">
+              <div className="border-t pt-3 mt-3">
+                <p className="text-sm font-medium text-gray-700 mb-3">Alamat Kelurahan</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">RT</label>
+                    <select
+                      value={createUserForm.rt}
+                      onChange={e => setCreateUserForm(f => ({ ...f, rt: e.target.value }))}
+                      title="RT"
+                      className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                    >
+                      <option value="">Pilih RT</option>
+                      {Array.from({ length: 20 }, (_, i) => {
+                        const value = String(i + 1).padStart(3, '0')
+                        return <option key={value} value={value}>{value}</option>
+                      })}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">RW</label>
+                    <input
+                      type="text"
+                      value={createUserForm.rw}
+                      onChange={e => setCreateUserForm(f => ({ ...f, rw: e.target.value }))}
+                      placeholder="01"
+                      className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Kelurahan</label>
+                    <input
+                      type="text"
+                      value={createUserForm.kelurahan}
+                      onChange={e => setCreateUserForm(f => ({ ...f, kelurahan: e.target.value }))}
+                      placeholder="Nama Kelurahan"
+                      className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowCreateUserModal(false)}
@@ -800,10 +1029,42 @@ export default function Profil() {
                   disabled={creatingUser}
                   className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
-                  {creatingUser ? 'Membuat...' : 'Buat Akun'}
+                  {creatingUser ? 'Membuat...' : 'Tambah'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Create User Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 transform transition-all animate-in fade-in zoom-in duration-200">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <User className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Konfirmasi Pembuatan Akun</h3>
+              <p className="text-gray-600 mb-6">
+                Anda yakin ingin membuat akun untuk <strong>{createUserForm.name}</strong> dengan ID <strong>{createUserForm.nik}</strong>?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmCreateUser}
+                  disabled={creatingUser}
+                  className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl font-medium transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50"
+                >
+                  {creatingUser ? 'Membuat...' : 'Buat Akun'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
