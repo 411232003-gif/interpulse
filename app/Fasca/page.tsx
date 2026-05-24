@@ -283,7 +283,7 @@ export default function CatatKesehatan() {
     return todayTBBB
   }
 
-  // Filter residents - only show those with attendance, TB/BB, AND health input for today
+  // Filter residents - only show those with attendance AND TB/BB data for today
   const filteredResidents = residents.filter(r => {
     const rwMatch = !filterRW || r.rw === filterRW
     const rtMatch = !filterRT || r.rt === filterRT
@@ -292,9 +292,7 @@ export default function CatatKesehatan() {
       r.nik.includes(searchQuery)
     const hasTBBB = getTodayTBBB(r.nik) !== undefined
     const hasAttendance = attendanceToday.has(r.nik)
-    const todayData = getTodayReadings(r.id)
-    const hasHealthInput = todayData.readings.length > 0
-    return rwMatch && rtMatch && searchMatch && hasTBBB && hasAttendance && hasHealthInput
+    return rwMatch && rtMatch && searchMatch && hasTBBB && hasAttendance
   }).sort((a, b) => {
     // Get latest health reading timestamp for each resident
     const getLatestHealthTimestamp = (nik: string) => {
@@ -645,7 +643,7 @@ export default function CatatKesehatan() {
                   <tbody>
                     {filteredResidents.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi, input TB/BB, dan input kesehatan hari ini</td>
+                        <td colSpan={9} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi dan input TB/BB hari ini</td>
                       </tr>
                     ) : filteredResidents.map(r => {
                       const todayTBBB = getTodayTBBB(r.nik)
