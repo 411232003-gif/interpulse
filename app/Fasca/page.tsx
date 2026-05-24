@@ -47,6 +47,7 @@ export default function CatatKesehatan() {
   const [todayReadingsForResident, setTodayReadingsForResident] = useState<any[]>([])
   const [isResetting, setIsResetting] = useState(false)
   const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
+  const [attendanceToday, setAttendanceToday] = useState<Set<string>>(new Set())
 
   // Fasca form state
   const [healthType, setHealthType] = useState<HealthType | null>(null)
@@ -222,6 +223,26 @@ export default function CatatKesehatan() {
     return () => unsubscribe()
   }, [])
 
+  // Load today's attendance
+  useEffect(() => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    
+    const attendanceRef = collection(db, 'attendance')
+    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
+      const todayAttendance = new Set<string>()
+      snapshot.docs.forEach(doc => {
+        const data = doc.data()
+        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
+          todayAttendance.add(data.nik)
+        }
+      })
+      setAttendanceToday(todayAttendance)
+    })
+    
+    return () => unsubscribe()
+  }, [])
+
   // Check if resident has health data for today (all types)
   const getTodayReadings = (residentId: string) => {
     const today = new Date()
@@ -260,7 +281,7 @@ export default function CatatKesehatan() {
     return todayTBBB
   }
 
-  // Filter residents - only show those with TB/BB data for today
+  // Filter residents - only show those with attendance AND TB/BB data for today
   const filteredResidents = residents.filter(r => {
     const rwMatch = !filterRW || r.rw === filterRW
     const rtMatch = !filterRT || r.rt === filterRT
@@ -268,7 +289,8 @@ export default function CatatKesehatan() {
       r.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
       r.nik.includes(searchQuery)
     const hasTBBB = getTodayTBBB(r.nik) !== undefined
-    return rwMatch && rtMatch && searchMatch && hasTBBB
+    const hasAttendance = attendanceToday.has(r.nik)
+    return rwMatch && rtMatch && searchMatch && hasTBBB && hasAttendance
   }).sort((a, b) => {
     // Get latest health reading timestamp for each resident
     const getLatestHealthTimestamp = (nik: string) => {
