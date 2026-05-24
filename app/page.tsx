@@ -486,7 +486,7 @@ export default function Home() {
                   className="group"
                 >
                   {isMobile ? (
-                    <div className={`${card.bgColor} rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-28 flex items-center justify-center`}>
+                    <div className={`${card.bgColor} rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-32 flex items-center justify-center`}>
                       <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${card.gradient} p-3 shadow-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0 mr-3`}>
                         <Icon className="w-full h-full text-white" />
                       </div>
@@ -522,7 +522,7 @@ export default function Home() {
                 className="group"
               >
                 {isMobile ? (
-                  <div className={`${card.bgColor} rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-28 flex items-center justify-center`}>
+                  <div className={`${card.bgColor} rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-32 flex items-center justify-center`}>
                     <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${card.gradient} p-3 shadow-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0 mr-3`}>
                       <Icon className="w-full h-full text-white" />
                     </div>
