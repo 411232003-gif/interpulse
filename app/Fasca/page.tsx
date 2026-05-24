@@ -61,6 +61,83 @@ export default function CatatKesehatan() {
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setShowExportDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Load residents from database
+  useEffect(() => {
+    const q = collection(db, 'residents')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Resident[]
+      setResidents(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Load health readings from database
+  useEffect(() => {
+    const q = collection(db, 'healthReadings')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[]
+      console.log('[Fasca] Health readings loaded:', data.length, 'items')
+      console.log('[Fasca] Current user profile:', userProfile)
+      if (userProfile) {
+        const userReadings = data.filter(r => r.userId === userProfile.uid)
+        console.log('[Fasca] User readings for', userProfile.uid, ':', userReadings.length, 'items')
+      }
+      setHealthReadings(data)
+    })
+    return () => unsubscribe()
+  }, [userProfile])
+
+  // Load TB/BB data from database
+  useEffect(() => {
+    const q = collection(db, 'tb-bb')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        nik: doc.data().nik,
+        tinggiBadan: doc.data().tinggiBadan,
+        beratBadan: doc.data().beratBadan,
+        lingkarPinggang: doc.data().lingkarPinggang || 0,
+        timestamp: doc.data().timestamp
+      })) as TBBBData[]
+      console.log('[Fasca] TB/BB data loaded:', data.length, 'items')
+      console.log('[Fasca] TB/BB data:', data)
+      setTbbbData(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Load today's attendance
+  useEffect(() => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+
+    const attendanceRef = collection(db, 'attendance')
+    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
+      const todayAttendance = new Set<string>()
+      snapshot.docs.forEach(doc => {
+        const data = doc.data()
+        console.log('[Fasca] Attendance doc:', doc.id, data)
+        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
+          todayAttendance.add(data.nik)
+        }
+      })
+      console.log('[Fasca] Today attendance loaded:', todayAttendance.size, 'NIKs:', Array.from(todayAttendance))
+      setAttendanceToday(todayAttendance)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
   // Show loading while auth state is being determined
   if (authLoading) {
     return (
@@ -72,17 +149,6 @@ export default function CatatKesehatan() {
       </div>
     )
   }
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
-        setShowExportDropdown(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   // Export functions
   const exportToPDF = () => {
@@ -194,72 +260,6 @@ export default function CatatKesehatan() {
       ]
     }
   }
-
-  // Load residents from database
-  useEffect(() => {
-    const q = collection(db, 'residents')
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Resident[]
-      setResidents(data)
-    })
-    return () => unsubscribe()
-  }, [])
-
-  // Load health readings from database
-  useEffect(() => {
-    const q = collection(db, 'healthReadings')
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[]
-      console.log('[Fasca] Health readings loaded:', data.length, 'items')
-      console.log('[Fasca] Current user profile:', userProfile)
-      if (userProfile) {
-        const userReadings = data.filter(r => r.userId === userProfile.uid)
-        console.log('[Fasca] User readings for', userProfile.uid, ':', userReadings.length, 'items')
-      }
-      setHealthReadings(data)
-    })
-    return () => unsubscribe()
-  }, [userProfile])
-
-  // Load TB/BB data from database
-  useEffect(() => {
-    const q = collection(db, 'tb-bb')
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        nik: doc.data().nik,
-        tinggiBadan: doc.data().tinggiBadan,
-        beratBadan: doc.data().beratBadan,
-        lingkarPinggang: doc.data().lingkarPinggang || 0,
-        timestamp: doc.data().timestamp
-      })) as TBBBData[]
-      console.log('[Fasca] TB/BB data loaded:', data.length, 'items')
-      console.log('[Fasca] TB/BB data:', data)
-      setTbbbData(data)
-    })
-    return () => unsubscribe()
-  }, [])
-
-  // Load today's attendance
-  useEffect(() => {
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    
-    const attendanceRef = collection(db, 'attendance')
-    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
-      const todayAttendance = new Set<string>()
-      snapshot.docs.forEach(doc => {
-        const data = doc.data()
-        console.log('[Fasca] Attendance doc:', doc.id, data)
-        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
-          todayAttendance.add(data.nik)
-        }
-      })
-      console.log('[Fasca] Today attendance loaded:', todayAttendance.size, 'NIKs:', Array.from(todayAttendance))
-      setAttendanceToday(todayAttendance)
-    })
-    
-    return () => unsubscribe()
-  }, [])
 
   // Check if resident has health data for today (all types)
   const getTodayReadings = (residentId: string) => {
