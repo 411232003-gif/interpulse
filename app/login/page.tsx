@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { Heart, Lock, Loader2, Eye, EyeOff, CreditCard, User } from 'lucide-react'
 
@@ -141,6 +142,9 @@ export default function LoginPage() {
             <p className="text-gray-400 text-sm">
               Hubungi admin untuk mendapatkan akun
             </p>
+            <Link href="/register" className="text-teal-600 text-sm font-medium hover:text-teal-700 mt-2 inline-block">
+              Daftar akun baru
+            </Link>
           </div>
         </div>
 
