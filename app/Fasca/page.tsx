@@ -583,6 +583,22 @@ export default function CatatKesehatan() {
     }
   }
 
+  // Redirect non-admin users
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Akses Ditolak</h2>
+          <p className="text-gray-600 mb-6">Halaman ini hanya dapat diakses oleh admin.</p>
+          <button onClick={() => router.push('/')} className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium">
+            Kembali ke Beranda
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Main table view
   if (!showFascaModal) {
     return (
@@ -592,40 +608,37 @@ export default function CatatKesehatan() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <button onClick={() => router.push('/')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
-                <h1 className="text-2xl font-bold text-gray-800">{isAdmin ? 'Input Kesehatan Warga' : 'Input Kesehatan Saya'}</h1>
+                <h1 className="text-2xl font-bold text-gray-800">Input Kesehatan Warga</h1>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-500">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
               </div>
             </div>
 
-            {/* Filters - only for admin */}
-            {isAdmin && (
-              <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Filter className="w-4 h-4 text-gray-600" />
-                  <span className="font-semibold text-gray-700 text-sm">Filter</span>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <select value={filterRW} onChange={e => setFilterRW(e.target.value)} title="Filter RW" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Semua RW</option>
-                    {['01','02','03','04','05','06','07','08','09','10'].map(rw => <option key={rw} value={rw}>RW {rw}</option>)}
-                  </select>
-                  <select value={filterRT} onChange={e => setFilterRT(e.target.value)} title="Filter RT" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Semua RT</option>
-                    {['01','02','03','04','05','06','07','08','09','10'].map(rt => <option key={rt} value={rt}>RT {rt}</option>)}
-                  </select>
-                  <div className="md:col-span-2 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input type="text" placeholder="Cari nama atau NIK..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
+            {/* Filters */}
+            <div className="bg-gray-50 rounded-xl p-4 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className="w-4 h-4 text-gray-600" />
+                <span className="font-semibold text-gray-700 text-sm">Filter</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <select value={filterRW} onChange={e => setFilterRW(e.target.value)} title="Filter RW" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Semua RW</option>
+                  {['01','02','03','04','05','06','07','08','09','10'].map(rw => <option key={rw} value={rw}>RW {rw}</option>)}
+                </select>
+                <select value={filterRT} onChange={e => setFilterRT(e.target.value)} title="Filter RT" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Semua RT</option>
+                  {['01','02','03','04','05','06','07','08','09','10'].map(rt => <option key={rt} value={rt}>RT {rt}</option>)}
+                </select>
+                <div className="md:col-span-2 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input type="text" placeholder="Cari nama atau NIK..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Residents Table - only for admin */}
-            {isAdmin && (
-              <div className="overflow-x-auto">
+            {/* Residents Table */}
+            <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-100">
@@ -670,7 +683,6 @@ export default function CatatKesehatan() {
                   </tbody>
                 </table>
               </div>
-            )}
 
           </div>
         </div>
