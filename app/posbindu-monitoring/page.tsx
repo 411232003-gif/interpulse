@@ -97,6 +97,8 @@ export default function PosbinduMonitoring() {
   const [riwayatExportOpen, setRiwayatExportOpen] = useState(false)
   const [showSuccessNotification, setShowSuccessNotification] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [healthTypeFilter, setHealthTypeFilter] = useState<string>('all')
+  const [healthTypeDropdownOpen, setHealthTypeDropdownOpen] = useState(false)
 
   // Fetch residents from Firestore
   useEffect(() => {
@@ -813,6 +815,21 @@ export default function PosbinduMonitoring() {
                   <option value="60+">60+ Tahun</option>
                 </select>
                 <div className="relative">
+                  <select
+                    value={healthTypeFilter}
+                    onChange={e => setHealthTypeFilter(e.target.value)}
+                    aria-label="Filter jenis data kesehatan"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                  >
+                    <option value="all">Semua Data Kesehatan</option>
+                    <option value="tensi">Tekanan Darah</option>
+                    <option value="kolesterol">Kolesterol</option>
+                    <option value="asamurat">Asam Urat</option>
+                    <option value="guladarah">Gula Darah</option>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+                <div className="relative col-span-2">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input type="text" placeholder="Cari nama..." value={searchNama} onChange={e => setSearchNama(e.target.value)} className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
