@@ -322,13 +322,15 @@ export default function CatatKesehatan() {
       if (residentReadings.length === 0) return 0
       return Math.max(...residentReadings.map(r => new Date(r.timestamp).getTime()))
     }
-    
+
     const aTimestamp = getLatestHealthTimestamp(a.nik)
     const bTimestamp = getLatestHealthTimestamp(b.nik)
-    
+
     // Sort by latest health input (newest first)
     return bTimestamp - aTimestamp
   })
+
+  console.log('[Fasca] Sorted residents:', sortedResidents.length, sortedResidents.map(r => ({ nama: r.nama, nik: r.nik })))
 
   // Validation functions
   const validateBloodPressure = (sys: number, dia: number) => {
