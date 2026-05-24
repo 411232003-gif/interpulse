@@ -1232,6 +1232,37 @@ export default function PosbinduMonitoring() {
         {/* Absen Tab - Only for non-admin */}
         {!isAdmin && activeTab === 'absen' && (
           <div className="space-y-6">
+            {/* Attendance Trend Chart */}
+            <div className="bg-white rounded-2xl p-6 shadow-md">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold text-gray-800">Tren Kehadiran Bulanan</h3>
+              </div>
+              <div className="grid grid-cols-12 gap-1">
+                {['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'].map(month => {
+                  const total = Object.entries(elderlyAttendance).reduce((s, [, d]) => s + (d[month] || 0), 0)
+                  const maxVal = Math.max(...['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'].map(m => Object.entries(elderlyAttendance).reduce((s, [, d]) => s + (d[m] || 0), 0)), 1)
+                  const height = Math.round((total / maxVal) * 60)
+                  const monthLabels: Record<string, string> = {
+                    januari: 'Jan', februari: 'Feb', maret: 'Mar', april: 'Apr', mei: 'Mei', juni: 'Jun',
+                    juli: 'Jul', agustus: 'Ags', september: 'Sep', oktober: 'Okt', november: 'Nov', desember: 'Des'
+                  }
+                  return (
+                    <div key={month} className="flex flex-col items-center gap-1">
+                      <span className="text-[9px] text-gray-500">{total}</span>
+                      <div className="w-full bg-gray-100 rounded-t" style={{ height: 64 }}>
+                        <div
+                          className="w-full rounded-t transition-all duration-500 bg-blue-500"
+                          style={{ height, marginTop: 64 - height }}
+                        />
+                      </div>
+                      <span className="text-[8px] text-gray-400">{monthLabels[month]}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
             <div className="bg-white rounded-2xl p-6 shadow-md">
               <div className="flex items-center gap-2 mb-6">
                 <UserPlus className="w-5 h-5 text-blue-600" />
