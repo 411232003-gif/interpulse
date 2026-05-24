@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, Search, Filter, ArrowLeft, Ruler, Scale, X, CheckCircle } from 'lucide-react'
+import { Users, Search, Filter, ArrowLeft, Ruler, Scale, X, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface Resident {
   id: string
@@ -40,7 +40,36 @@ interface TBBBData {
 
 export default function InputTBBBPage() {
   const router = useRouter()
-  const { isAdmin, userProfile } = useAuth()
+  const { isAdmin, userProfile, loading: authLoading } = useAuth()
+
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Memuat...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Redirect non-admin users
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Akses Ditolak</h2>
+          <p className="text-gray-600 mb-6">Halaman ini hanya dapat diakses oleh admin.</p>
+          <button onClick={() => router.push('/')} className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium">
+            Kembali ke Beranda
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const [attendanceToday, setAttendanceToday] = useState<AttendanceRecord[]>([])
   const [filterRW, setFilterRW] = useState('')
   const [filterRT, setFilterRT] = useState('')
