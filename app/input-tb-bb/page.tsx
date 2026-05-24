@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, Search, Filter, ArrowLeft, Ruler, Scale, X } from 'lucide-react'
+import { Users, Search, Filter, ArrowLeft, Ruler, Scale, X, CheckCircle } from 'lucide-react'
 
 interface Resident {
   id: string
@@ -30,6 +30,13 @@ interface AttendanceRecord {
   timestamp: string
 }
 
+interface TBBBData {
+  nik: string
+  tinggiBadan: number
+  beratBadan: number
+  timestamp: string
+}
+
 export default function InputTBBBPage() {
   const router = useRouter()
   const { isAdmin, userProfile } = useAuth()
@@ -44,6 +51,7 @@ export default function InputTBBBPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showSuccessBanner, setShowSuccessBanner] = useState(false)
+  const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
 
   // Calculate age from birthDate
   const calculateAge = (birthDate: string): number => {
@@ -87,6 +95,31 @@ export default function InputTBBBPage() {
     
     return () => unsubscribe()
   }, [])
+
+  // Load TB/BB data from database
+  useEffect(() => {
+    const q = collection(db, 'tb-bb')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        nik: doc.data().nik,
+        tinggiBadan: doc.data().tinggiBadan,
+        beratBadan: doc.data().beratBadan,
+        timestamp: doc.data().timestamp
+      })) as TBBBData[]
+      setTbbbData(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Check if resident has TB/BB data for today
+  const getTodayTBBB = (nik: string) => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    const todayTBBB = tbbbData.find(tb => 
+      tb.nik === nik && tb.timestamp.startsWith(todayStr)
+    )
+    return todayTBBB
+  }
 
   // Filter attendance
   const filteredAttendance = attendanceToday.filter(att => {
