@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import BigNumpad from '@/components/BigNumpad'
-import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope } from 'lucide-react'
+import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope, Download, MoreVertical, FileText, Table, MessageCircle, PlusCircle, Edit2, Trash2 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 type HealthType = 'tensi' | 'kolesterol' | 'asamurat' | 'guladarah'
 type Step = 'select' | 'input' | 'result'
@@ -44,6 +47,90 @@ export default function CatatKesehatan() {
   const [saving, setSaving] = useState(false)
   const [data, setData] = useState<Record<string, string>>({})
   const [result, setResult] = useState<any>(null)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setShowExportDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Export functions
+  const exportToPDF = () => {
+    if (!userProfile) return
+    const userHealthData = healthReadings.filter(r => r.userId === userProfile.uid)
+    
+    const doc = new jsPDF()
+    doc.setFontSize(18)
+    doc.text(`Riwayat Kesehatan - ${userProfile.name}`, 14, 20)
+    doc.setFontSize(11)
+    doc.text(`NIK: ${userProfile.nik}`, 14, 30)
+    doc.text(`Tanggal Export: ${new Date().toLocaleDateString('id-ID')}`, 14, 38)
+    
+    const tableData = userHealthData.map(r => [
+      new Date(r.timestamp).toLocaleDateString('id-ID'),
+      healthConfig[r.type as HealthType]?.title || r.type,
+      r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
+      r.type === 'kolesterol' ? `${r.total} mg/dL` :
+      `${r.nilai} mg/dL`
+    ])
+    
+    autoTable(doc, {
+      head: [['Tanggal', 'Jenis Pemeriksaan', 'Nilai']],
+      body: tableData,
+      startY: 45,
+    })
+    
+    doc.save(`riwayat-kesehatan-${userProfile.name}.pdf`)
+    setShowExportDropdown(false)
+  }
+
+  const exportToExcel = () => {
+    if (!userProfile) return
+    const userHealthData = healthReadings.filter(r => r.userId === userProfile.uid)
+    
+    const excelData = userHealthData.map(r => ({
+      Tanggal: new Date(r.timestamp).toLocaleDateString('id-ID'),
+      Jenis: healthConfig[r.type as HealthType]?.title || r.type,
+      Nilai: r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
+             r.type === 'kolesterol' ? `${r.total} mg/dL` :
+             `${r.nilai} mg/dL`
+    }))
+    
+    const ws = XLSX.utils.json_to_sheet(excelData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Riwayat Kesehatan')
+    XLSX.writeFile(wb, `riwayat-kesehatan-${userProfile.name}.xlsx`)
+    setShowExportDropdown(false)
+  }
+
+  const exportToWhatsApp = () => {
+    if (!userProfile) return
+    const userHealthData = healthReadings.filter(r => r.userId === userProfile.uid)
+    
+    let message = `*Riwayat Kesehatan - ${userProfile.name}*\n`
+    message += `NIK: ${userProfile.nik}\n`
+    message += `Tanggal Export: ${new Date().toLocaleDateString('id-ID')}\n\n`
+    message += `*Data Kesehatan:*\n\n`
+    
+    userHealthData.forEach(r => {
+      message += `📅 ${new Date(r.timestamp).toLocaleDateString('id-ID')}\n`
+      message += `🏥 ${healthConfig[r.type as HealthType]?.title || r.type}\n`
+      message += `📊 ${r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
+                 r.type === 'kolesterol' ? `${r.total} mg/dL` :
+                 `${r.nilai} mg/dL`}\n\n`
+    })
+    
+    const encodedMessage = encodeURIComponent(message)
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
+    setShowExportDropdown(false)
+  }
 
   const healthConfig: Record<HealthType, { icon: string; title: string; color: string; fields: { key: string; label: string; unit: string }[] }> = {
     tensi: {
@@ -99,11 +186,17 @@ export default function CatatKesehatan() {
   useEffect(() => {
     const q = collection(db, 'healthReadings')
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[]
+      console.log('[Fasca] Health readings loaded:', data.length, 'items')
+      console.log('[Fasca] Current user profile:', userProfile)
+      if (userProfile) {
+        const userReadings = data.filter(r => r.userId === userProfile.uid)
+        console.log('[Fasca] User readings for', userProfile.uid, ':', userReadings.length, 'items')
+      }
       setHealthReadings(data)
     })
     return () => unsubscribe()
-  }, [])
+  }, [userProfile])
 
   // Check if resident has health data for today (all types)
   const getTodayReadings = (residentId: string) => {
@@ -146,10 +239,10 @@ export default function CatatKesehatan() {
   // Validation functions
   const validateBloodPressure = (sys: number, dia: number) => {
     if (sys < 90 || dia < 60) return { title: 'Hipotensi', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Tekanan Darah Rendah', advice: 'Perbanyak konsumsi air dan garam, istirahat yang cukup' }
-    if (sys < 120 && dia < 80) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Tekanan Darah Normal', advice: 'Pertahankan pola hidup sehat' }
-    if (sys < 130 || dia < 85) return { title: 'Pra-Hipertensi', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Pra-Hipertensi', advice: 'Kurangi garam dan konsumsi makanan sehat' }
-    if (sys < 140 || dia < 90) return { title: 'Hipertensi Stage 1', color: 'text-orange-600', bgColor: 'bg-orange-50', icon: <AlertCircle className="w-16 h-16 text-orange-600" />, message: 'Hipertensi Stage 1', advice: 'Konsultasi dokter, kurangi garam dan stress' }
-    return { title: 'Hipertensi Stage 2', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Hipertensi Stage 2', advice: 'Segera konsultasi dokter' }
+    if (sys >= 120 && sys <= 130 && dia >= 70 && dia <= 85) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Tekanan Darah Normal', advice: 'Pertahankan pola hidup sehat' }
+    if (sys >= 130 && sys <= 139 && dia >= 85 && dia <= 89) return { title: 'Pra-Hipertensi', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Pra-Hipertensi', advice: 'Kurangi garam dan konsumsi makanan sehat' }
+    if (sys > 140 || dia > 90) return { title: 'Hipertensi', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Hipertensi', advice: 'Segera konsultasi dokter' }
+    return { title: 'Perlu Perhatian', color: 'text-orange-600', bgColor: 'bg-orange-50', icon: <AlertCircle className="w-16 h-16 text-orange-600" />, message: 'Perlu Monitoring', advice: 'Pantau tekanan darah secara rutin' }
   }
 
   const validateBloodSugar = (nilai: number) => {
@@ -161,14 +254,40 @@ export default function CatatKesehatan() {
 
   const validateCholesterol = (total: number) => {
     if (total < 200) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Kolesterol Normal', advice: 'Pertahankan pola makan sehat' }
-    if (total < 240) return { title: 'Sedang', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Kolesterol Sedang', advice: 'Kurangi makanan berlemak' }
     return { title: 'Tinggi', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Kolesterol Tinggi', advice: 'Konsultasi dokter, kurangi makanan berlemak' }
   }
 
-  const validateUricAcid = (nilai: number) => {
-    if (nilai < 6) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Asam Urat Normal', advice: 'Pertahankan pola makan sehat' }
-    if (nilai < 7) return { title: 'Sedang', color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: <AlertCircle className="w-16 h-16 text-yellow-600" />, message: 'Asam Urat Sedang', advice: 'Kurangi makanan purin' }
+  const validateUricAcid = (nilai: number, gender: string) => {
+    const isMale = gender === 'L' || gender === 'Laki-laki'
+    const threshold = isMale ? 7 : 6
+    if (nilai <= threshold) return { title: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50', icon: <CheckCircle className="w-16 h-16 text-green-600" />, message: 'Asam Urat Normal', advice: 'Pertahankan pola makan sehat' }
     return { title: 'Tinggi', color: 'text-red-600', bgColor: 'bg-red-50', icon: <XCircle className="w-16 h-16 text-red-600" />, message: 'Asam Urat Tinggi', advice: 'Konsultasi dokter, kurangi makanan purin' }
+  }
+
+  // CRUD functions
+  const handleDeleteReading = async (readingId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus data ini?')) return
+    try {
+      await deleteDoc(doc(db, 'healthReadings', readingId))
+      console.log('[Fasca] Reading deleted:', readingId)
+    } catch (error) {
+      console.error('[Fasca] Error deleting reading:', error)
+    }
+  }
+
+  const handleEditReading = (reading: any) => {
+    setSelectedResident({
+      id: userProfile?.uid || '',
+      nama: userProfile?.name || '',
+      nik: userProfile?.nik || '',
+      rw: userProfile?.rw || '',
+      rt: userProfile?.rt || '',
+      umur: 0,
+      jenisKelamin: userProfile?.gender === 'Laki-laki' ? 'L' : 'P'
+    })
+    setHealthType(reading.type as HealthType)
+    setStep('select')
+    setShowFascaModal(true)
   }
 
   // Fasca form handlers
@@ -199,7 +318,7 @@ export default function CatatKesehatan() {
     if (!selectedResident) return
     setSaving(true)
     const timestamp = new Date().toISOString()
-    
+
     const userInfo = {
       uid: selectedResident.id,
       name: selectedResident.nama,
@@ -207,9 +326,11 @@ export default function CatatKesehatan() {
       rw: selectedResident.rw,
       kelurahan: userProfile?.kelurahan || '-'
     }
-    
+
     console.log('[Fasca] Saving data for resident:', selectedResident.nama, 'ID:', selectedResident.id)
     console.log('[Fasca] userInfo:', userInfo)
+    console.log('[Fasca] userProfile.uid:', userProfile?.uid)
+    console.log('[Fasca] Match check:', selectedResident.id === userProfile?.uid)
     
     let newReading: any
     let validationResult: any
@@ -277,21 +398,19 @@ export default function CatatKesehatan() {
       ]
     } else if (healthType === 'asamurat') {
       const nilai = parseFloat(allData.nilai)
-      newReading = { 
-        type: 'asamurat', 
-        ...allData, 
-        timestamp, 
+      newReading = {
+        type: 'asamurat',
+        ...allData,
+        timestamp,
         userId: userInfo.uid,
-        userName: userInfo.name, 
-        rt: userInfo.rt, 
-        rw: userInfo.rw, 
+        userName: userInfo.name,
+        rt: userInfo.rt,
+        rw: userInfo.rw,
         kelurahan: userInfo.kelurahan,
         source: 'posbindu'
       }
-      
-      if (nilai <= (selectedResident.jenisKelamin === 'L' ? 7 : 6)) validationResult = { status: 'normal', title: 'Asam Urat Normal', color: 'text-green-700', bgColor: 'bg-gradient-to-br from-green-100 to-green-200', icon: <CheckCircle className="w-24 h-24 text-green-600" />, message: `${nilai} mg/dL`, advice: 'Asam urat normal. Pertahankan!' }
-      else if (nilai <= (selectedResident.jenisKelamin === 'L' ? 8 : 7)) validationResult = { status: 'warning', title: 'Asam Urat Batas', color: 'text-yellow-700', bgColor: 'bg-gradient-to-br from-yellow-100 to-yellow-200', icon: <AlertCircle className="w-24 h-24 text-yellow-600" />, message: `${nilai} mg/dL`, advice: 'Asam urat mendekati tinggi. Hindari jeroan.' }
-      else validationResult = { status: 'danger', title: 'Asam Urat Tinggi', color: 'text-red-700', bgColor: 'bg-gradient-to-br from-red-100 to-red-200', icon: <XCircle className="w-24 h-24 text-red-600" />, message: `${nilai} mg/dL`, advice: 'Asam urat tinggi! Segera ke dokter.' }
+
+      validationResult = validateUricAcid(nilai, selectedResident.jenisKelamin)
       validationResult.values = [
         { label: 'Asam Urat', value: nilai, unit: 'mg/dL' }
       ]
@@ -400,80 +519,85 @@ export default function CatatKesehatan() {
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <button onClick={() => router.push('/')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-xl transition-all">← Kembali</button>
-                <h1 className="text-2xl font-bold text-gray-800">Input Kesehatan Warga</h1>
+                <button onClick={() => router.push('/')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
+                <h1 className="text-2xl font-bold text-gray-800">{isAdmin ? 'Input Kesehatan Warga' : 'Input Kesehatan Saya'}</h1>
               </div>
             </div>
 
-            {/* Filters */}
-            <div className="bg-gray-50 rounded-xl p-4 mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <Filter className="w-4 h-4 text-gray-600" />
-                <span className="font-semibold text-gray-700 text-sm">Filter</span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <select value={filterRW} onChange={e => setFilterRW(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Semua RW</option>
-                  {['01','02','03','04','05','06','07','08','09','10'].map(rw => <option key={rw} value={rw}>RW {rw}</option>)}
-                </select>
-                <select value={filterRT} onChange={e => setFilterRT(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Semua RT</option>
-                  {['01','02','03','04','05','06','07','08','09','10'].map(rt => <option key={rt} value={rt}>RT {rt}</option>)}
-                </select>
-                <div className="md:col-span-2 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="text" placeholder="Cari nama atau NIK..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {/* Filters - only for admin */}
+            {isAdmin && (
+              <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Filter className="w-4 h-4 text-gray-600" />
+                  <span className="font-semibold text-gray-700 text-sm">Filter</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <select value={filterRW} onChange={e => setFilterRW(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Semua RW</option>
+                    {['01','02','03','04','05','06','07','08','09','10'].map(rw => <option key={rw} value={rw}>RW {rw}</option>)}
+                  </select>
+                  <select value={filterRT} onChange={e => setFilterRT(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Semua RT</option>
+                    {['01','02','03','04','05','06','07','08','09','10'].map(rt => <option key={rt} value={rt}>RT {rt}</option>)}
+                  </select>
+                  <div className="md:col-span-2 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input type="text" placeholder="Cari nama atau NIK..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Residents Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">NIK</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">RW/RT</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Umur</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Jenis Kelamin</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Status Input</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredResidents.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
+            {/* Residents Table - only for admin */}
+            {isAdmin && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">NIK</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">RW/RT</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Umur</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Jenis Kelamin</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-700">Status Input</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                     </tr>
-                  ) : filteredResidents.map(r => {
-                    const todayData = getTodayReadings(r.id)
-                    return (
-                      <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
-                        <td className="px-4 py-3 text-gray-600">{r.nik}</td>
-                        <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
-                        <td className="px-4 py-3 text-gray-600">{r.umur} th</td>
-                        <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-                        <td className="px-4 py-3 text-center">
-                          {todayData.allTypes ? (
-                            <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-gray-400 mx-auto" />
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
-                            <Stethoscope className="w-3.5 h-3.5" />
-                            Input Kesehatan
-                          </button>
-                        </td>
+                  </thead>
+                  <tbody>
+                    {filteredResidents.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    ) : filteredResidents.map(r => {
+                      const todayData = getTodayReadings(r.id)
+                      return (
+                        <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
+                          <td className="px-4 py-3 text-gray-600">{r.nik}</td>
+                          <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
+                          <td className="px-4 py-3 text-gray-600">{r.umur} th</td>
+                          <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+                          <td className="px-4 py-3 text-center">
+                            {todayData.allTypes ? (
+                              <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
+                            ) : (
+                              <XCircle className="w-5 h-5 text-gray-400 mx-auto" />
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
+                              <Stethoscope className="w-3.5 h-3.5" />
+                              Input Kesehatan
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
           </div>
         </div>
       </div>
