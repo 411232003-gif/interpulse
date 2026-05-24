@@ -696,7 +696,7 @@ export default function PosbinduMonitoring() {
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-2xl font-bold">{isAdmin ? 'Monitoring Posbindu' : 'Absensi Posbindu'}</h1>
+          <h1 className="text-2xl font-bold">{isAdmin ? 'Monitoring dan Evaluasi' : 'Absensi Posbindu'}</h1>
         </div>
         <p className="text-blue-100 text-sm ml-10">{isAdmin ? 'Pantau kesehatan warga dan partisipasi lansia' : 'Silakan isi form absensi saat datang ke Posbindu'}</p>
       </div>
