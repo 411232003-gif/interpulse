@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { 
-  History, 
-  Download, 
-  Share2, 
-  FileSpreadsheet, 
-  MessageCircle, 
-  Trash2, 
-  ChevronDown, 
+import {
+  History,
+  Download,
+  Share2,
+  FileSpreadsheet,
+  FileText,
+  MessageCircle,
+  Trash2,
+  ChevronDown,
   ChevronUp,
   Heart,
   Activity,
@@ -25,6 +26,8 @@ import {
   Minus,
   ArrowLeft
 } from 'lucide-react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { useAuth } from '@/lib/auth-context'
 import { db } from '@/lib/firebase'
@@ -60,14 +63,12 @@ interface KolesterolReading extends BaseHealthReading {
 
 interface AsamUratReading extends BaseHealthReading {
   type: 'asamurat'
-  value: string
-  gender: 'pria' | 'wanita'
+  nilai: string
 }
 
 interface GulaDarahReading extends BaseHealthReading {
   type: 'guladarah'
-  value: string
-  condition: 'puasa' | 'sepuasa' | 'acak'
+  nilai: string
 }
 
 type HealthReading = TensiReading | KolesterolReading | AsamUratReading | GulaDarahReading
@@ -103,6 +104,7 @@ export default function RiwayatKesehatan() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; id: string | null; isMultiple: boolean }>({ show: false, id: null, isMultiple: false })
 
   useEffect(() => {
     loadReadings()
@@ -149,21 +151,20 @@ export default function RiwayatKesehatan() {
     
     try {
       // Build query based on user role
-      // Riwayat hanya menampilkan data dari posbindu (admin input), tidak termasuk data pribadi
+      // Riwayat menampilkan semua data kesehatan user (baik dari posbindu maupun input sendiri)
       let q
       if (isAdmin) {
-        // Admin sees posbindu data only
+        // Admin sees all posbindu data
         q = query(
-          collection(db, 'healthReadings'), 
+          collection(db, 'healthReadings'),
           where('source', '==', 'posbindu'),
           orderBy('timestamp', 'desc')
         )
       } else if (userProfile?.uid) {
-        // User sees only their own posbindu data (not pribadi)
+        // User sees all their health data (both posbindu and personal input)
         q = query(
-          collection(db, 'healthReadings'), 
+          collection(db, 'healthReadings'),
           where('userId', '==', userProfile.uid),
-          where('source', '==', 'posbindu'),
           orderBy('timestamp', 'desc')
         )
       } else {
@@ -174,10 +175,14 @@ export default function RiwayatKesehatan() {
       
       // Subscribe to real-time updates
       const unsubscribe = onSnapshot(q, (snapshot) => {
+        console.log('[Riwayat] Snapshot received:', snapshot.docs.length, 'documents')
+        console.log('[Riwayat] User profile:', userProfile)
+        console.log('[Riwayat] Screen size:', window.innerWidth, 'x', window.innerHeight)
         const data: HealthReading[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as HealthReading[]
+        console.log('[Riwayat] Data loaded:', data.length, 'items')
         setReadings(data)
         setIsLoading(false)
       }, (error) => {
@@ -198,42 +203,35 @@ export default function RiwayatKesehatan() {
     const dia = parseInt(diastolik)
     
     if (sys < 90 || dia < 60) return { status: 'rendah', label: 'Rendah', color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '💙' }
-    if (sys < 120 && dia < 80) return { status: 'normal', label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '💚' }
-    if (sys < 140 && dia < 90) return { status: 'prehipertensi', label: 'Waspada', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '💛' }
-    return { status: 'hipertensi', label: 'Tinggi', color: 'text-red-600', bgColor: 'bg-red-100', icon: '❤️' }
+    if (sys >= 120 && sys <= 130 && dia >= 70 && dia <= 85) return { status: 'normal', label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '💚' }
+    if (sys >= 130 && sys <= 139 && dia >= 85 && dia <= 89) return { status: 'prehipertensi', label: 'Pra-Hipertensi', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '💛' }
+    if (sys > 140 || dia > 90) return { status: 'hipertensi', label: 'Hipertensi', color: 'text-red-600', bgColor: 'bg-red-100', icon: '❤️' }
+    return { status: 'perlu-perhatian', label: 'Perlu Perhatian', color: 'text-orange-600', bgColor: 'bg-orange-100', icon: '🧡' }
   }
 
   const getKolesterolStatus = (total: string, ldl: string, hdl: string) => {
     const totalVal = parseInt(total)
-    const ldlVal = parseInt(ldl)
-    const hdlVal = parseInt(hdl)
     
-    if (totalVal < 200 && ldlVal < 130 && hdlVal >= 40) 
+    if (totalVal < 200) 
       return { label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '💚' }
-    if (totalVal < 240 && ldlVal < 160) 
-      return { label: 'Batas', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '💛' }
     return { label: 'Tinggi', color: 'text-red-600', bgColor: 'bg-red-100', icon: '❤️' }
   }
 
-  const getAsamUratStatus = (value: string, gender: 'pria' | 'wanita') => {
-    const val = parseFloat(value)
-    const normalMax = gender === 'pria' ? 7.0 : 6.0
-    
-    if (val <= normalMax) return { label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '💚' }
-    if (val <= normalMax + 1) return { label: 'Batas', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '💛' }
+  const getAsamUratStatus = (nilai: string, gender?: string) => {
+    const val = parseFloat(nilai)
+    const isMale = gender === 'L' || gender === 'Laki-laki'
+    const threshold = isMale ? 7 : 6
+
+    if (val <= threshold) return { label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '💚' }
     return { label: 'Tinggi', color: 'text-red-600', bgColor: 'bg-red-100', icon: '❤️' }
   }
 
-  const getGulaDarahStatus = (value: string, condition: 'puasa' | 'sepuasa' | 'acak') => {
-    const val = parseInt(value)
-    
-    if (condition === 'puasa') {
-      if (val < 100) return { label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '💚' }
-      if (val < 126) return { label: 'Prediabetes', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '💛' }
-      return { label: 'Diabetes', color: 'text-red-600', bgColor: 'bg-red-100', icon: '❤️' }
-    }
-    if (val < 140) return { label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '💚' }
-    if (val < 200) return { label: 'Batas', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '💛' }
+  const getGulaDarahStatus = (nilai: string) => {
+    const val = parseInt(nilai)
+
+    if (val < 70) return { label: 'Hipoglikemia', color: 'text-red-600', bgColor: 'bg-red-100', icon: '❤️' }
+    if (val < 100) return { label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '💚' }
+    if (val < 126) return { label: 'Normal', color: 'text-green-600', bgColor: 'bg-green-100', icon: '�' }
     return { label: 'Tinggi', color: 'text-red-600', bgColor: 'bg-red-100', icon: '❤️' }
   }
 
@@ -267,10 +265,10 @@ export default function RiwayatKesehatan() {
           return r.total.includes(searchTerm) || r.ldl.includes(searchTerm) || r.hdl.includes(searchTerm)
         }
         if (r.type === 'asamurat') {
-          return r.value.includes(searchTerm)
+          return r.nilai.includes(searchTerm)
         }
         if (r.type === 'guladarah') {
-          return r.value.includes(searchTerm) || r.condition.toLowerCase().includes(searchLower)
+          return r.nilai.includes(searchTerm)
         }
         return false
       })
@@ -304,32 +302,61 @@ export default function RiwayatKesehatan() {
   }
 
   const deleteReading = async (id: string) => {
-    if (confirm('Yakin ingin menghapus data ini?')) {
-      try {
-        await deleteDoc(doc(db, 'healthReadings', id))
-        // Real-time listener will update the UI
-      } catch (error) {
-        console.error('Error deleting reading:', error)
-        alert('Gagal menghapus data. Coba lagi.')
-      }
-    }
+    setDeleteModal({ show: true, id, isMultiple: false })
   }
 
-  const deleteSelected = async () => {
-    if (confirm(`Yakin ingin menghapus ${selectedItems.size} data?`)) {
+  const confirmDelete = async () => {
+    if (deleteModal.isMultiple) {
       try {
         const deletePromises = Array.from(selectedItems).map(id => 
           deleteDoc(doc(db, 'healthReadings', id))
         )
         await Promise.all(deletePromises)
-        // Real-time listener will update the UI
         setSelectedItems(new Set())
         setIsSelectionMode(false)
+        if ((window as any).showNotification) {
+          (window as any).showNotification({
+            type: 'success',
+            title: 'Data Berhasil Dihapus',
+            message: `${selectedItems.size} data kesehatan telah berhasil dihapus`
+          })
+        }
       } catch (error) {
         console.error('Error deleting selected readings:', error)
-        alert('Gagal menghapus data. Coba lagi.')
+        if ((window as any).showNotification) {
+          (window as any).showNotification({
+            type: 'error',
+            title: 'Gagal Menghapus Data',
+            message: 'Terjadi kesalahan saat menghapus data'
+          })
+        }
+      }
+    } else if (deleteModal.id) {
+      try {
+        await deleteDoc(doc(db, 'healthReadings', deleteModal.id))
+        if ((window as any).showNotification) {
+          (window as any).showNotification({
+            type: 'success',
+            title: 'Data Berhasil Dihapus',
+            message: 'Data kesehatan telah berhasil dihapus'
+          })
+        }
+      } catch (error) {
+        console.error('Error deleting reading:', error)
+        if ((window as any).showNotification) {
+          (window as any).showNotification({
+            type: 'error',
+            title: 'Gagal Menghapus Data',
+            message: 'Terjadi kesalahan saat menghapus data'
+          })
+        }
       }
     }
+    setDeleteModal({ show: false, id: null, isMultiple: false })
+  }
+
+  const deleteSelected = async () => {
+    setDeleteModal({ show: true, id: null, isMultiple: true })
   }
 
   const toggleSelection = (id: string) => {
@@ -340,6 +367,114 @@ export default function RiwayatKesehatan() {
       newSelected.add(id)
     }
     setSelectedItems(newSelected)
+  }
+
+  const exportToPDF = (items: HealthReading[]) => {
+    if (!userProfile) return
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    
+    // Header
+    doc.setFillColor(37, 99, 235)
+    doc.rect(0, 0, pageWidth, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(24)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Riwayat Kesehatan', pageWidth / 2, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text('InterPulse Health App', pageWidth / 2, 30, { align: 'center' })
+    
+    // User Info
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Informasi Pasien', 14, 55)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Nama: ${userProfile.name}`, 14, 65)
+    doc.text(`NIK: ${userProfile.nik || '-'}`, 14, 73)
+    doc.text(`RT/RW: ${userProfile.rt || '-'}/${userProfile.rw || '-'}`, 14, 81)
+    doc.text(`Kelurahan: ${userProfile.kelurahan || '-'}`, 14, 89)
+    doc.text(`Tanggal Export: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 97)
+    
+    // Table
+    const type = items[0]?.type || 'tensi'
+    let tableData: any[] = []
+    let headers: string[] = []
+    
+    if (type === 'tensi') {
+      headers = ['No', 'Tanggal', 'Waktu', 'Sistolik', 'Diastolik', 'Nadi', 'Status']
+      tableData = items.filter((i): i is TensiReading => i.type === 'tensi').map((item, index) => [
+        index + 1,
+        formatDate(item.timestamp),
+        formatTime(item.timestamp),
+        item.sistolik,
+        item.diastolik,
+        item.nadi,
+        getTensiStatus(item.sistolik, item.diastolik).label
+      ])
+    } else if (type === 'kolesterol') {
+      headers = ['No', 'Tanggal', 'Waktu', 'Total', 'LDL', 'HDL', 'Trigliserida', 'Status']
+      tableData = items.filter((i): i is KolesterolReading => i.type === 'kolesterol').map((item, index) => [
+        index + 1,
+        formatDate(item.timestamp),
+        formatTime(item.timestamp),
+        item.total,
+        item.ldl,
+        item.hdl,
+        item.trigliserida,
+        getKolesterolStatus(item.total, item.ldl, item.hdl).label
+      ])
+    } else if (type === 'asamurat') {
+      headers = ['No', 'Tanggal', 'Waktu', 'Nilai', 'Status']
+      tableData = items.filter((i): i is AsamUratReading => i.type === 'asamurat').map((item, index) => [
+        index + 1,
+        formatDate(item.timestamp),
+        formatTime(item.timestamp),
+        item.nilai,
+        getAsamUratStatus(item.nilai).label
+      ])
+    } else if (type === 'guladarah') {
+      headers = ['No', 'Tanggal', 'Waktu', 'Nilai', 'Status']
+      tableData = items.filter((i): i is GulaDarahReading => i.type === 'guladarah').map((item, index) => [
+        index + 1,
+        formatDate(item.timestamp),
+        formatTime(item.timestamp),
+        item.nilai,
+        getGulaDarahStatus(item.nilai).label
+      ])
+    }
+    
+    autoTable(doc, {
+      head: [headers],
+      body: tableData,
+      startY: 110,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [37, 99, 235],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10
+      },
+      bodyStyles: {
+        fontSize: 9,
+        cellPadding: 3
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      }
+    })
+    
+    // Footer
+    const pageCount = doc.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setTextColor(128, 128, 128)
+      doc.text(`Halaman ${i} dari ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' })
+    }
+    
+    doc.save(`Riwayat_Kesehatan_${userProfile.name}_${new Date().toISOString().split('T')[0]}.pdf`)
   }
 
   const exportToWhatsApp = (items: HealthReading[]) => {
@@ -399,9 +534,8 @@ export default function RiwayatKesehatan() {
         'RT': item.rt || '-',
         'RW': item.rw || '-',
         'Kelurahan': item.kelurahan || '-',
-        'Nilai (mg/dL)': item.value,
-        'Gender': item.gender,
-        'Status': getAsamUratStatus(item.value, item.gender).label
+        'Nilai (mg/dL)': item.nilai,
+        'Status': getAsamUratStatus(item.nilai).label
       }))
       sheetName = 'Riwayat Asam Urat'
       colWidths = [{ wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 8 }, { wch: 8 }, { wch: 18 }, { wch: 15 }, { wch: 12 }, { wch: 12 }]
@@ -415,9 +549,8 @@ export default function RiwayatKesehatan() {
         'RT': item.rt || '-',
         'RW': item.rw || '-',
         'Kelurahan': item.kelurahan || '-',
-        'Nilai (mg/dL)': item.value,
-        'Kondisi': item.condition,
-        'Status': getGulaDarahStatus(item.value, item.condition).label
+        'Nilai (mg/dL)': item.nilai,
+        'Status': getGulaDarahStatus(item.nilai).label
       }))
       sheetName = 'Riwayat Gula Darah'
       colWidths = [{ wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 8 }, { wch: 8 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 12 }]
@@ -444,17 +577,32 @@ export default function RiwayatKesehatan() {
   }
 
   const formatForWhatsApp = (items: HealthReading[]) => {
+    if (!userProfile) return ''
     const type = items[0]?.type || 'tensi'
     const typeLabels: Record<HealthCheckType, string> = {
-      tensi: '📊 Riwayat Tensi',
+      tensi: '📊 Riwayat Tekanan Darah',
       kolesterol: '🧈 Riwayat Kolesterol',
       asamurat: '🔥 Riwayat Asam Urat',
       guladarah: '🍯 Riwayat Gula Darah'
     }
     
-    let message = `*${typeLabels[type as HealthCheckType] || 'Riwayat Kesehatan'}*\n`
-    message += `*${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}*\n`
-    message += '━━━━━━━━━━━━━━━━\n\n'
+    let message = `╔══════════════════════════╗\n`
+    message += `║  *${typeLabels[type as HealthCheckType] || 'Riwayat Kesehatan'}*  ║\n`
+    message += `╚══════════════════════════╝\n\n`
+    
+    message += `👤 *Data Pasien*\n`
+    message += `━━━━━━━━━━━━━━━━\n`
+    message += `📛 Nama: ${userProfile.name}\n`
+    message += `🆔 NIK: ${userProfile.nik || '-'}\n`
+    message += `📍 RT/RW: ${userProfile.rt || '-'}/${userProfile.rw || '-'}\n`
+    message += `🏘️ Kelurahan: ${userProfile.kelurahan || '-'}\n\n`
+    
+    message += `📅 *Tanggal Export*\n`
+    message += `━━━━━━━━━━━━━━━━\n`
+    message += `${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\n\n`
+    
+    message += `📋 *Data Pemeriksaan*\n`
+    message += `━━━━━━━━━━━━━━━━\n\n`
 
     items.forEach((item, index) => {
       message += `*${index + 1}. ${formatDate(item.timestamp)} ${formatTime(item.timestamp)}*\n`
@@ -481,18 +629,18 @@ export default function RiwayatKesehatan() {
         message += `HDL: *${item.hdl}* mg/dL\n`
         message += `Status: ${status.label}\n\n`
       } else if (item.type === 'asamurat') {
-        const status = getAsamUratStatus(item.value, item.gender)
-        message += `Nilai: *${item.value}* mg/dL\n`
+        const status = getAsamUratStatus(item.nilai)
+        message += `Nilai: *${item.nilai}* mg/dL\n`
         message += `Status: ${status.label}\n\n`
       } else if (item.type === 'guladarah') {
-        const status = getGulaDarahStatus(item.value, item.condition)
-        message += `Nilai: *${item.value}* mg/dL (${item.condition})\n`
+        const status = getGulaDarahStatus(item.nilai)
+        message += `Nilai: *${item.nilai}* mg/dL\n`
         message += `Status: ${status.label}\n\n`
       }
     })
 
     message += '━━━━━━━━━━━━━━━━\n'
-    message += '_Dicatat via InterPulse App_'
+    message += '_📱 Dicatat via InterPulse Health App_'
     return message
   }
 
@@ -556,11 +704,11 @@ export default function RiwayatKesehatan() {
     if (activeTab === 'asamurat') {
       const auReadings = filteredReadings.filter((r): r is AsamUratReading => r.type === 'asamurat')
       if (auReadings.length > 0) {
-        const values = auReadings.map(r => parseFloat(r.value))
+        const values = auReadings.map(r => parseFloat(r.nilai))
         stats.avgValue = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)
-        stats.normal = auReadings.filter(r => getAsamUratStatus(r.value, r.gender).label === 'Normal').length
-        stats.hipertensi = auReadings.filter(r => getAsamUratStatus(r.value, r.gender).label === 'Tinggi').length
-        stats.waspada = auReadings.filter(r => getAsamUratStatus(r.value, r.gender).label === 'Batas').length
+        stats.normal = auReadings.filter(r => getAsamUratStatus(r.nilai).label === 'Normal').length
+        stats.hipertensi = auReadings.filter(r => getAsamUratStatus(r.nilai).label === 'Tinggi').length
+        stats.waspada = auReadings.filter(r => getAsamUratStatus(r.nilai).label === 'Batas').length
         stats.rendah = 0
       }
     }
@@ -568,12 +716,12 @@ export default function RiwayatKesehatan() {
     if (activeTab === 'guladarah') {
       const gdReadings = filteredReadings.filter((r): r is GulaDarahReading => r.type === 'guladarah')
       if (gdReadings.length > 0) {
-        const values = gdReadings.map(r => parseInt(r.value))
+        const values = gdReadings.map(r => parseInt(r.nilai))
         stats.avgValue = Math.round(values.reduce((a, b) => a + b, 0) / values.length)
-        stats.normal = gdReadings.filter(r => getGulaDarahStatus(r.value, r.condition).label === 'Normal').length
-        stats.hipertensi = gdReadings.filter(r => ['Diabetes', 'Tinggi'].includes(getGulaDarahStatus(r.value, r.condition).label)).length
-        stats.waspada = gdReadings.filter(r => ['Prediabetes', 'Batas'].includes(getGulaDarahStatus(r.value, r.condition).label)).length
-        stats.rendah = gdReadings.filter(r => getGulaDarahStatus(r.value, r.condition).label === 'Rendah').length
+        stats.normal = gdReadings.filter(r => getGulaDarahStatus(r.nilai).label === 'Normal').length
+        stats.hipertensi = gdReadings.filter(r => ['Diabetes', 'Tinggi'].includes(getGulaDarahStatus(r.nilai).label)).length
+        stats.waspada = gdReadings.filter(r => ['Prediabetes', 'Batas'].includes(getGulaDarahStatus(r.nilai).label)).length
+        stats.rendah = gdReadings.filter(r => getGulaDarahStatus(r.nilai).label === 'Hipoglikemia').length
       }
     }
 
@@ -766,10 +914,20 @@ export default function RiwayatKesehatan() {
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-50">
                   <button
                     onClick={() => {
-                      exportToWhatsApp(selectedItems.size > 0 ? readings.filter(r => selectedItems.has(r.id)) : filteredReadings)
+                      exportToPDF(selectedItems.size > 0 ? readings.filter(r => selectedItems.has(r.id)) : filteredReadings)
                       setShowExportMenu(false)
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left first:rounded-t-xl"
+                  >
+                    <FileText className="w-5 h-5 text-red-500" />
+                    <span className="text-sm">PDF</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      exportToWhatsApp(selectedItems.size > 0 ? readings.filter(r => selectedItems.has(r.id)) : filteredReadings)
+                      setShowExportMenu(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
                   >
                     <MessageCircle className="w-5 h-5 text-green-500" />
                     <span className="text-sm">WhatsApp</span>
@@ -779,30 +937,10 @@ export default function RiwayatKesehatan() {
                       exportToExcel(selectedItems.size > 0 ? readings.filter(r => selectedItems.has(r.id)) : filteredReadings)
                       setShowExportMenu(false)
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left last:rounded-b-xl"
                   >
                     <FileSpreadsheet className="w-5 h-5 text-green-600" />
                     <span className="text-sm">Excel (.xlsx)</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      exportToCSV(selectedItems.size > 0 ? readings.filter(r => selectedItems.has(r.id)) : filteredReadings)
-                      setShowExportMenu(false)
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
-                  >
-                    <FileSpreadsheet className="w-5 h-5 text-gray-600" />
-                    <span className="text-sm">CSV</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      shareAsText(selectedItems.size > 0 ? readings.filter(r => selectedItems.has(r.id)) : filteredReadings)
-                      setShowExportMenu(false)
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left last:rounded-b-xl"
-                  >
-                    <Share2 className="w-5 h-5 text-blue-500" />
-                    <span className="text-sm">Salin Teks</span>
                   </button>
                 </div>
               )}
@@ -911,19 +1049,17 @@ export default function RiwayatKesehatan() {
                 ]
               } else if (reading.type === 'asamurat') {
                 const ar = reading as AsamUratReading
-                status = getAsamUratStatus(ar.value, ar.gender)
-                displayValue = `${ar.value} mg/dL`
+                status = getAsamUratStatus(ar.nilai)
+                displayValue = `${ar.nilai} mg/dL`
                 details = [
-                  { label: 'Nilai', value: ar.value, unit: 'mg/dL', icon: Activity },
-                  { label: 'Gender', value: ar.gender, unit: '', icon: Heart },
+                  { label: 'Nilai', value: ar.nilai, unit: 'mg/dL', icon: Activity },
                 ]
               } else if (reading.type === 'guladarah') {
                 const gr = reading as GulaDarahReading
-                status = getGulaDarahStatus(gr.value, gr.condition)
-                displayValue = `${gr.value} mg/dL`
+                status = getGulaDarahStatus(gr.nilai)
+                displayValue = `${gr.nilai} mg/dL`
                 details = [
-                  { label: 'Nilai', value: gr.value, unit: 'mg/dL', icon: Activity },
-                  { label: 'Kondisi', value: gr.condition, unit: '', icon: Heart },
+                  { label: 'Nilai', value: gr.nilai, unit: 'mg/dL', icon: Activity },
                 ]
               }
 
@@ -1038,6 +1174,41 @@ export default function RiwayatKesehatan() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.show && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 transform transition-all animate-in fade-in zoom-in duration-200">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                {deleteModal.isMultiple ? 'Hapus Data Terpilih' : 'Hapus Data'}
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {deleteModal.isMultiple
+                  ? `Anda yakin ingin menghapus ${selectedItems.size} data kesehatan? Tindakan ini tidak dapat dibatalkan.`
+                  : 'Anda yakin ingin menghapus data kesehatan ini? Tindakan ini tidak dapat dibatalkan.'}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteModal({ show: false, id: null, isMultiple: false })}
+                  className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 py-3 px-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-medium transition-all shadow-lg shadow-red-500/30"
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
