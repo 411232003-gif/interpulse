@@ -525,8 +525,8 @@ export default function MonitoringPage() {
                     <span className="text-xs font-medium text-gray-600 w-12">RW {rw}</span>
                     <div className="flex-1 h-6 bg-gray-100 rounded-lg overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg transition-all duration-500 relative"
-                        style={{ width: `${Math.min(pct, 100)}%` }}
+                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg transition-all duration-500 relative progress-bar"
+                        style={{ '--progress-width': `${Math.min(pct, 100)}%` } as React.CSSProperties}
                       >
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-white">
                           {count}

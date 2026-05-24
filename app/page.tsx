@@ -601,8 +601,8 @@ export default function Home() {
           onTouchEnd={handleTouchEnd}
         >
           <div
-            className="flex transition-transform duration-500 ease-in-out"
-            style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+            className="flex transition-transform duration-500 ease-in-out carousel-slide"
+            style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
           >
             {bannerImages.map((image, index) => (
               <div key={index} className="w-full flex-shrink-0 relative">
@@ -657,8 +657,8 @@ export default function Home() {
           onTouchEnd={handleTouchEnd}
         >
           <div
-            className="flex transition-transform duration-500 ease-in-out"
-            style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+            className="flex transition-transform duration-500 ease-in-out carousel-slide"
+            style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
           >
             {bannerImages.map((image, index) => (
               <div key={index} className="w-full flex-shrink-0 relative">

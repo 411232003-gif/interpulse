@@ -123,4 +123,13 @@
   .pb-nav {
     padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   }
+
+  /* Dynamic utility classes */
+  .carousel-slide {
+    transform: translateX(var(--slide-offset, 0%));
+  }
+
+  .progress-bar {
+    width: var(--progress-width, 0%);
+  }
 }
