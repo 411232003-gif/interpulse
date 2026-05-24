@@ -486,15 +486,15 @@ export default function Home() {
                   className="group"
                 >
                   {isMobile ? (
-                    <div className={`${card.bgColor} rounded-2xl p-3 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-24 flex items-center justify-center`}>
-                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${card.gradient} p-2 shadow-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0 mr-3`}>
+                    <div className={`${card.bgColor} rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-28 flex items-center justify-center`}>
+                      <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${card.gradient} p-3 shadow-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0 mr-3`}>
                         <Icon className="w-full h-full text-white" />
                       </div>
                       <div className="flex-1 text-left">
-                        <h3 className="text-sm font-bold text-gray-800 group-hover:text-teal-600 transition-colors">
+                        <h3 className="text-base font-bold text-gray-800 group-hover:text-teal-600 transition-colors">
                           {card.title}
                         </h3>
-                        <p className="text-xs text-gray-600 line-clamp-1">
+                        <p className="text-sm text-gray-600 line-clamp-1">
                           {card.description}
                         </p>
                       </div>
@@ -522,15 +522,15 @@ export default function Home() {
                 className="group"
               >
                 {isMobile ? (
-                  <div className={`${card.bgColor} rounded-2xl p-3 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-24 flex items-center justify-center`}>
-                    <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${card.gradient} p-2 shadow-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0 mr-3`}>
+                  <div className={`${card.bgColor} rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-28 flex items-center justify-center`}>
+                    <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${card.gradient} p-3 shadow-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0 mr-3`}>
                       <Icon className="w-full h-full text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <h3 className="text-sm font-bold text-gray-800 group-hover:text-teal-600 transition-colors">
+                      <h3 className="text-base font-bold text-gray-800 group-hover:text-teal-600 transition-colors">
                         {card.title}
                       </h3>
-                      <p className="text-xs text-gray-600 line-clamp-1">
+                      <p className="text-sm text-gray-600 line-clamp-1">
                         {card.description}
                       </p>
                     </div>
