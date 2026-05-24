@@ -220,6 +220,8 @@ export default function CatatKesehatan() {
         lingkarPinggang: doc.data().lingkarPinggang || 0,
         timestamp: doc.data().timestamp
       })) as TBBBData[]
+      console.log('[Fasca] TB/BB data loaded:', data.length, 'items')
+      console.log('[Fasca] TB/BB data:', data)
       setTbbbData(data)
     })
     return () => unsubscribe()
@@ -235,10 +237,12 @@ export default function CatatKesehatan() {
       const todayAttendance = new Set<string>()
       snapshot.docs.forEach(doc => {
         const data = doc.data()
+        console.log('[Fasca] Attendance doc:', doc.id, data)
         if (data.timestamp && data.timestamp.startsWith(todayStr)) {
           todayAttendance.add(data.nik)
         }
       })
+      console.log('[Fasca] Today attendance loaded:', todayAttendance.size, 'NIKs:', Array.from(todayAttendance))
       setAttendanceToday(todayAttendance)
     })
     
@@ -292,6 +296,7 @@ export default function CatatKesehatan() {
       r.nik.includes(searchQuery)
     const hasTBBB = getTodayTBBB(r.nik) !== undefined
     const hasAttendance = attendanceToday.has(r.nik)
+    console.log('[Fasca] Filter check for', r.nama, 'NIK:', r.nik, '- hasTBBB:', hasTBBB, 'hasAttendance:', hasAttendance, 'attendanceToday size:', attendanceToday.size)
     return rwMatch && rtMatch && searchMatch && hasTBBB && hasAttendance
   }).sort((a, b) => {
     // Get latest health reading timestamp for each resident
