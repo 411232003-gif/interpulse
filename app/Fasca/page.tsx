@@ -49,6 +49,7 @@ export default function CatatKesehatan() {
   const [isResetting, setIsResetting] = useState(false)
   const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
   const [attendanceToday, setAttendanceToday] = useState<Set<string>>(new Set())
+  const [todayAttendanceFull, setTodayAttendanceFull] = useState<any[]>([])
 
   // Fasca form state
   const [healthType, setHealthType] = useState<HealthType | null>(null)
@@ -125,15 +126,21 @@ export default function CatatKesehatan() {
     const attendanceRef = collection(db, 'attendance')
     const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
       const todayAttendance = new Set<string>()
+      const fullData: any[] = []
+      const seenNIKs = new Set<string>()
       snapshot.docs.forEach(doc => {
         const data = doc.data()
-        console.log('[Fasca] Attendance doc:', doc.id, data)
-        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
+        if (data.timestamp && data.timestamp.startsWith(todayStr) && data.nik) {
           todayAttendance.add(data.nik)
+          if (!seenNIKs.has(data.nik)) {
+            seenNIKs.add(data.nik)
+            fullData.push({ ...data, id: doc.id })
+          }
         }
       })
       console.log('[Fasca] Today attendance loaded:', todayAttendance.size, 'NIKs:', Array.from(todayAttendance))
       setAttendanceToday(todayAttendance)
+      setTodayAttendanceFull(fullData)
     })
 
     return () => unsubscribe()
@@ -300,17 +307,38 @@ export default function CatatKesehatan() {
     return todayTBBB
   }
 
-  // Filter residents - only show those with attendance AND TB/BB data for today
-  const filteredResidents = residents.filter(r => {
+  // Build resident list from attendance + TB/BB data
+  // Use residents collection data if available, otherwise use attendance record data
+  const allEligibleResidents: Resident[] = Array.from(attendanceToday)
+    .filter(nik => getTodayTBBB(nik) !== undefined)
+    .map(nik => {
+      const fromCollection = residents.find(r => r.nik === nik)
+      if (fromCollection) return fromCollection
+      const fromAttendance = todayAttendanceFull.find(a => a.nik === nik)
+      if (fromAttendance) {
+        return {
+          id: fromAttendance.id || nik,
+          nik: fromAttendance.nik,
+          nama: fromAttendance.nama || 'Tanpa Nama',
+          rw: fromAttendance.rw || '',
+          rt: fromAttendance.rt || '',
+          jenisKelamin: fromAttendance.jenisKelamin || '',
+          umur: fromAttendance.umur || 0,
+          alamat: fromAttendance.alamat || '',
+        } as Resident
+      }
+      return null
+    })
+    .filter((r): r is Resident => r !== null)
+
+  // Apply RW/RT/search filters
+  const filteredResidents = allEligibleResidents.filter(r => {
     const rwMatch = !filterRW || r.rw === filterRW
     const rtMatch = !filterRT || r.rt === filterRT
     const searchMatch = !searchQuery ||
       r.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.nik.includes(searchQuery)
-    const hasTBBB = getTodayTBBB(r.nik) !== undefined
-    const hasAttendance = attendanceToday.has(r.nik)
-    console.log('[Fasca] Filter check for', r.nama, 'NIK:', r.nik, '- rwMatch:', rwMatch, 'rtMatch:', rtMatch, 'searchMatch:', searchMatch, 'hasTBBB:', hasTBBB, 'hasAttendance:', hasAttendance, 'filterRW:', filterRW, 'filterRT:', filterRT, 'searchQuery:', searchQuery)
-    return rwMatch && rtMatch && searchMatch && hasTBBB && hasAttendance
+    return rwMatch && rtMatch && searchMatch
   })
 
   console.log('[Fasca] Total residents:', residents.length, 'Filtered residents:', filteredResidents.length)
