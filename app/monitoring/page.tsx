@@ -650,7 +650,7 @@ export default function MonitoringPage() {
                   return (
                     <g>
                       <path d={areaD} fill="url(#gradient)" />
-                      <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5,5" />
                       {dataPoints.map((p, i) => (
                         <g key={i}>
                           <circle cx={p.x} cy={p.y} r={4} fill={p.month === selectedMonth ? '#6366f1' : '#fff'} stroke="#6366f1" strokeWidth="2" />
