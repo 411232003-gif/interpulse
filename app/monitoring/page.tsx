@@ -25,8 +25,11 @@ export default function MonitoringPage() {
   const [healthReadings, setHealthReadings] = useState<Record<string, Record<string, number>>>({})
   const [healthTypeDistribution, setHealthTypeDistribution] = useState<Record<string, number>>({})
   const [attendanceData, setAttendanceData] = useState<Record<string, Record<string, number>>>({})
+  const [healthReadingsDetails, setHealthReadingsDetails] = useState<Record<string, any[]>>({})
+  const [residentsData, setResidentsData] = useState<Record<string, any>>({})
   const [selectedMonth, setSelectedMonth] = useState('april')
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
+  const [rwExportDropdown, setRwExportDropdown] = useState<string | null>(null)
 
   // Fetch health readings data from healthReadings collection
   useEffect(() => {
@@ -106,6 +109,62 @@ export default function MonitoringPage() {
       })
       
       setAttendanceData(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Fetch residents data for names and NIK
+  useEffect(() => {
+    const residentsRef = collection(db, 'residents')
+    const unsubscribe = onSnapshot(residentsRef, (snapshot) => {
+      const data: Record<string, any> = {}
+      const nameMap: Record<string, any> = {} // For name-based matching
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        // Use document ID (which should be Firebase Auth UID), NIK, and uid field as keys
+        data[doc.id] = { ...d, id: doc.id }
+        if (d.nik) {
+          data[d.nik] = { ...d, id: doc.id }
+        }
+        if (d.uid) {
+          data[d.uid] = { ...d, id: doc.id }
+        }
+        // Also store by name for fallback matching
+        if (d.nama) {
+          nameMap[d.nama.toLowerCase()] = { ...d, id: doc.id }
+        }
+      })
+      setResidentsData({ ...data, ...nameMap })
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Fetch detailed health readings for per-RW export
+  useEffect(() => {
+    const healthReadingsRef = collection(db, 'healthReadings')
+    const unsubscribe = onSnapshot(healthReadingsRef, (snapshot) => {
+      const data: Record<string, any[]> = {}
+      
+      Object.keys(rwTargets).forEach(rw => {
+        data[rw] = []
+      })
+      
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        if (!d || !d.timestamp) return
+        let rw = d.rw
+        
+        // Normalize RW to match rwTargets format (01, 02, etc.)
+        if (rw !== undefined) {
+          rw = String(rw).padStart(2, '0')
+        }
+        
+        if (rw && data[rw]) {
+          data[rw].push({ ...d, id: doc.id })
+        }
+      })
+      
+      setHealthReadingsDetails(data)
     })
     return () => unsubscribe()
   }, [])
@@ -375,6 +434,135 @@ export default function MonitoringPage() {
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
   }
 
+  // Per-RW export functions
+  const exportRWToPDF = (rw: string) => {
+    const doc = new jsPDF()
+    
+    // Header
+    doc.setFillColor(79, 70, 229)
+    doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Pemeriksaan Kesehatan RW ${rw}`, 105, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan Duris Selatan - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+    
+    // Filter data for selected RW and month
+    const rwData = healthReadingsDetails[rw] || []
+    const monthData = rwData.filter(d => {
+      const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+      return month === selectedMonth
+    })
+    
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(10)
+    doc.text(`Total Pemeriksaan: ${monthData.length}`, 14, 50)
+    
+    // Table data - merge with residents data (no grouping, each reading as separate row)
+    const tableData = monthData.map(d => {
+      const resident = residentsData[d.userId] || residentsData[d.nik] || residentsData[d.residentId] || 
+                      (d.nama ? residentsData[d.nama.toLowerCase()] : {}) || 
+                      (d.userName ? residentsData[d.userName.toLowerCase()] : {}) || {}
+      return [
+        resident.nama || d.nama || d.userName || '-',
+        resident.nik || d.nik || '-',
+        d.type || '-',
+        d.timestamp ? new Date(d.timestamp).toLocaleDateString('id-ID') : '-'
+      ]
+    })
+    
+    autoTable(doc, {
+      startY: 55,
+      head: [['Nama', 'NIK', 'Jenis Pemeriksaan', 'Tanggal']],
+      body: tableData,
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [79, 70, 229],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [238, 242, 255],
+      },
+    })
+    
+    doc.save(`pemeriksaan-rw-${rw}-${selectedMonth}.pdf`)
+  }
+
+  const exportRWToExcel = (rw: string) => {
+    const rwData = healthReadingsDetails[rw] || []
+    const monthData = rwData.filter(d => {
+      const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+      return month === selectedMonth
+    })
+    
+    // No grouping, each reading as separate row
+    const data = monthData.map(d => {
+      const resident = residentsData[d.userId] || residentsData[d.nik] || residentsData[d.residentId] || 
+                      (d.nama ? residentsData[d.nama.toLowerCase()] : {}) || 
+                      (d.userName ? residentsData[d.userName.toLowerCase()] : {}) || {}
+      return {
+        'Nama': resident.nama || d.nama || d.userName || '-',
+        'NIK': resident.nik || d.nik || '-',
+        'Jenis Pemeriksaan': d.type || '-',
+        'Tanggal': d.timestamp ? new Date(d.timestamp).toLocaleDateString('id-ID') : '-',
+        'RW': d.rw || '-'
+      }
+    })
+    
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, `RW ${rw}`)
+    
+    ws['!cols'] = [
+      { wch: 25 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 10 },
+    ]
+    
+    XLSX.writeFile(wb, `pemeriksaan-rw-${rw}-${selectedMonth}.xlsx`)
+  }
+
+  const exportRWToWhatsApp = (rw: string) => {
+    const rwData = healthReadingsDetails[rw] || []
+    const monthData = rwData.filter(d => {
+      const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+      return month === selectedMonth
+    })
+    
+    let message = `📊 *PEMERIKSAAN KESEHATAN RW ${rw}*\n`
+    message += `🏥 Kelurahan Duris Selatan\n`
+    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `📈 *RINGKASAN DATA*\n`
+    message += `• Total Pemeriksaan: ${monthData.length}\n\n`
+    message += `📋 *DAFTAR WARGA YANG DIPERIKSA*\n\n`
+    
+    // No grouping, each reading as separate row
+    monthData.forEach((d, i) => {
+      const resident = residentsData[d.userId] || residentsData[d.nik] || residentsData[d.residentId] || 
+                      (d.nama ? residentsData[d.nama.toLowerCase()] : {}) || 
+                      (d.userName ? residentsData[d.userName.toLowerCase()] : {}) || {}
+      message += `${i + 1}. ${resident.nama || d.nama || d.userName || '-'}\n`
+      message += `   NIK: ${resident.nik || d.nik || '-'}\n`
+      message += `   Jenis: ${d.type || '-'}\n`
+      message += `   Tanggal: ${d.timestamp ? new Date(d.timestamp).toLocaleDateString('id-ID') : '-'}\n\n`
+    })
+    
+    message += `━━━━━━━━━━━━━━━━━━━━\n`
+    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
+    
+    const encodedMessage = encodeURIComponent(message)
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
@@ -598,7 +786,49 @@ export default function MonitoringPage() {
                         <p className="text-xs text-gray-500">{count} / {target} PMT</p>
                       </div>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${badgeColor}`}>{pct}%</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${badgeColor}`}>{pct}%</span>
+                      <div className="relative">
+                        <button
+                          onClick={() => setRwExportDropdown(rwExportDropdown === rw ? null : rw)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Export"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        {rwExportDropdown === rw && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                            <button
+                              onClick={() => { exportRWToPDF(rw); setRwExportDropdown(null); }}
+                              className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl"
+                            >
+                              <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+                              </svg>
+                              <span className="text-sm text-gray-700">Export PDF</span>
+                            </button>
+                            <button
+                              onClick={() => { exportRWToExcel(rw); setRwExportDropdown(null); }}
+                              className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                            >
+                              <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
+                              </svg>
+                              <span className="text-sm text-gray-700">Export Excel</span>
+                            </button>
+                            <button
+                              onClick={() => { exportRWToWhatsApp(rw); setRwExportDropdown(null); }}
+                              className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
+                            >
+                              <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                              </svg>
+                              <span className="text-sm text-gray-700">Export WhatsApp</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
