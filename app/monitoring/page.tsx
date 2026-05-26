@@ -611,14 +611,14 @@ export default function MonitoringPage() {
             })}
           </div>
 
-          {/* Chart 3: Monthly Trend Line Chart */}
+          {/* Chart 3: Per-RW Line Chart */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Trafik Pemeriksaan Bulanan</span>
+                <span className="font-semibold text-gray-800 text-sm">Trafik Pemeriksaan per RW</span>
               </div>
-              <span className="text-xs text-gray-500">Tahun {new Date().getFullYear()}</span>
+              <span className="text-xs text-gray-500">Bulan: {monthLabels[selectedMonth]}</span>
             </div>
             <div className="relative h-40">
               {/* Grid lines */}
@@ -638,12 +638,14 @@ export default function MonitoringPage() {
                   </linearGradient>
                 </defs>
                 {(() => {
-                  const dataPoints = months.map((m, i) => {
-                    const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
-                    const maxVal = Math.max(...months.map(mo => Object.entries(healthReadings).reduce((s, [, d]) => s + (d[mo] || 0), 0)), 1)
-                    const y = 140 - ((total / maxVal) * 120)
-                    const x = (i / (months.length - 1)) * 280 + 10
-                    return { x, y, total, month: m }
+                  const rwList = Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b))
+                  const dataPoints = rwList.map((rw, i) => {
+                    const readings = healthReadings[rw] || {}
+                    const count = readings[selectedMonth] || 0
+                    const maxVal = Math.max(...rwList.map(r => (healthReadings[r] || {})[selectedMonth] || 0), 1)
+                    const y = 140 - ((count / maxVal) * 120)
+                    const x = (i / (rwList.length - 1)) * 280 + 10
+                    return { x, y, count, rw }
                   })
                   const pathD = dataPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
                   const areaD = `${pathD} L ${dataPoints[dataPoints.length - 1].x} 140 L ${dataPoints[0].x} 140 Z`
@@ -653,8 +655,8 @@ export default function MonitoringPage() {
                       <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5,5" />
                       {dataPoints.map((p, i) => (
                         <g key={i}>
-                          <circle cx={p.x} cy={p.y} r={4} fill={p.month === selectedMonth ? '#6366f1' : '#fff'} stroke="#6366f1" strokeWidth="2" />
-                          <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="8" fill="#6b7280">{p.total}</text>
+                          <circle cx={p.x} cy={p.y} r={4} fill="#6366f1" stroke="#fff" strokeWidth="2" />
+                          <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="8" fill="#6b7280">{p.count}</text>
                         </g>
                       ))}
                     </g>
@@ -663,9 +665,9 @@ export default function MonitoringPage() {
               </svg>
               {/* X-axis labels */}
               <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
-                {months.map((m, i) => (
-                  <span key={m} className={`text-[8px] ${m === selectedMonth ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
-                    {monthLabels[m]}
+                {Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b)).map((rw) => (
+                  <span key={rw} className="text-[8px] text-gray-400">
+                    RW {rw}
                   </span>
                 ))}
               </div>
