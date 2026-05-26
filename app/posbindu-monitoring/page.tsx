@@ -99,6 +99,9 @@ export default function PosbinduMonitoring() {
   const [successMessage, setSuccessMessage] = useState('')
   const [healthTypeFilter, setHealthTypeFilter] = useState<string>('all')
   const [healthTypeDropdownOpen, setHealthTypeDropdownOpen] = useState(false)
+  const [healthReadings, setHealthReadings] = useState<Record<string, any>>({})
+  const [tbbbData, setTbbbData] = useState<Record<string, any>>({})
+  const [todayAttendance, setTodayAttendance] = useState<Record<string, any>>({})
 
   // Fetch residents from Firestore
   useEffect(() => {
@@ -212,6 +215,66 @@ export default function PosbinduMonitoring() {
     }, (error) => {
       console.error('Error fetching elderly attendance:', error)
       setElderlyAttendance(mockAttendance)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Fetch health readings for today
+  useEffect(() => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    
+    const healthRef = collection(db, 'healthReadings')
+    const unsubscribe = onSnapshot(healthRef, (snapshot) => {
+      const data: Record<string, any> = {}
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        const nik = d.userId || d.nik
+        if (nik && d.timestamp && d.timestamp.startsWith(todayStr)) {
+          data[nik] = { ...d, id: doc.id }
+        }
+      })
+      setHealthReadings(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Fetch TB/BB data for today
+  useEffect(() => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    
+    const tbbbRef = collection(db, 'tb-bb')
+    const unsubscribe = onSnapshot(tbbbRef, (snapshot) => {
+      const data: Record<string, any> = {}
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        const nik = d.nik
+        if (nik && d.timestamp && d.timestamp.startsWith(todayStr)) {
+          data[nik] = { ...d, id: doc.id }
+        }
+      })
+      setTbbbData(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Fetch today's attendance
+  useEffect(() => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    
+    const attendanceRef = collection(db, 'attendance')
+    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
+      const data: Record<string, any> = {}
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        const nik = d.nik
+        if (nik && d.timestamp && d.timestamp.startsWith(todayStr)) {
+          data[nik] = { ...d, id: doc.id, timestamp: d.timestamp }
+        }
+      })
+      setTodayAttendance(data)
     })
     return () => unsubscribe()
   }, [])
@@ -407,20 +470,33 @@ export default function PosbinduMonitoring() {
     return value ? value.toString().padStart(2, '0') : ''
   }
 
-  // Filter residents based on criteria
-  const filteredResidents = residents.filter(resident => {
-    if (filterRW && normalizeRTRW(resident.rw) !== normalizeRTRW(filterRW)) return false
-    if (filterRT && normalizeRTRW(resident.rt) !== normalizeRTRW(filterRT)) return false
-    if (filterUmur) {
-      const age = resident.umur
-      if (filterUmur === '0-20' && (age < 0 || age > 20)) return false
-      if (filterUmur === '21-50' && (age < 21 || age > 50)) return false
-      if (filterUmur === '51-60' && (age < 51 || age > 60)) return false
-      if (filterUmur === '60+' && age < 60) return false
-    }
-    if (searchNama && resident.nama && !resident.nama.toLowerCase().includes(searchNama.toLowerCase())) return false
-    return true
-  })
+  // Filter residents based on criteria and sort by latest attendance
+  const filteredResidents = residents
+    .filter(resident => {
+      if (filterRW && normalizeRTRW(resident.rw) !== normalizeRTRW(filterRW)) return false
+      if (filterRT && normalizeRTRW(resident.rt) !== normalizeRTRW(filterRT)) return false
+      if (filterUmur) {
+        const age = resident.umur
+        if (filterUmur === '0-20' && (age < 0 || age > 20)) return false
+        if (filterUmur === '21-50' && (age < 21 || age > 50)) return false
+        if (filterUmur === '51-60' && (age < 51 || age > 60)) return false
+        if (filterUmur === '60+' && age < 60) return false
+      }
+      if (searchNama && resident.nama && !resident.nama.toLowerCase().includes(searchNama.toLowerCase())) return false
+      return true
+    })
+    .map(resident => ({
+      ...resident,
+      healthData: healthReadings[resident.nik] || null,
+      tbbbData: tbbbData[resident.nik] || null,
+      attendanceData: todayAttendance[resident.nik] || null
+    }))
+    .sort((a, b) => {
+      // Sort by attendance timestamp (latest first)
+      const aTime = a.attendanceData?.timestamp ? new Date(a.attendanceData.timestamp).getTime() : 0
+      const bTime = b.attendanceData?.timestamp ? new Date(b.attendanceData.timestamp).getTime() : 0
+      return bTime - aTime
+    })
 
   // Export to PDF
   const exportToPDF = () => {
@@ -929,8 +1005,13 @@ export default function PosbinduMonitoring() {
               ) : filteredResidents.map(resident => (
                 <div key={resident.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                   <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-semibold text-gray-800">{resident.nama}</p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-gray-800">{resident.nama}</p>
+                        {resident.attendanceData && (
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">Hadir</span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500">NIK: {resident.nik}</p>
                       <div className="flex gap-3 mt-1 text-xs text-gray-600">
                         <span>RW {resident.rw} / RT {resident.rt}</span>
@@ -947,6 +1028,44 @@ export default function PosbinduMonitoring() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Health Data Section */}
+                  {(resident.tbbbData || resident.healthData) && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      {/* TB/BB/LP Data */}
+                      {resident.tbbbData && (
+                        <div className="mb-2">
+                          <p className="text-xs font-medium text-gray-700 mb-1">TB/BB/LP:</p>
+                          <div className="flex gap-2 text-xs text-gray-600">
+                            <span>TB: {resident.tbbbData.tinggiBadan} cm</span>
+                            <span>BB: {resident.tbbbData.beratBadan} kg</span>
+                            <span>LP: {resident.tbbbData.lingkarPinggang} cm</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Health Readings */}
+                      {resident.healthData && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-700 mb-1">Pemeriksaan Kesehatan:</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                            {resident.healthData.systolic && resident.healthData.diastolic && (
+                              <span>Tensi: {resident.healthData.systolic}/{resident.healthData.diastolic} mmHg</span>
+                            )}
+                            {resident.healthData.kolesterol && (
+                              <span>Kolesterol: {resident.healthData.kolesterol} mg/dL</span>
+                            )}
+                            {resident.healthData.asamUrat && (
+                              <span>Asam Urat: {resident.healthData.asamUrat} mg/dL</span>
+                            )}
+                            {resident.healthData.gulaDarah && (
+                              <span>Gula Darah: {resident.healthData.gulaDarah} mg/dL</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
