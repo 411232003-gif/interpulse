@@ -242,12 +242,18 @@ export default function Profil() {
   }
 
   const handleSave = async () => {
-    if (!authProfile?.uid) return
+    console.log('[Profile] handleSave called, authProfile:', authProfile)
+    if (!authProfile?.uid) {
+      console.error('[Profile] No authProfile.uid found')
+      return
+    }
     
     setSaving(true)
+    console.log('[Profile] Saving profile data:', editedProfile)
     try {
       // Update Firestore
       const userRef = doc(db, 'users', authProfile.uid)
+      console.log('[Profile] Updating document:', authProfile.uid)
       await updateDoc(userRef, {
         name: editedProfile.name,
         phone: editedProfile.phone,
@@ -261,10 +267,12 @@ export default function Profil() {
         kelurahan: editedProfile.kelurahan,
         adminKelurahan: editedProfile.adminKelurahan || ''
       })
+      console.log('[Profile] Firestore update successful')
       
       setProfile({ ...editedProfile })
       setIsEditing(false)
       await refreshProfile()
+      console.log('[Profile] Profile refreshed')
       
       if ((window as any).showNotification) {
         (window as any).showNotification({
@@ -274,7 +282,7 @@ export default function Profil() {
         })
       }
     } catch (error) {
-      console.error('Error saving profile:', error)
+      console.error('[Profile] Error saving profile:', error)
       if ((window as any).showNotification) {
         (window as any).showNotification({
           type: 'error',
@@ -284,6 +292,7 @@ export default function Profil() {
       }
     } finally {
       setSaving(false)
+      console.log('[Profile] Saving state reset')
     }
   }
 
