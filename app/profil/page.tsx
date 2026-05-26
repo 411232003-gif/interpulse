@@ -311,7 +311,12 @@ export default function Profil() {
   }
 
   const handleChange = (field: keyof UserProfile, value: string | number) => {
-    setEditedProfile(prev => ({ ...prev, [field]: value }))
+    console.log('[Profile] handleChange:', field, '=', value)
+    setEditedProfile(prev => {
+      const updated = { ...prev, [field]: value }
+      console.log('[Profile] editedProfile updated:', updated)
+      return updated
+    })
   }
 
   // Health Data CRUD
@@ -658,7 +663,11 @@ export default function Profil() {
                       </Button>
                       <Button 
                         className="flex-1 bg-teal-600 hover:bg-teal-700 text-white" 
-                        onClick={handleSave}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          console.log('[Profile] Save button clicked')
+                          handleSave()
+                        }}
                         disabled={saving}
                       >
                         {saving ? (
