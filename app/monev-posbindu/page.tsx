@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { Users, Activity, TrendingUp, ArrowLeft } from 'lucide-react'
+import { Users, Activity, TrendingUp } from 'lucide-react'
 
 export default function MonevPosbindu() {
   const { isAdmin, loading } = useAuth()
@@ -74,10 +74,6 @@ export default function MonevPosbindu() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/" className={`inline-flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors ${isMobile ? 'text-sm' : 'text-base'}`}>
-            <ArrowLeft className={isMobile ? 'w-5 h-5' : 'w-6 h-6'} />
-            Kembali
-          </Link>
           <h1 className={`${isMobile ? 'text-2xl' : 'text-4xl'} font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent`}>
             Monev Posbindu
           </h1>
