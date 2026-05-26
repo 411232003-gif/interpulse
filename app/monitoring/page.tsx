@@ -24,6 +24,7 @@ export default function MonitoringPage() {
   const { isAdmin } = useAuth()
   const [healthReadings, setHealthReadings] = useState<Record<string, Record<string, number>>>({})
   const [healthTypeDistribution, setHealthTypeDistribution] = useState<Record<string, number>>({})
+  const [attendanceData, setAttendanceData] = useState<Record<string, Record<string, number>>>({})
   const [selectedMonth, setSelectedMonth] = useState('april')
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
 
@@ -81,9 +82,42 @@ export default function MonitoringPage() {
     return () => unsubscribe()
   }, [selectedMonth])
 
+  // Fetch attendance data from attendance collection
+  useEffect(() => {
+    const attendanceRef = collection(db, 'attendance')
+    const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
+      const data: Record<string, Record<string, number>> = {}
+      
+      Object.keys(rwTargets).forEach(rw => {
+        data[rw] = {}
+        months.forEach(m => { data[rw][m] = 0 })
+      })
+      
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        const rw = d.rw
+        if (rw && data[rw]) {
+          const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+          if (data[rw][month] !== undefined) data[rw][month]++
+        }
+      })
+      
+      setAttendanceData(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
   const totalReadings = Object.entries(healthReadings).reduce((sum, [rw, months_data]) => {
     return sum + (months_data[selectedMonth] || 0)
   }, 0)
+
+  const totalAttendance = Object.entries(attendanceData).reduce((sum, [rw, months_data]) => {
+    return sum + (months_data[selectedMonth] || 0)
+  }, 0)
+
+  const totalTarget = Object.values(rwTargets).reduce((sum, target) => sum + target, 0)
+  const attendancePercentage = totalTarget > 0 ? ((totalAttendance / totalTarget) * 100).toFixed(1) : '0'
+  const healthPercentage = totalTarget > 0 ? ((totalReadings / totalTarget) * 100).toFixed(1) : '0'
 
   const exportToPDF = () => {
     const doc = new jsPDF()
@@ -350,20 +384,20 @@ export default function MonitoringPage() {
       </div>
 
       <div className="px-4 mt-6 space-y-4">
-        {/* Month Filter */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-3">
+        {/* Ringkasan - Bulan Section */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-indigo-600" />
-              <span className="font-semibold text-gray-800 text-sm">Pilih Bulan</span>
+              <TrendingUp className="w-5 h-5 text-indigo-600" />
+              <span className="font-semibold text-gray-800">Ringkasan - {monthLabels[selectedMonth]}</span>
             </div>
             <div className="relative">
               <button
                 onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Export Laporan</span>
+                <span className="hidden sm:inline">Export</span>
               </button>
               {exportDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
@@ -397,6 +431,37 @@ export default function MonitoringPage() {
                 </div>
               )}
             </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <span className="text-sm text-gray-600">Total Hadir</span>
+              </div>
+              <p className="text-2xl font-bold text-gray-800">{totalAttendance}</p>
+            </div>
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-5 h-5 text-green-600" />
+                <span className="text-sm text-gray-600">Total Warga (Target)</span>
+              </div>
+              <p className="text-2xl font-bold text-gray-800">{totalTarget}</p>
+            </div>
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-5 h-5 text-purple-600" />
+                <span className="text-sm text-gray-600">Capaian</span>
+              </div>
+              <p className="text-2xl font-bold text-gray-800">{attendancePercentage}%</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Month Filter */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4 text-indigo-600" />
+            <span className="font-semibold text-gray-800 text-sm">Pilih Bulan</span>
           </div>
           <div className="grid grid-cols-6 gap-1.5">
             {months.map(m => (
@@ -505,38 +570,42 @@ export default function MonitoringPage() {
             </div>
           </div>
 
-          {/* Chart 2: Per-RW Bar Chart */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Pemeriksaan per RW</span>
-              </div>
-              <span className="text-xs text-gray-500">Bulan: {monthLabels[selectedMonth]}</span>
-            </div>
-            <div className="space-y-3">
-              {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, _]) => {
-                const readings = healthReadings[rw] || {}
-                const count = readings[selectedMonth] || 0
-                const maxVal = Math.max(...Object.entries(healthReadings).map(([_, d]) => d[selectedMonth] || 0), 1)
-                const pct = maxVal > 0 ? (count / maxVal) * 100 : 0
-                return (
-                  <div key={rw} className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-gray-600 w-12">RW {rw}</span>
-                    <div className="flex-1 h-6 bg-gray-100 rounded-lg overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg transition-all duration-500 relative progress-bar"
-                        style={{ '--progress-width': `${Math.min(pct, 100)}%` } as React.CSSProperties}
-                      >
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-white">
-                          {count}
-                        </span>
+          {/* Chart 2: Per-RW Cards (like Partisipasi) */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+              <Users className="w-4 h-4 text-indigo-600" />
+              Pemeriksaan per RW
+            </h3>
+            {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, target]) => {
+              const readings = healthReadings[rw] || {}
+              const count = readings[selectedMonth] || 0
+              const pctNum = target > 0 ? Math.min((count / target) * 100, 100) : 0
+              const pct = pctNum.toFixed(1)
+              const barColor = pctNum >= 80 ? 'bg-green-500' : pctNum >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+              const badgeColor = pctNum >= 80 ? 'bg-green-100 text-green-700' : pctNum >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+              return (
+                <div key={rw} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <Target className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-800">RW {rw}</p>
+                        <p className="text-xs text-gray-500">{count} / {target} PMT</p>
                       </div>
                     </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${badgeColor}`}>{pct}%</span>
                   </div>
-                )
-              })}
-            </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                      style={{ width: `${Math.min(pctNum, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           {/* Chart 3: Monthly Trend Line Chart */}
