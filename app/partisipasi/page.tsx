@@ -328,7 +328,7 @@ export default function PartisipasiPage() {
             Partisipasi per RW
           </h3>
           {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, _]) => {
-            const hadir = elderlyAttendance[rw]?.[selectedMonth] || 0
+            const hadir = attendanceData[rw]?.[selectedMonth] || 0
             const totalResidents = residentsPerRW[rw] || 0
             const pctNum = totalResidents > 0 ? Math.min((hadir / totalResidents) * 100, 100) : 0
             const pct = pctNum.toFixed(1)
