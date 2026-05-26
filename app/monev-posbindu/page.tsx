@@ -73,19 +73,19 @@ export default function MonevPosbindu() {
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20">
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="mb-6">
-          <Link href="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+        <div className="mb-8">
+          <Link href="/" className={`inline-flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors ${isMobile ? 'text-sm' : 'text-base'}`}>
+            <ArrowLeft className={isMobile ? 'w-5 h-5' : 'w-6 h-6'} />
             Kembali
           </Link>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-4xl'} font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent`}>
             Monev Posbindu
           </h1>
-          <p className="text-gray-600 mt-1">Monitoring dan evaluasi Posbindu</p>
+          <p className={`${isMobile ? 'text-gray-600' : 'text-lg text-gray-600'} mt-2`}>Monitoring dan evaluasi Posbindu</p>
         </div>
 
         {/* Feature Cards */}
-        <div className={isMobile ? 'grid gap-3 grid-cols-1' : 'grid gap-4 grid-cols-3'}>
+        <div className={isMobile ? 'grid gap-3 grid-cols-1' : 'grid gap-6 grid-cols-3'}>
           {featureCards.map((card, index) => {
             const Icon = card.icon
             return (
@@ -109,14 +109,14 @@ export default function MonevPosbindu() {
                     </div>
                   </div>
                 ) : (
-                  <div className={`${card.bgColor} rounded-xl p-6 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 border border-white/50`}>
-                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${card.gradient} p-4 shadow-md group-hover:scale-110 transition-transform duration-300 mx-auto mb-3`}>
+                  <div className={`${card.bgColor} rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50`}>
+                    <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${card.gradient} p-5 shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto mb-4`}>
                       <Icon className="w-full h-full text-white" />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-800 group-hover:text-teal-600 transition-colors text-center">
+                    <h3 className="text-xl font-bold text-gray-800 group-hover:text-teal-600 transition-colors text-center">
                       {card.title}
                     </h3>
-                    <p className="text-sm text-gray-600 mt-2 text-center">
+                    <p className="text-base text-gray-600 mt-3 text-center">
                       {card.description}
                     </p>
                   </div>

@@ -445,17 +445,17 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20 flex flex-col">
       <div className="max-w-7xl mx-auto px-4 py-2 flex-1 flex flex-col">
         {/* Header */}
-        <div className="mb-3 mt-2">
+        <div className="mb-4 mt-3">
           <div className="text-center">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-1">
+            <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2`}>
               Selamat Datang 👋
             </h1>
-            <p className="text-xs text-gray-600">
+            <p className={`${isMobile ? 'text-xs' : 'text-base'} text-gray-600`}>
               {isGuest ? 'Tamu' : user ? (userProfile?.name || 'Pengguna') : 'Tamu'}, ayo jaga kesehatanmu
             </p>
             {!user && !isGuest && (
-              <Link href="/login" className="inline-flex items-center gap-2 mt-1 px-2 py-1 bg-teal-600 text-white text-xs font-medium rounded-full hover:bg-teal-700 transition-colors">
-                <LogIn className="w-3 h-3" />
+              <Link href="/login" className={`inline-flex items-center gap-2 mt-2 ${isMobile ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} bg-teal-600 text-white font-medium rounded-full hover:bg-teal-700 transition-colors`}>
+                <LogIn className={isMobile ? 'w-3 h-3' : 'w-4 h-4'} />
                 Masuk untuk fitur lengkap
               </Link>
             )}
@@ -521,7 +521,7 @@ export default function Home() {
         {/* Sehat Sentosa Banner Carousel - Desktop */}
         {!isMobile && (
           <div
-            className="w-full relative overflow-hidden shadow-2xl shadow-emerald-500/30 mb-4"
+            className="w-full relative overflow-hidden shadow-2xl shadow-emerald-500/30 mb-6"
             ref={carouselRef}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -533,7 +533,7 @@ export default function Home() {
             >
               {bannerImages.map((image, index) => (
                 <div key={index} className="w-full flex-shrink-0 relative">
-                  <div className="relative w-full h-72 bg-gray-200">
+                  <div className="relative w-full h-96 bg-gray-200">
                     <img
                       src={image.src}
                       alt=""
@@ -541,16 +541,16 @@ export default function Home() {
                     />
                   </div>
                   <Link href="/sehat-sentosa" className="absolute inset-0 bg-gradient-to-r from-emerald-800/90 via-emerald-700/60 to-emerald-600/30 flex items-center">
-                    <div className="px-4 sm:px-6 lg:px-8 max-w-md">
-                      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 sm:mb-3 drop-shadow-lg">
+                    <div className="px-8 sm:px-12 lg:px-16 max-w-2xl">
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4 drop-shadow-lg">
                         {image.title}
                       </h2>
-                      <p className="text-base sm:text-lg text-white drop-shadow-md mb-3 sm:mb-4 font-medium">
+                      <p className="text-lg sm:text-xl lg:text-2xl text-white drop-shadow-md mb-4 sm:mb-5 font-medium">
                         {image.subtitle}
                       </p>
-                      <span className="inline-flex items-center gap-2 bg-white text-emerald-700 px-4 py-2 rounded-full font-semibold text-sm hover:bg-emerald-50 transition-colors">
+                      <span className="inline-flex items-center gap-3 bg-white text-emerald-700 px-6 py-3 rounded-full font-semibold text-base sm:text-lg hover:bg-emerald-50 transition-colors">
                         Lihat Selengkapnya
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="w-5 h-5" />
                       </span>
                     </div>
                   </Link>
@@ -559,13 +559,13 @@ export default function Home() {
             </div>
 
             {/* Dots Indicator */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 z-10">
               {bannerImages.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`h-2 rounded-full transition-all ${
-                    currentSlide === index ? 'bg-white w-6' : 'bg-white/60 w-2'
+                  className={`h-3 rounded-full transition-all ${
+                    currentSlide === index ? 'bg-white w-8' : 'bg-white/60 w-3'
                   }`}
                   aria-label={`Go to slide ${index + 1}`}
                 />
@@ -575,7 +575,7 @@ export default function Home() {
         )}
 
         {/* Feature Cards */}
-        <div className={isMobile ? `grid gap-2 grid-cols-1 flex-1` : `grid gap-3 mb-4 ${featureCards.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <div className={isMobile ? `grid gap-2 grid-cols-1 flex-1` : `grid gap-5 mb-6 ${featureCards.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {featureCards.map((card, index) => {
             const Icon = card.icon
             if (card.isModal) {
@@ -600,14 +600,14 @@ export default function Home() {
                       </div>
                     </div>
                   ) : (
-                    <div className={`${card.bgColor} rounded-xl p-4 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 border border-white/50`}>
-                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${card.gradient} p-3 shadow-md group-hover:scale-110 transition-transform duration-300 mx-auto mb-2`}>
+                    <div className={`${card.bgColor} rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50`}>
+                      <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${card.gradient} p-4 shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto mb-3`}>
                         <Icon className="w-full h-full text-white" />
                       </div>
-                      <h3 className="text-sm font-bold text-gray-800 group-hover:text-teal-600 transition-colors text-center">
+                      <h3 className="text-lg font-bold text-gray-800 group-hover:text-teal-600 transition-colors text-center">
                         {card.title}
                       </h3>
-                      <p className="text-xs text-gray-600 mt-1 text-center">
+                      <p className="text-sm text-gray-600 mt-2 text-center">
                         {card.description}
                       </p>
                     </div>
@@ -636,14 +636,14 @@ export default function Home() {
                     </div>
                   </div>
                 ) : (
-                  <div className={`${card.bgColor} rounded-xl p-3 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 border border-white/50`}>
-                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${card.gradient} p-2 shadow-md group-hover:scale-110 transition-transform duration-300 mx-auto mb-2`}>
+                  <div className={`${card.bgColor} rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50`}>
+                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${card.gradient} p-4 shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto mb-3`}>
                       <Icon className="w-full h-full text-white" />
                     </div>
-                    <h3 className="text-sm font-bold text-gray-800 group-hover:text-teal-600 transition-colors text-center">
+                    <h3 className="text-lg font-bold text-gray-800 group-hover:text-teal-600 transition-colors text-center">
                       {card.title}
                     </h3>
-                    <p className="text-xs text-gray-600 mt-1 text-center line-clamp-1">
+                    <p className="text-sm text-gray-600 mt-2 text-center line-clamp-2">
                       {card.description}
                     </p>
                   </div>
@@ -655,11 +655,11 @@ export default function Home() {
 
         {/* Additional Features Section - only for non-admin, non-guest, and desktop */}
         {!isAdmin && !isGuest && !isMobile && (
-          <div className="bg-white rounded-2xl shadow-lg p-4 mb-4">
-            <h2 className="text-lg font-bold text-gray-800 mb-3 text-center">Fitur Lainnya</h2>
-            <div className="grid grid-cols-3 gap-3">
-              <Link href="/kalori-tracker" className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-all border border-orange-200">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 p-1.5">
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-5 text-center">Fitur Lainnya</h2>
+            <div className="grid grid-cols-3 gap-5">
+              <Link href="/kalori-tracker" className="flex flex-col items-center gap-3 p-5 rounded-xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-all border border-orange-200">
+                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 p-2.5">
                   <Activity className="w-full h-full text-white" />
                 </div>
                 <div className="text-center">
@@ -667,22 +667,22 @@ export default function Home() {
                   <p className="text-[10px] text-gray-600">Tracker</p>
                 </div>
               </Link>
-              <Link href="/deteksi-jantung" className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 p-1.5">
+              <Link href="/deteksi-jantung" className="flex flex-col items-center gap-3 p-5 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200">
+                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 p-2.5">
                   <Heart className="w-full h-full text-white" />
                 </div>
                 <div className="text-center">
-                  <h3 className="text-xs font-semibold text-gray-800">Skrining</h3>
-                  <p className="text-[10px] text-gray-600">Jantung</p>
+                  <h3 className="text-sm font-semibold text-gray-800">Skrining</h3>
+                  <p className="text-xs text-gray-600">Jantung</p>
                 </div>
               </Link>
-              <Link href="/musik-relaksasi" className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 p-1.5">
+              <Link href="/musik-relaksasi" className="flex flex-col items-center gap-3 p-5 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200">
+                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 p-2.5">
                   <PlayCircle className="w-full h-full text-white" />
                 </div>
                 <div className="text-center">
-                  <h3 className="text-xs font-semibold text-gray-800">Musik</h3>
-                  <p className="text-[10px] text-gray-600">Relaksasi</p>
+                  <h3 className="text-sm font-semibold text-gray-800">Musik</h3>
+                  <p className="text-xs text-gray-600">Relaksasi</p>
                 </div>
               </Link>
             </div>
