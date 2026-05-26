@@ -251,10 +251,11 @@ export default function Profil() {
     setSaving(true)
     console.log('[Profile] Saving profile data:', editedProfile)
     try {
-      // Update Firestore
+      // Update Firestore - only save relevant fields based on role
       const userRef = doc(db, 'users', authProfile.uid)
       console.log('[Profile] Updating document:', authProfile.uid)
-      await updateDoc(userRef, {
+      
+      const updateData: any = {
         name: editedProfile.name,
         phone: editedProfile.phone,
         birthDate: editedProfile.birthDate,
@@ -262,11 +263,19 @@ export default function Profil() {
         weight: editedProfile.weight,
         targetWeight: editedProfile.targetWeight,
         gender: editedProfile.gender,
-        rt: editedProfile.rt,
-        rw: editedProfile.rw,
-        kelurahan: editedProfile.kelurahan,
-        adminKelurahan: editedProfile.adminKelurahan || ''
-      })
+      }
+      
+      // Only add location fields based on role
+      if (editedProfile.role === 'admin') {
+        updateData.adminKelurahan = editedProfile.adminKelurahan || ''
+      } else {
+        updateData.rt = editedProfile.rt || ''
+        updateData.rw = editedProfile.rw || ''
+        updateData.kelurahan = editedProfile.kelurahan || ''
+      }
+      
+      console.log('[Profile] Update data prepared:', updateData)
+      await updateDoc(userRef, updateData)
       console.log('[Profile] Firestore update successful')
       
       setProfile({ ...editedProfile })
