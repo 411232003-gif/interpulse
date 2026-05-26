@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Home, User, Activity, Heart, Flame, Music, History, PlayCircle, Grid3x3 } from 'lucide-react'
+import { Home, User, Activity, Heart, Flame, Music, History, PlayCircle, Grid3x3, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 
-// Admin nav: Beranda + Profil
+// Admin nav: Beranda + Monev Posbindu + Profil
 const adminNavItems = [
   { href: '/', label: 'Beranda', icon: Home },
+  { href: '/monev-posbindu', label: 'Monev Posbindu', icon: BarChart3 },
   { href: '/profil', label: 'Profil', icon: User },
 ]
 
@@ -87,12 +88,15 @@ export default function Navigation() {
   const isFeatureActive = featureNavItems.some((item: { href: string }) => pathname === item.href)
 
   if (!isMobile) {
-    const allNavItems = [...mainNavItems, ...featureNavItems, { href: '/profil', label: 'Profil', icon: User }]
+    const desktopNavItems = [
+      { href: '/', label: 'Beranda', icon: Home },
+      { href: '/profil', label: 'Profil', icon: User }
+    ]
     return (
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 safe-area-bottom">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-around items-center py-2 pb-safe">
-            {allNavItems.map((item: { href: string; label: string; icon: any }) => (
+            {desktopNavItems.map((item: { href: string; label: string; icon: any }) => (
               <NavItem key={item.href} item={item} isActive={pathname === item.href} />
             ))}
           </div>
@@ -101,7 +105,7 @@ export default function Navigation() {
     )
   }
 
-  // Mobile view - Beranda, Tips, Profil
+  // Mobile view - Beranda, Profil
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 safe-area-bottom">
       <div className="max-w-lg mx-auto">
@@ -115,17 +119,6 @@ export default function Navigation() {
           >
             <Home className={cn('transition-all', pathname === '/' ? 'w-6 h-6' : 'w-5 h-5')} />
             <span className="text-[10px] font-medium mt-0.5 leading-tight">Beranda</span>
-          </Link>
-
-          <Link
-            href="/tips"
-            className={cn(
-              'flex flex-col items-center justify-center min-w-[64px] min-h-[56px] px-2 py-1 transition-all active:scale-95',
-              pathname === '/tips' || isFeatureActive ? 'text-teal-600' : 'text-gray-500'
-            )}
-          >
-            <Grid3x3 className={cn('transition-all', pathname === '/tips' || isFeatureActive ? 'w-6 h-6' : 'w-5 h-5')} />
-            <span className="text-[10px] font-medium mt-0.5 leading-tight">Tips</span>
           </Link>
 
           <Link

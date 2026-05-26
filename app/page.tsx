@@ -382,28 +382,8 @@ export default function Home() {
     isModal?: boolean
   }
 
-  // Admin feature cards - Top row
-  const adminTopCards: FeatureCard[] = [
-    {
-      title: 'Data Warga',
-      description: 'Kelola data warga dan riwayat kesehatan',
-      href: '/posbindu-monitoring',
-      icon: Users,
-      gradient: 'from-blue-500 to-cyan-500',
-      bgColor: 'bg-blue-50'
-    },
-    {
-      title: 'Input Kesehatan',
-      description: 'Catat hasil pemeriksaan kesehatan',
-      href: '/Fasca',
-      icon: Heart,
-      gradient: 'from-red-500 to-orange-500',
-      bgColor: 'bg-red-50'
-    }
-  ]
-
-  // Admin feature cards - Middle row
-  const adminMiddleCards: FeatureCard[] = [
+  // Admin feature cards - Only 3 buttons: Absensi, Input TB/BB/LP, Input Kesehatan
+  const adminCards: FeatureCard[] = [
     {
       title: 'Absensi',
       description: 'Catat kehadiran warga',
@@ -413,32 +393,20 @@ export default function Home() {
       bgColor: 'bg-teal-50'
     },
     {
-      title: 'Input TB/BB',
-      description: 'Input tinggi badan dan berat badan',
+      title: 'Input TB/BB/LP',
+      description: 'Input tinggi badan, berat badan, lingkar pinggang',
       href: '/input-tb-bb',
       icon: Scale,
       gradient: 'from-purple-500 to-pink-500',
       bgColor: 'bg-purple-50'
-    }
-  ]
-
-  // Admin feature cards - Bottom row
-  const adminBottomCards: FeatureCard[] = [
-    {
-      title: 'Trafik',
-      description: 'Export Laporan',
-      href: '/monitoring',
-      icon: Activity,
-      gradient: 'from-indigo-500 to-purple-500',
-      bgColor: 'bg-indigo-50'
     },
     {
-      title: 'Partisipasi',
-      description: 'Trafik kehadiran warga',
-      href: '/partisipasi',
-      icon: TrendingUp,
-      gradient: 'from-green-500 to-teal-500',
-      bgColor: 'bg-green-50'
+      title: 'Input Kesehatan',
+      description: 'Catat hasil pemeriksaan kesehatan',
+      href: '/Fasca',
+      icon: Heart,
+      gradient: 'from-red-500 to-orange-500',
+      bgColor: 'bg-red-50'
     }
   ]
 
@@ -471,7 +439,7 @@ export default function Home() {
     }] : [])
   ]
 
-  const featureCards: FeatureCard[] = isAdmin ? [...adminTopCards, ...adminMiddleCards, ...adminBottomCards] : userCards
+  const featureCards: FeatureCard[] = isAdmin ? adminCards : userCards
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20 flex flex-col">
@@ -493,6 +461,118 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* Sehat Sentosa Banner Carousel - Top, below welcome message */}
+        {isMobile && (
+          <div
+            className="w-full relative overflow-hidden shadow-xl shadow-emerald-500/20 mb-4"
+            ref={carouselRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div
+              className="flex transition-transform duration-500 ease-in-out carousel-slide"
+              style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
+            >
+              {bannerImages.map((image, index) => (
+                <div key={index} className="w-full flex-shrink-0 relative">
+                  <div className="relative w-full h-48 bg-gray-200">
+                    <img
+                      src={image.src}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Link href="/sehat-sentosa" className="absolute inset-0 bg-gradient-to-r from-emerald-800/90 via-emerald-700/60 to-emerald-600/30 flex items-center">
+                    <div className="px-4 max-w-md">
+                      <h2 className="text-xl font-bold text-white mb-1 drop-shadow-lg">
+                        {image.title}
+                      </h2>
+                      <p className="text-sm text-white drop-shadow-md mb-2 font-medium">
+                        {image.subtitle}
+                      </p>
+                      <span className="inline-flex items-center gap-1 bg-white text-emerald-700 px-3 py-1.5 rounded-full font-semibold text-xs hover:bg-emerald-50 transition-colors">
+                        Lihat Selengkapnya
+                        <ChevronRight className="w-4 h-4" />
+                      </span>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+
+            {/* Dots Indicator */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+              {bannerImages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`h-2 rounded-full transition-all ${
+                    currentSlide === index ? 'bg-white w-6' : 'bg-white/60 w-2'
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sehat Sentosa Banner Carousel - Desktop */}
+        {!isMobile && (
+          <div
+            className="w-full relative overflow-hidden shadow-2xl shadow-emerald-500/30 mb-4"
+            ref={carouselRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div
+              className="flex transition-transform duration-500 ease-in-out carousel-slide"
+              style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
+            >
+              {bannerImages.map((image, index) => (
+                <div key={index} className="w-full flex-shrink-0 relative">
+                  <div className="relative w-full h-72 bg-gray-200">
+                    <img
+                      src={image.src}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Link href="/sehat-sentosa" className="absolute inset-0 bg-gradient-to-r from-emerald-800/90 via-emerald-700/60 to-emerald-600/30 flex items-center">
+                    <div className="px-4 sm:px-6 lg:px-8 max-w-md">
+                      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 sm:mb-3 drop-shadow-lg">
+                        {image.title}
+                      </h2>
+                      <p className="text-base sm:text-lg text-white drop-shadow-md mb-3 sm:mb-4 font-medium">
+                        {image.subtitle}
+                      </p>
+                      <span className="inline-flex items-center gap-2 bg-white text-emerald-700 px-4 py-2 rounded-full font-semibold text-sm hover:bg-emerald-50 transition-colors">
+                        Lihat Selengkapnya
+                        <ChevronRight className="w-4 h-4" />
+                      </span>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+
+            {/* Dots Indicator */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+              {bannerImages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`h-2 rounded-full transition-all ${
+                    currentSlide === index ? 'bg-white w-6' : 'bg-white/60 w-2'
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Feature Cards */}
         <div className={isMobile ? `grid gap-2 grid-cols-1 flex-1` : `grid gap-3 mb-4 ${featureCards.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -608,120 +688,7 @@ export default function Home() {
             </div>
           </div>
         )}
-
       </div>
-
-      {/* Sehat Sentosa Banner Carousel - Full Width for Mobile (at bottom, above navigation) */}
-      {isMobile && (
-        <div
-          className="w-full relative overflow-hidden shadow-xl shadow-emerald-500/20"
-          ref={carouselRef}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div
-            className="flex transition-transform duration-500 ease-in-out carousel-slide"
-            style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
-          >
-            {bannerImages.map((image, index) => (
-              <div key={index} className="w-full flex-shrink-0 relative">
-                <div className="relative w-full h-48 bg-gray-200">
-                  <img
-                    src={image.src}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <Link href="/sehat-sentosa" className="absolute inset-0 bg-gradient-to-r from-emerald-800/90 via-emerald-700/60 to-emerald-600/30 flex items-center">
-                  <div className="px-4 max-w-md">
-                    <h2 className="text-xl font-bold text-white mb-1 drop-shadow-lg">
-                      {image.title}
-                    </h2>
-                    <p className="text-sm text-white drop-shadow-md mb-2 font-medium">
-                      {image.subtitle}
-                    </p>
-                    <span className="inline-flex items-center gap-1 bg-white text-emerald-700 px-3 py-1.5 rounded-full font-semibold text-xs hover:bg-emerald-50 transition-colors">
-                      Lihat Selengkapnya
-                      <ChevronRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-
-          {/* Dots Indicator */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-            {bannerImages.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlide(index)}
-                className={`h-2 rounded-full transition-all ${
-                  currentSlide === index ? 'bg-white w-6' : 'bg-white/60 w-2'
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Sehat Sentosa Banner Carousel - Full Width at Bottom for Desktop */}
-      {!isMobile && (
-        <div
-          className="w-full relative overflow-hidden shadow-2xl shadow-emerald-500/30"
-          ref={carouselRef}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div
-            className="flex transition-transform duration-500 ease-in-out carousel-slide"
-            style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
-          >
-            {bannerImages.map((image, index) => (
-              <div key={index} className="w-full flex-shrink-0 relative">
-                <div className="relative w-full h-72 bg-gray-200">
-                  <img
-                    src={image.src}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <Link href="/sehat-sentosa" className="absolute inset-0 bg-gradient-to-r from-emerald-800/90 via-emerald-700/60 to-emerald-600/30 flex items-center">
-                  <div className="px-4 sm:px-6 lg:px-8 max-w-md">
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 sm:mb-3 drop-shadow-lg">
-                      {image.title}
-                    </h2>
-                    <p className="text-base sm:text-lg text-white drop-shadow-md mb-3 sm:mb-4 font-medium">
-                      {image.subtitle}
-                    </p>
-                    <span className="inline-flex items-center gap-2 bg-white text-emerald-700 px-4 py-2 rounded-full font-semibold text-sm hover:bg-emerald-50 transition-colors">
-                      Lihat Selengkapnya
-                      <ChevronRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-
-          {/* Dots Indicator */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-            {bannerImages.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlide(index)}
-                className={`h-2 rounded-full transition-all ${
-                  currentSlide === index ? 'bg-white w-6' : 'bg-white/60 w-2'
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Fasca Modal */}
       {showFascaModal && step === 'select' && (
