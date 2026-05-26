@@ -41,6 +41,7 @@ export default function MonitoringPage() {
 
       snapshot.docs.forEach(doc => {
         const d = doc.data()
+        if (!d || !d.timestamp) return
         const rw = d.rw
         if (rw && data[rw]) {
           const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
@@ -70,6 +71,7 @@ export default function MonitoringPage() {
 
       snapshot.docs.forEach(doc => {
         const d = doc.data()
+        if (!d || !d.timestamp) return
         const type = d.type
         const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
         if (type && filteredTypeDist[type] !== undefined && month === selectedMonth) {
@@ -95,6 +97,7 @@ export default function MonitoringPage() {
       
       snapshot.docs.forEach(doc => {
         const d = doc.data()
+        if (!d || !d.timestamp) return
         const rw = d.rw
         if (rw && data[rw]) {
           const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
