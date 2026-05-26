@@ -20,7 +20,7 @@ const monthLabels: Record<string, string> = {
 }
 
 export default function PartisipasiPage() {
-  const [elderlyAttendance, setElderlyAttendance] = useState<Record<string, Record<string, number>>>({})
+  const [attendanceData, setAttendanceData] = useState<Record<string, Record<string, number>>>({})
   const [residentsPerRW, setResidentsPerRW] = useState<Record<string, number>>({})
   const [selectedMonth, setSelectedMonth] = useState('april')
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
@@ -42,7 +42,7 @@ export default function PartisipasiPage() {
           if (data[rw][month] !== undefined) data[rw][month]++
         }
       })
-      setElderlyAttendance(data)
+      setAttendanceData(data)
     })
     return () => unsubscribe()
   }, [])
@@ -101,7 +101,7 @@ export default function PartisipasiPage() {
   }, [selectedMonth])
 
   const totalTarget = Object.values(residentsPerRW).reduce((a, b) => a + b, 0)
-  const totalAttendance = Object.entries(elderlyAttendance).reduce((sum, [rw, months_data]) => {
+  const totalAttendance = Object.entries(attendanceData).reduce((sum, [rw, months_data]) => {
     return sum + (months_data[selectedMonth] || 0)
   }, 0)
   const overallPctNum = totalTarget > 0 ? (totalAttendance / totalTarget) * 100 : 0
@@ -126,7 +126,7 @@ export default function PartisipasiPage() {
     doc.text(`Total Hadir: ${totalAttendance} (${overallPct}%)`, 14, 58)
 
     const tableData = Object.entries(rwTargets).map(([rw, _]) => {
-      const attendance = elderlyAttendance[rw] || {}
+      const attendance = attendanceData[rw] || {}
       const count = attendance[selectedMonth] || 0
       const totalResidents = residentsPerRW[rw] || 0
       const pctNum = totalResidents > 0 ? Math.min((count / totalResidents) * 100, 100) : 0
@@ -163,7 +163,7 @@ export default function PartisipasiPage() {
 
   const exportToExcel = () => {
     const data = Object.entries(rwTargets).map(([rw, _]) => {
-      const attendance = elderlyAttendance[rw] || {}
+      const attendance = attendanceData[rw] || {}
       const count = attendance[selectedMonth] || 0
       const totalResidents = residentsPerRW[rw] || 0
       const pct = totalResidents > 0 ? Math.round((count / totalResidents) * 100) : 0
@@ -204,7 +204,7 @@ export default function PartisipasiPage() {
     message += `📋 *DATA DETAIL PER RW*\n\n`
 
     Object.entries(rwTargets).forEach(([rw, _]) => {
-      const attendance = elderlyAttendance[rw] || {}
+      const attendance = attendanceData[rw] || {}
       const count = attendance[selectedMonth] || 0
       const totalResidents = residentsPerRW[rw] || 0
       const pct = totalResidents > 0 ? Math.round((count / totalResidents) * 100) : 0
@@ -367,8 +367,8 @@ export default function PartisipasiPage() {
           </div>
           <div className="grid grid-cols-6 gap-1">
             {months.map(m => {
-              const total = Object.entries(elderlyAttendance).reduce((s, [, d]) => s + (d[m] || 0), 0)
-              const maxVal = Math.max(...months.map(mo => Object.entries(elderlyAttendance).reduce((s, [, d]) => s + (d[mo] || 0), 0)), 1)
+              const total = Object.entries(attendanceData).reduce((s, [, d]) => s + (d[m] || 0), 0)
+              const maxVal = Math.max(...months.map(mo => Object.entries(attendanceData).reduce((s, [, d]) => s + (d[mo] || 0), 0)), 1)
               const height = Math.round((total / maxVal) * 60)
               return (
                 <div key={m} className="flex flex-col items-center gap-1">

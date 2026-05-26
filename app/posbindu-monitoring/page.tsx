@@ -32,7 +32,7 @@ interface Resident {
   alamat: string
 }
 
-// Mock data for elderly attendance
+// Mock data for attendance
 const mockAttendance = {
   '01': { januari: 28, februari: 30, maret: 25, april: 32 },
   '02': { januari: 55, februari: 60, maret: 58, april: 62 },
@@ -76,7 +76,7 @@ export default function PosbinduMonitoring() {
   })
   const [userAttendance, setUserAttendance] = useState<any[]>([])
   const [showAttendanceHistory, setShowAttendanceHistory] = useState(false)
-  const [elderlyAttendance, setElderlyAttendance] = useState<Record<string, Record<string, number>>>(mockAttendance)
+  const [attendanceData, setAttendanceData] = useState<Record<string, Record<string, number>>>(mockAttendance)
   const [attendanceList, setAttendanceList] = useState<any[]>([])
   const [attendanceFilter, setAttendanceFilter] = useState({ rw: '', rt: '', search: '' })
   const [attendancePage, setAttendancePage] = useState(1)
@@ -185,7 +185,7 @@ export default function PosbinduMonitoring() {
     handleAutoFillFromProfile()
   }, [autoFillFromProfile, userProfile])
 
-  // Fetch elderly attendance from Firestore - REAL TIME SYNC
+  // Fetch attendance from Firestore - REAL TIME SYNC
   useEffect(() => {
     const attendanceRef = collection(db, 'attendance')
     const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
@@ -211,10 +211,10 @@ export default function PosbinduMonitoring() {
       })
       
       // Always use real data (even if 0), fallback to mock only on error
-      setElderlyAttendance(attendanceData)
+      setAttendanceData(attendanceData)
     }, (error) => {
-      console.error('Error fetching elderly attendance:', error)
-      setElderlyAttendance(mockAttendance)
+      console.error('Error fetching attendance:', error)
+      setAttendanceData(mockAttendance)
     })
     return () => unsubscribe()
   }, [])
@@ -785,31 +785,6 @@ export default function PosbinduMonitoring() {
         await addDoc(collection(db, 'attendance'), checkInData)
       }
       
-      // If elderly, also save/update to elderly-attendance collection for participation tracking
-      if (isElderly) {
-        const existingElderlyQuery = query(
-          collection(db, 'elderly-attendance'),
-          where('nik', '==', checkInForm.nik)
-        )
-        const existingElderlySnapshot = await getDocs(existingElderlyQuery)
-        
-        let existingElderlyDocId = null
-        existingElderlySnapshot.docs.forEach(doc => {
-          const d = doc.data()
-          const docMonth = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-          const docYear = new Date(d.timestamp).getFullYear()
-          if (docMonth === currentMonth && docYear === currentYear) {
-            existingElderlyDocId = doc.id
-          }
-        })
-        
-        if (existingElderlyDocId) {
-          await updateDoc(doc(db, 'elderly-attendance', existingElderlyDocId), checkInData)
-        } else {
-          await addDoc(collection(db, 'elderly-attendance'), checkInData)
-        }
-      }
-      
       // Fetch user's attendance history
       const attendanceQuery = query(
         collection(db, 'attendance'),
@@ -1359,8 +1334,8 @@ export default function PosbinduMonitoring() {
               </div>
               <div className="grid grid-cols-12 gap-1">
                 {['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'].map(month => {
-                  const total = Object.entries(elderlyAttendance).reduce((s, [, d]) => s + (d[month] || 0), 0)
-                  const maxVal = Math.max(...['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'].map(m => Object.entries(elderlyAttendance).reduce((s, [, d]) => s + (d[m] || 0), 0)), 1)
+                  const total = Object.entries(attendanceData).reduce((s, [, d]) => s + (d[month] || 0), 0)
+                  const maxVal = Math.max(...['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'].map(m => Object.entries(attendanceData).reduce((s, [, d]) => s + (d[m] || 0), 0)), 1)
                   const height = Math.round((total / maxVal) * 60)
                   const monthLabels: Record<string, string> = {
                     januari: 'Jan', februari: 'Feb', maret: 'Mar', april: 'Apr', mei: 'Mei', juni: 'Jun',

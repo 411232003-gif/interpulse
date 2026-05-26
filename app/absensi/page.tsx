@@ -202,31 +202,6 @@ export default function AbsensiPage() {
         await addDoc(collection(db, 'attendance'), attendanceData)
       }
       
-      // If elderly (60+), also save to elderly-attendance
-      if (resident.umur >= 60) {
-        const existingElderlyQuery = query(
-          collection(db, 'elderly-attendance'),
-          where('nik', '==', resident.nik)
-        )
-        const existingElderlySnapshot = await getDocs(existingElderlyQuery)
-        
-        let existingElderlyDocId = null
-        existingElderlySnapshot.docs.forEach(doc => {
-          const d = doc.data()
-          const docMonth = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-          const docYear = new Date(d.timestamp).getFullYear()
-          if (docMonth === currentMonth && docYear === currentYear) {
-            existingElderlyDocId = doc.id
-          }
-        })
-        
-        if (existingElderlyDocId) {
-          await updateDoc(doc(db, 'elderly-attendance', existingElderlyDocId), attendanceData)
-        } else {
-          await addDoc(collection(db, 'elderly-attendance'), attendanceData)
-        }
-      }
-      
       setShowSuccessBanner(true)
       setTimeout(() => setShowSuccessBanner(false), 4000)
     } catch (error) {

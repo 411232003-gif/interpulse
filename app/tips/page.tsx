@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Apple, Activity, Dumbbell, Heart, ArrowLeft, Lightbulb, RefreshCw } from 'lucide-react'
+import { Apple, Activity, Dumbbell, Heart, ArrowLeft, Lightbulb, RefreshCw, PlayCircle, Flame } from 'lucide-react'
 
 interface Tip {
   href: string
@@ -89,6 +89,34 @@ export default function TipsPage() {
       icon: Heart,
       description: 'Ringkasan status kebugaran',
       color: 'from-red-500 to-pink-500'
+    },
+    {
+      href: '/video-edukasi',
+      label: 'Video Edukasi',
+      icon: PlayCircle,
+      description: 'Tonton video kesehatan dan edukasi',
+      color: 'from-purple-500 to-pink-500'
+    },
+    {
+      href: '/kalori-tracker',
+      label: 'Kalori Tracker',
+      icon: Flame,
+      description: 'Tracking kalori harian',
+      color: 'from-orange-500 to-yellow-500'
+    },
+    {
+      href: '/deteksi-jantung',
+      label: 'Skrining Jantung',
+      icon: Heart,
+      description: 'Tes kesehatan jantung',
+      color: 'from-red-500 to-orange-500'
+    },
+    {
+      href: '/musik-relaksasi',
+      label: 'Musik Relaksasi',
+      icon: PlayCircle,
+      description: 'Musik untuk relaksasi',
+      color: 'from-indigo-500 to-purple-500'
     }
   ]
 

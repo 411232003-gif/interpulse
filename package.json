@@ -6,7 +6,9 @@
     "dev": "rm -rf dist .next && next dev -p 3002",
     "build": "cp next.config.build.js next.config.js && rm -rf dist .next && next build",
     "start": "next start -p 3002",
-    "lint": "next lint"
+    "lint": "next lint",
+    "cleanup:old-data": "node cleanup-old-data.js",
+    "clear:firestore": "node clear-firestore.js"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",
