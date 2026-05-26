@@ -643,8 +643,8 @@ export default function CatatKesehatan() {
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Akses Ditolak</h2>
           <p className="text-gray-600 mb-6">Halaman ini hanya dapat diakses oleh admin.</p>
-          <button onClick={() => router.push('/')} className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium">
-            Kembali ke Beranda
+          <button onClick={() => router.push('/monev-posbindu')} className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium">
+            Kembali ke Monev Posbindu
           </button>
         </div>
       </div>
@@ -661,7 +661,7 @@ export default function CatatKesehatan() {
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <button onClick={() => router.push('/')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
+                <button onClick={() => router.push('/monev-posbindu')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
                 <h1 className="text-2xl font-bold text-gray-800">Input Kesehatan Warga</h1>
               </div>
               <div className="text-right">

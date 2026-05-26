@@ -343,7 +343,7 @@ export default function MonitoringPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-b-3xl shadow-lg">
         <div className="flex items-center gap-3 mb-1">
-          <Link href="/" className="text-indigo-200 hover:text-white text-sm">← Beranda</Link>
+          <Link href="/monev-posbindu" className="text-indigo-200 hover:text-white text-sm">← Monev Posbindu</Link>
         </div>
         <h1 className="text-2xl font-bold">Laporan</h1>
         <p className="text-indigo-100 text-sm mt-1">Pantau data kesehatan warga</p>

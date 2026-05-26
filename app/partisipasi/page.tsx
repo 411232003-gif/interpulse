@@ -225,7 +225,7 @@ export default function PartisipasiPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-teal-600 text-white p-6 rounded-b-3xl shadow-lg">
         <div className="flex items-center gap-3 mb-1">
-          <Link href="/" className="text-green-200 hover:text-white text-sm">← Beranda</Link>
+          <Link href="/monev-posbindu" className="text-green-200 hover:text-white text-sm">← Monev Posbindu</Link>
         </div>
         <h1 className="text-2xl font-bold">Partisipasi</h1>
         <p className="text-green-100 text-sm mt-1">Trafik kehadiran warga Posbindu</p>

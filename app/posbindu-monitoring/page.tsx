@@ -775,9 +775,9 @@ export default function PosbinduMonitoring() {
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-b-3xl shadow-lg">
         <div className="flex items-center gap-4 mb-2">
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/monev-posbindu')}
             className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            title="Kembali ke Beranda"
+            title="Kembali ke Monev Posbindu"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
