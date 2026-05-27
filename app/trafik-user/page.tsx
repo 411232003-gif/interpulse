@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Activity, Users, Download, FileText, MessageCircle, Calendar, Heart, Droplet, Thermometer, Target } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Activity, Users, Download, FileText, MessageCircle, Calendar, Heart, Droplet, Thermometer, Target, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -16,6 +17,7 @@ const monthLabels: Record<string, string> = {
 }
 
 export default function TrafikUser() {
+  const router = useRouter()
   const { userProfile, loading: authLoading } = useAuth()
   const [healthReadings, setHealthReadings] = useState<any[]>([])
   const [rwHealthData, setRwHealthData] = useState<Record<string, number>>({})
@@ -192,9 +194,18 @@ export default function TrafikUser() {
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Trafik Kesehatan</h1>
-          <p className="text-gray-600 mt-1">Riwayat kesehatan pribadi dan trafik RW {userProfile?.rw}</p>
+        <div className="mb-6 flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="p-2 rounded-lg bg-white shadow-md hover:bg-gray-50 transition-colors"
+            title="Kembali"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">Trafik Kesehatan</h1>
+            <p className="text-gray-600 mt-1">Riwayat kesehatan pribadi dan trafik RW {userProfile?.rw}</p>
+          </div>
         </div>
 
         {/* Month Selector */}
