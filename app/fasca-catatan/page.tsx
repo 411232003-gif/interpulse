@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import BigNumpad from '@/components/BigNumpad'
-import { Activity, CheckCircle, AlertCircle, XCircle, Download, MoreVertical, FileText, MessageCircle, Trash2 } from 'lucide-react'
+import { Activity, CheckCircle, AlertCircle, XCircle, Download, MoreVertical, FileText, MessageCircle, Trash2, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -289,9 +289,18 @@ export default function FascaCatatan() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-800">FASCA</h1>
-            <p className="text-gray-600 mt-1">Fasilitas Catatan - Catatan Kesehatan Pribadi</p>
+          <div className="mb-6 flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="p-2 rounded-lg bg-white shadow-md hover:bg-gray-50 transition-colors"
+              title="Kembali"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">FASCA</h1>
+              <p className="text-gray-600 mt-1">Fasilitas Catatan - Catatan Kesehatan Pribadi</p>
+            </div>
           </div>
 
           {/* Health Type Selection */}

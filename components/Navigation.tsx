@@ -28,6 +28,7 @@ const getUserFeatureNavItems = () => [
   { href: '/riwayat-tensi', label: 'Kesehatan', icon: History },
   { href: '/video-edukasi', label: 'Video', icon: PlayCircle },
   { href: '/musik-relaksasi', label: 'Musik', icon: Music },
+  { href: '/fasca-catatan', label: 'FASCA', icon: FileText },
 ]
 
 
@@ -106,9 +107,10 @@ export default function Navigation() {
     )
   }
 
-  // Mobile view - Beranda, Profil
+  // Mobile view - Beranda, Trafik, Profil
   const mobileNavItems = [
     { href: '/', label: 'Beranda', icon: Home },
+    { href: '/trafik-user', label: 'Trafik', icon: TrendingUp },
     { href: '/profil', label: 'Profil', icon: User },
   ]
 

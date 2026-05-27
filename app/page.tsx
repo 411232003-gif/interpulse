@@ -430,14 +430,6 @@ export default function Home() {
       bgColor: 'bg-teal-50'
     }] : []),
     ...(user ? [{
-      title: 'Absensi',
-      description: 'Catat kehadiran Posbindu',
-      href: '/posbindu-monitoring',
-      icon: Activity,
-      gradient: 'from-blue-500 to-indigo-500',
-      bgColor: 'bg-blue-50'
-    }] : []),
-    ...(user ? [{
       title: 'Riwayat Kesehatan',
       description: 'Lihat riwayat data kesehatan',
       href: '/riwayat-tensi',
