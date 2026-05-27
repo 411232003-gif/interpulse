@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight, Users, TrendingUp, LogIn, CheckCircle, AlertCircle, XCircle, PlusCircle, Calendar, Ruler, Scale } from 'lucide-react'
+import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight, Users, TrendingUp, LogIn, CheckCircle, AlertCircle, XCircle, PlusCircle, Calendar, Ruler, Scale, FileText } from 'lucide-react'
 import BigNumpad from '@/components/BigNumpad'
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -413,20 +413,27 @@ export default function Home() {
   // User/guest feature cards - ordered vertically for mobile
   const userCards: FeatureCard[] = isGuest ? [] : [
     {
-      title: 'Input Kesehatan',
-      description: 'Catat data kesehatan',
-      href: '#',
-      icon: Heart,
-      gradient: 'from-red-500 to-orange-500',
-      bgColor: 'bg-red-50',
-      isModal: true
+      title: 'FASCA',
+      description: 'Fasilitas Catatan Kesehatan',
+      href: '/fasca-catatan',
+      icon: FileText,
+      gradient: 'from-purple-500 to-pink-500',
+      bgColor: 'bg-purple-50'
+    },
+    {
+      title: 'Trafik',
+      description: 'Trafik kesehatan RW',
+      href: '/trafik-user',
+      icon: TrendingUp,
+      gradient: 'from-teal-500 to-cyan-500',
+      bgColor: 'bg-teal-50'
     },
     ...(user ? [{
       title: 'Absensi',
       description: 'Catat kehadiran Posbindu',
       href: '/posbindu-monitoring',
       icon: Activity,
-      gradient: 'from-blue-500 to-cyan-500',
+      gradient: 'from-blue-500 to-indigo-500',
       bgColor: 'bg-blue-50'
     }] : []),
     ...(user ? [{
