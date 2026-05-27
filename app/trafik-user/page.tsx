@@ -30,10 +30,14 @@ export default function TrafikUser() {
 
     const healthReadingsRef = collection(db, 'healthReadings')
     const q = query(healthReadingsRef, where('nik', '==', userProfile.nik))
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      console.log('[TrafikUser] User health readings loaded:', data.length, 'items')
+      console.log('[TrafikUser] User health readings loaded:', {
+        userNIK: userProfile.nik,
+        count: data.length,
+        items: data.map(d => ({ type: d.type, timestamp: d.timestamp, source: d.source, rw: d.rw }))
+      })
       setHealthReadings(data)
     })
 
@@ -49,15 +53,28 @@ export default function TrafikUser() {
       const data: Record<string, number> = {}
       months.forEach(m => { data[m] = 0 })
 
+      let totalDocs = 0
+      let matchedDocs = 0
+
       snapshot.docs.forEach(doc => {
         const d = doc.data()
+        totalDocs++
         if (!d || !d.timestamp) return
         const rw = d.rw
-        // Only aggregate data for user's RW
-        if (rw === userProfile.rw) {
+        const source = d.source
+        // Only aggregate data for user's RW and from posbindu (admin input)
+        if (rw === userProfile.rw && source === 'posbindu') {
+          matchedDocs++
           const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
           if (data[month] !== undefined) data[month]++
         }
+      })
+
+      console.log('[TrafikUser] RW health data aggregation:', {
+        userRW: userProfile.rw,
+        totalDocs,
+        matchedDocs,
+        result: data
       })
 
       setRwHealthData(data)
