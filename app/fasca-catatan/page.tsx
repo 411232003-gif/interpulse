@@ -292,7 +292,6 @@ export default function FascaCatatan() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-800">FASCA</h1>
             <p className="text-gray-600 mt-1">Fasilitas Catatan - Catatan Kesehatan Pribadi</p>
-            <p className="text-sm text-orange-600 mt-2">⚠️ Data hanya tersimpan di browser dan akan hilang saat logout</p>
           </div>
 
           {/* Health Type Selection */}
