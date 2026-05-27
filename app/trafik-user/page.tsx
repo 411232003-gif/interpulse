@@ -41,7 +41,7 @@ export default function TrafikUser() {
     const q = query(healthReadingsRef, where('nik', '==', userProfile.nik))
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as HealthReading[]
       console.log('[TrafikUser] User health readings loaded:', {
         userNIK: userProfile.nik,
         count: data.length,
