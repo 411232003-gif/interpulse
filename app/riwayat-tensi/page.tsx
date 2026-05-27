@@ -114,44 +114,12 @@ export default function RiwayatKesehatan() {
     applyFilters()
   }, [readings, searchTerm, filters, activeTab])
 
-  // Auto-cleanup: Hapus data pribadi yang lebih dari 7 hari
-  useEffect(() => {
-    const cleanupOldPribadiData = async () => {
-      try {
-        const sevenDaysAgo = new Date()
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-        
-        const oldPribadiQuery = query(
-          collection(db, 'healthReadings'),
-          where('source', '==', 'pribadi'),
-          where('timestamp', '<', sevenDaysAgo.toISOString())
-        )
-        
-        const snapshot = await getDocs(oldPribadiQuery)
-        const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref))
-        await Promise.all(deletePromises)
-        
-        if (deletePromises.length > 0) {
-          console.log(`Cleaned up ${deletePromises.length} old pribadi records`)
-        }
-      } catch (error) {
-        console.error('Error cleaning up old pribadi data:', error)
-      }
-    }
-    
-    // Run cleanup on mount and every hour
-    cleanupOldPribadiData()
-    const interval = setInterval(cleanupOldPribadiData, 60 * 60 * 1000) // 1 hour
-    
-    return () => clearInterval(interval)
-  }, [])
-
   const loadReadings = () => {
     setIsLoading(true)
-    
+
     try {
       // Build query based on user role
-      // Riwayat menampilkan semua data kesehatan user (baik dari posbindu maupun input sendiri)
+      // Riwayat menampilkan data kesehatan dari Posbindu (input oleh admin)
       let q
       if (isAdmin) {
         // Admin sees all posbindu data
@@ -161,10 +129,11 @@ export default function RiwayatKesehatan() {
           orderBy('timestamp', 'desc')
         )
       } else if (userProfile?.uid) {
-        // User sees all their health data (both posbindu and personal input)
+        // User sees only their posbindu data (input by admin)
         q = query(
           collection(db, 'healthReadings'),
           where('userId', '==', userProfile.uid),
+          where('source', '==', 'posbindu'),
           orderBy('timestamp', 'desc')
         )
       } else {
