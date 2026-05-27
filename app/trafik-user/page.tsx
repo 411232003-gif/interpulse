@@ -16,6 +16,15 @@ const monthLabels: Record<string, string> = {
   juli:'Jul', agustus:'Agu', september:'Sep', oktober:'Okt', november:'Nov', desember:'Des'
 }
 
+interface HealthReading {
+  id: string
+  type: string
+  timestamp: string
+  source: string
+  rw: string
+  [key: string]: any
+}
+
 export default function TrafikUser() {
   const router = useRouter()
   const { userProfile, loading: authLoading } = useAuth()
