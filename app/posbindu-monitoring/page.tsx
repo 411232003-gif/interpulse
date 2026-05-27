@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle, Download, FileText, MessageSquare, ChevronDown } from 'lucide-react'
+import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle, Download, FileText, MessageSquare, ChevronDown, Info, ArrowRight } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
@@ -45,7 +45,7 @@ const mockAttendance = {
 export default function PosbinduMonitoring() {
   const router = useRouter()
   const { isAdmin, userProfile } = useAuth()
-  const [activeTab, setActiveTab] = useState<'datawarga' | 'riwayat' | 'absen'>(isAdmin ? 'datawarga' : 'absen')
+  const [activeTab, setActiveTab] = useState<'datawarga' | 'riwayat' | 'riwayat-kesehatan' | 'absen'>(isAdmin ? 'datawarga' : 'absen')
   const [autoFillFromProfile, setAutoFillFromProfile] = useState(false)
   const [filterRW, setFilterRW] = useState<string>('')
   const [filterRT, setFilterRT] = useState<string>('')
@@ -859,6 +859,15 @@ export default function PosbinduMonitoring() {
               <Calendar className="w-4 h-4 flex-shrink-0" />
               <span className="text-sm">Absensi</span>
             </button>
+            <button
+              onClick={() => setActiveTab('riwayat-kesehatan')}
+              className={`flex-1 py-3 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'riwayat-kesehatan' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Activity className="w-4 h-4 flex-shrink-0" />
+              <span className="text-sm">Riwayat Kesehatan</span>
+            </button>
           </div>
         </div>
       )}
@@ -1321,6 +1330,42 @@ export default function PosbinduMonitoring() {
                 </div>
               </div>
             </div>
+        )}
+
+        {/* Riwayat Kesehatan Tab - Only for Admin */}
+        {isAdmin && activeTab === 'riwayat-kesehatan' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-md">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-semibold text-gray-800">Riwayat Kesehatan Warga</h3>
+                </div>
+                <Link
+                  href="/riwayat-tensi"
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Lihat Detail Lengkap
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+              <p className="text-gray-600 text-sm mb-4">
+                Lihat riwayat lengkap data kesehatan warga di halaman Riwayat Kesehatan.
+              </p>
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-800 font-medium">Informasi</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Data kesehatan yang diinput oleh admin saat Posbindu tersimpan di sini.
+                      Anda dapat melihat, filter, dan export data kesehatan semua warga.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Absen Tab - Only for non-admin */}
