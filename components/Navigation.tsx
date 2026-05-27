@@ -106,11 +106,9 @@ export default function Navigation() {
     )
   }
 
-  // Mobile view - Beranda, FASCA, Trafik, Profil
+  // Mobile view - Beranda, Profil
   const mobileNavItems = [
     { href: '/', label: 'Beranda', icon: Home },
-    { href: '/fasca-catatan', label: 'FASCA', icon: FileText },
-    { href: '/trafik-user', label: 'Trafik', icon: TrendingUp },
     { href: '/profil', label: 'Profil', icon: User },
   ]
 

@@ -420,14 +420,15 @@ export default function Home() {
       gradient: 'from-purple-500 to-pink-500',
       bgColor: 'bg-purple-50'
     },
-    {
+    // Trafik only on desktop
+    ...(!isMobile ? [{
       title: 'Trafik',
       description: 'Trafik kesehatan RW',
       href: '/trafik-user',
       icon: TrendingUp,
       gradient: 'from-teal-500 to-cyan-500',
       bgColor: 'bg-teal-50'
-    },
+    }] : []),
     ...(user ? [{
       title: 'Absensi',
       description: 'Catat kehadiran Posbindu',
