@@ -221,9 +221,30 @@ export default function Profil() {
     const savedAchievements = localStorage.getItem('achievements')
     const savedTargets = localStorage.getItem('progressTargets')
     
-    if (savedHealth) setHealthData(JSON.parse(savedHealth))
-    if (savedAchievements) setAchievements(JSON.parse(savedAchievements))
-    if (savedTargets) setProgressTargets(JSON.parse(savedTargets))
+    if (savedHealth) {
+      try {
+        setHealthData(JSON.parse(savedHealth))
+      } catch (e) {
+        console.error('Error parsing healthData:', e)
+        localStorage.removeItem('healthData')
+      }
+    }
+    if (savedAchievements) {
+      try {
+        setAchievements(JSON.parse(savedAchievements))
+      } catch (e) {
+        console.error('Error parsing achievements:', e)
+        localStorage.removeItem('achievements')
+      }
+    }
+    if (savedTargets) {
+      try {
+        setProgressTargets(JSON.parse(savedTargets))
+      } catch (e) {
+        console.error('Error parsing progressTargets:', e)
+        localStorage.removeItem('progressTargets')
+      }
+    }
   }, [authProfile])
 
   // Save local data to localStorage

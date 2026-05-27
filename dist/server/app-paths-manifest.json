@@ -1,7 +1,0 @@
-{
-  "/monitoring/page": "app/monitoring/page.js",
-  "/monev-posbindu/page": "app/monev-posbindu/page.js",
-  "/Fasca/page": "app/Fasca/page.js",
-  "/posbindu-monitoring/page": "app/posbindu-monitoring/page.js",
-  "/partisipasi/page": "app/partisipasi/page.js"
-}

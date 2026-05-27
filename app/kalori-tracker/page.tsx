@@ -126,15 +126,30 @@ export default function KaloriTracker() {
     const savedCustomFoods = localStorage.getItem('kaloriCustomFoods')
     
     if (savedFoods) {
-      setFoodItems(JSON.parse(savedFoods))
+      try {
+        setFoodItems(JSON.parse(savedFoods))
+      } catch (e) {
+        console.error('Error parsing kaloriFoods:', e)
+        localStorage.removeItem('kaloriFoods')
+      }
     }
     
     if (savedProfile) {
-      setProfile(JSON.parse(savedProfile))
+      try {
+        setProfile(JSON.parse(savedProfile))
+      } catch (e) {
+        console.error('Error parsing kaloriProfile:', e)
+        localStorage.removeItem('kaloriProfile')
+      }
     }
     
     if (savedCustomFoods) {
-      setCustomFoods(JSON.parse(savedCustomFoods))
+      try {
+        setCustomFoods(JSON.parse(savedCustomFoods))
+      } catch (e) {
+        console.error('Error parsing kaloriCustomFoods:', e)
+        localStorage.removeItem('kaloriCustomFoods')
+      }
     }
   }, [])
 

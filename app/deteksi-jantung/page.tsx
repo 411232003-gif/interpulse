@@ -426,7 +426,14 @@ export default function HealthTools() {
   // Load medicines from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('medicineReminders')
-    if (saved) setMedicines(JSON.parse(saved))
+    if (saved) {
+      try {
+        setMedicines(JSON.parse(saved))
+      } catch (e) {
+        console.error('Error parsing medicineReminders:', e)
+        localStorage.removeItem('medicineReminders')
+      }
+    }
   }, [])
 
   // Save medicines to localStorage
