@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { Users, Activity, TrendingUp } from 'lucide-react'
+import { Users, Activity } from 'lucide-react'
 
 export default function MonevPosbindu() {
   const { isAdmin, loading } = useAuth()
@@ -58,14 +58,6 @@ export default function MonevPosbindu() {
       icon: Activity,
       gradient: 'from-indigo-500 to-purple-500',
       bgColor: 'bg-indigo-50'
-    },
-    {
-      title: 'Partisipasi',
-      description: 'Trafik kehadiran warga',
-      href: '/partisipasi',
-      icon: TrendingUp,
-      gradient: 'from-green-500 to-teal-500',
-      bgColor: 'bg-green-50'
     }
   ]
 
@@ -81,7 +73,7 @@ export default function MonevPosbindu() {
         </div>
 
         {/* Feature Cards */}
-        <div className={isMobile ? 'grid gap-3 grid-cols-1' : 'grid gap-6 grid-cols-3'}>
+        <div className={isMobile ? 'grid gap-3 grid-cols-1' : 'grid gap-6 grid-cols-2'}>
           {featureCards.map((card, index) => {
             const Icon = card.icon
             return (
