@@ -1055,6 +1055,7 @@ export default function MonitoringPage() {
                   value={filterRW}
                   onChange={(e) => setFilterRW(e.target.value)}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  title="Filter RW"
                 >
                   <option value="all">Semua RW</option>
                   {Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b)).map(rw => (
@@ -1068,6 +1069,7 @@ export default function MonitoringPage() {
                   value={filterRT}
                   onChange={(e) => setFilterRT(e.target.value)}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  title="Filter RT"
                 >
                   <option value="all">Semua RT</option>
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rt => (
@@ -1081,6 +1083,7 @@ export default function MonitoringPage() {
                   value={filterHealthType}
                   onChange={(e) => setFilterHealthType(e.target.value)}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  title="Filter Jenis Pemeriksaan"
                 >
                   <option value="kolesterol">Kolesterol</option>
                   <option value="tensi">Tensi</option>
@@ -1095,6 +1098,8 @@ export default function MonitoringPage() {
                   value={filterDate}
                   onChange={(e) => setFilterDate(e.target.value)}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  title="Filter Tanggal"
+                  placeholder="Pilih tanggal"
                 />
               </div>
             </div>
@@ -1151,6 +1156,7 @@ export default function MonitoringPage() {
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="w-full sm:w-48 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                title="Filter Bulan"
               >
                 {months.map(m => (
                   <option key={m} value={m}>{monthLabels[m]}</option>
@@ -1225,6 +1231,7 @@ export default function MonitoringPage() {
                     value={tableFilterRT}
                     onChange={(e) => setTableFilterRT(e.target.value)}
                     className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    title="Filter RT Tabel"
                   >
                     <option value="all">Semua RT</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rt => (
