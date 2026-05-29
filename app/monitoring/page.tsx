@@ -30,6 +30,16 @@ export default function MonitoringPage() {
   const [selectedMonth, setSelectedMonth] = useState('april')
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
   const [rwExportDropdown, setRwExportDropdown] = useState<string | null>(null)
+  
+  // Filters for health examination chart
+  const [filterRW, setFilterRW] = useState<string>('all')
+  const [filterRT, setFilterRT] = useState<string>('all')
+  const [filterHealthType, setFilterHealthType] = useState<string>('kolesterol')
+  const [filterDate, setFilterDate] = useState<string>('')
+  
+  // Filters for data table
+  const [tableFilterRT, setTableFilterRT] = useState<string>('all')
+  const [tableSearchTerm, setTableSearchTerm] = useState<string>('')
 
   // Fetch health readings data from healthReadings collection
   useEffect(() => {
@@ -138,6 +148,128 @@ export default function MonitoringPage() {
     })
     return () => unsubscribe()
   }, [])
+
+  // Fetch TB/BB data
+  const [tbbbData, setTbbbData] = useState<Record<string, any[]>>({})
+  useEffect(() => {
+    const tbbbRef = collection(db, 'tbbb')
+    const unsubscribe = onSnapshot(tbbbRef, (snapshot) => {
+      const data: Record<string, any[]> = {}
+      Object.keys(rwTargets).forEach(rw => {
+        data[rw] = []
+      })
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        let rw = d.rw
+        if (rw !== undefined) {
+          rw = String(rw).padStart(2, '0')
+        }
+        if (rw && data[rw]) {
+          data[rw].push({ ...d, id: doc.id })
+        }
+      })
+      setTbbbData(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Health status calculation functions
+  const getHealthStatus = (type: string, value: number) => {
+    if (type === 'kolesterol') {
+      if (value < 200) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
+      if (value < 240) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
+      return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
+    }
+    if (type === 'tensi') {
+      if (value < 120) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
+      if (value < 140) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
+      return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
+    }
+    if (type === 'guladarah') {
+      if (value < 100) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
+      if (value < 126) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
+      return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
+    }
+    if (type === 'asamurat') {
+      if (value < 7) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
+      if (value < 9) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
+      return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
+    }
+    return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
+  }
+
+  // Calculate health status distribution for filtered data
+  const getHealthStatusDistribution = () => {
+    const distribution = { rendah: 0, normal: 0, batas: 0, tinggi: 0 }
+    
+    Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
+      if (filterRW !== 'all' && rw !== filterRW) return
+      
+      readings.forEach(reading => {
+        if (reading.type !== filterHealthType) return
+        
+        const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+        if (filterDate && new Date(reading.timestamp).toISOString().split('T')[0] !== filterDate) return
+        
+        const value = reading.value || 0
+        const status = getHealthStatus(filterHealthType, value)
+        
+        if (status.status === 'Normal') distribution.normal++
+        else if (status.status === 'Batas') distribution.batas++
+        else if (status.status === 'Tinggi') distribution.tinggi++
+        else distribution.rendah++
+      })
+    })
+    
+    return distribution
+  }
+
+  // Calculate participation per RW for selected month
+  const getParticipationData = () => {
+    const data: Record<string, number> = {}
+    Object.keys(rwTargets).forEach(rw => {
+      data[rw] = 0
+    })
+    
+    Object.entries(attendanceData).forEach(([rw, months]) => {
+      data[rw] = months[selectedMonth] || 0
+    })
+    
+    return data
+  }
+
+  // Get filtered table data
+  const getTableData = () => {
+    const data: any[] = []
+    
+    Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
+      readings.forEach(reading => {
+        const resident = residentsData[reading.userId] || residentsData[reading.nik] || {}
+        
+        // Filter by RT
+        if (tableFilterRT !== 'all' && resident.rt !== tableFilterRT) return
+        
+        // Filter by search term
+        if (tableSearchTerm) {
+          const searchLower = tableSearchTerm.toLowerCase()
+          const matchesName = resident.nama?.toLowerCase().includes(searchLower)
+          const matchesNIK = resident.nik?.includes(searchLower)
+          if (!matchesName && !matchesNIK) return
+        }
+        
+        data.push({
+          nik: resident.nik || reading.nik || '-',
+          nama: resident.nama || reading.nama || '-',
+          tensi: reading.type === 'tensi' ? reading.value : '-',
+          kolesterol: reading.type === 'kolesterol' ? reading.value : '-',
+          asamurat: reading.type === 'asamurat' ? reading.value : '-',
+          guladarah: reading.type === 'guladarah' ? reading.value : '-',
+        })
+      })
+    })
+    
+    return data
+  }
 
   // Fetch detailed health readings for per-RW export
   useEffect(() => {
@@ -901,6 +1033,279 @@ export default function MonitoringPage() {
                   </span>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* New Chart 1: Grafik Hasil Pemeriksaan with Filters */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-indigo-600" />
+                <span className="font-semibold text-gray-800 text-sm">Grafik Hasil Pemeriksaan</span>
+              </div>
+              <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                Export
+              </button>
+            </div>
+            {/* Filters */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">RW</label>
+                <select
+                  value={filterRW}
+                  onChange={(e) => setFilterRW(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">Semua RW</option>
+                  {Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b)).map(rw => (
+                    <option key={rw} value={rw}>RW {rw}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">RT</label>
+                <select
+                  value={filterRT}
+                  onChange={(e) => setFilterRT(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">Semua RT</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rt => (
+                    <option key={rt} value={String(rt)}>RT {rt}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Jenis Pemeriksaan</label>
+                <select
+                  value={filterHealthType}
+                  onChange={(e) => setFilterHealthType(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="kolesterol">Kolesterol</option>
+                  <option value="tensi">Tensi</option>
+                  <option value="guladarah">Gula Darah</option>
+                  <option value="asamurat">Asam Urat</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Tanggal</label>
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+            {/* Bar Chart */}
+            <div className="h-48">
+              {(() => {
+                const distribution = getHealthStatusDistribution()
+                const maxVal = Math.max(distribution.rendah, distribution.normal, distribution.batas, distribution.tinggi, 1)
+                const labels = ['Rendah', 'Normal', 'Batas', 'Tinggi']
+                const values = [distribution.rendah, distribution.normal, distribution.batas, distribution.tinggi]
+                const colors = ['rgba(54, 162, 235, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(255, 206, 86, 0.6)', 'rgba(255, 99, 132, 0.6)']
+                const borderColors = ['rgba(54, 162, 235, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 206, 86, 1)', 'rgba(255, 99, 132, 1)']
+                
+                return (
+                  <div className="flex items-end justify-around h-full gap-2">
+                    {labels.map((label, i) => {
+                      const height = (values[i] / maxVal) * 160
+                      return (
+                        <div key={label} className="flex flex-col items-center flex-1">
+                          <span className="text-xs font-medium text-gray-600 mb-1">{values[i]}</span>
+                          <div
+                            className="w-full rounded-t-lg transition-all duration-300"
+                            style={{
+                              height: `${height}px`,
+                              backgroundColor: colors[i],
+                              border: `2px solid ${borderColors[i]}`
+                            }}
+                          />
+                          <span className="text-xs text-gray-500 mt-2">{label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* New Chart 2: Grafik Partisipasi Warga (Line Chart) */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-600" />
+                <span className="font-semibold text-gray-800 text-sm">Grafik Partisipasi Warga</span>
+              </div>
+              <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                Export
+              </button>
+            </div>
+            {/* Month Filter */}
+            <div className="mb-4">
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Bulan</label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full sm:w-48 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {months.map(m => (
+                  <option key={m} value={m}>{monthLabels[m]}</option>
+                ))}
+              </select>
+            </div>
+            {/* Line Chart */}
+            <div className="h-48">
+              {(() => {
+                const participationData = getParticipationData()
+                const rwList = Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b))
+                const maxVal = Math.max(...Object.values(participationData), 1)
+                const dataPoints = rwList.map((rw, i) => {
+                  const count = participationData[rw] || 0
+                  const y = 160 - ((count / maxVal) * 140)
+                  const x = (i / (rwList.length - 1)) * 280 + 10
+                  return { x, y, count, rw }
+                })
+                const pathD = dataPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+                const areaD = `${pathD} L ${dataPoints[dataPoints.length - 1].x} 160 L ${dataPoints[0].x} 160 Z`
+                
+                return (
+                  <div className="relative h-full">
+                    {/* Grid lines */}
+                    <div className="absolute inset-0 flex flex-col justify-between">
+                      <div className="border-b border-gray-200"></div>
+                      <div className="border-b border-gray-200"></div>
+                      <div className="border-b border-gray-200"></div>
+                      <div className="border-b border-gray-200"></div>
+                    </div>
+                    <svg className="w-full h-full" viewBox="0 0 300 180" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="participationGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <path d={areaD} fill="url(#participationGradient)" />
+                      <path d={pathD} fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      {dataPoints.map((p, i) => (
+                        <g key={i}>
+                          <circle cx={p.x} cy={p.y} r={4} fill="#8b5cf6" stroke="#fff" strokeWidth="2" />
+                          <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="8" fill="#6b7280">{p.count}</text>
+                        </g>
+                      ))}
+                    </svg>
+                    {/* X-axis labels */}
+                    <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
+                      {rwList.map((rw) => (
+                        <span key={rw} className="text-[8px] text-gray-400">
+                          RW {rw}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* New Chart 3: Data Table with Filters */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-indigo-600" />
+                <span className="font-semibold text-gray-800 text-sm">Data Kesehatan Warga</span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-600">RT</label>
+                  <select
+                    value={tableFilterRT}
+                    onChange={(e) => setTableFilterRT(e.target.value)}
+                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="all">Semua RT</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rt => (
+                      <option key={rt} value={String(rt)}>RT {rt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-600">Nama / NIK</label>
+                  <input
+                    type="text"
+                    value={tableSearchTerm}
+                    onChange={(e) => setTableSearchTerm(e.target.value)}
+                    placeholder="Cari..."
+                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-32"
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">NIK</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Nama Warga</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Tensi (mmHg)</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Kolesterol (mg/dL)</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Asam Urat (mg/dL)</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Gula Darah (mg/dL)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getTableData().slice(0, 10).map((row, i) => (
+                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-3 py-2 text-gray-600">{row.nik}</td>
+                      <td className="px-3 py-2 font-medium text-gray-800">{row.nama}</td>
+                      <td className="px-3 py-2">
+                        {row.tensi !== '-' ? (
+                          <span className="flex items-center gap-1">
+                            {row.tensi}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getHealthStatus('tensi', row.tensi).textColor} ${getHealthStatus('tensi', row.tensi).color}`}>
+                              {getHealthStatus('tensi', row.tensi).status}
+                            </span>
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.kolesterol !== '-' ? (
+                          <span className="flex items-center gap-1">
+                            {row.kolesterol}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getHealthStatus('kolesterol', row.kolesterol).textColor} ${getHealthStatus('kolesterol', row.kolesterol).color}`}>
+                              {getHealthStatus('kolesterol', row.kolesterol).status}
+                            </span>
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.asamurat !== '-' ? (
+                          <span className="flex items-center gap-1">
+                            {row.asamurat}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getHealthStatus('asamurat', row.asamurat).textColor} ${getHealthStatus('asamurat', row.asamurat).color}`}>
+                              {getHealthStatus('asamurat', row.asamurat).status}
+                            </span>
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.guladarah !== '-' ? (
+                          <span className="flex items-center gap-1">
+                            {row.guladarah}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getHealthStatus('guladarah', row.guladarah).textColor} ${getHealthStatus('guladarah', row.guladarah).color}`}>
+                              {getHealthStatus('guladarah', row.guladarah).status}
+                            </span>
+                          </span>
+                        ) : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
