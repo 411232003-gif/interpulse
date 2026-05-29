@@ -209,7 +209,7 @@ export default function MonitoringPage() {
         if (reading.type !== filterHealthType) return
         
         const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-        if (filterDate && new Date(reading.timestamp).toISOString().split('T')[0] !== filterDate) return
+        if (month !== selectedMonth) return
         
         const value = reading.value || 0
         const status = getHealthStatus(filterHealthType, value)
@@ -799,244 +799,7 @@ export default function MonitoringPage() {
           </div>
         </div>
 
-        {/* 3 Modern Charts */}
-        <div className="space-y-4">
-          {/* Chart 1: Circular Health Type Distribution */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Distribusi Jenis Pemeriksaan</span>
-              </div>
-              <span className="text-xs text-gray-500">Total: {Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)}</span>
-            </div>
-            <div className="flex items-center justify-center gap-6">
-              {/* Circular Progress Chart */}
-              <div className="relative w-40 h-40">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  {/* Background circle */}
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="12" />
-                  {/* Tensi segment */}
-                  {healthTypeDistribution.tensi > 0 && (
-                    <circle
-                      cx="50" cy="50" r="40"
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="12"
-                      strokeDasharray={`${(healthTypeDistribution.tensi / Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)) * 251.2} 251.2`}
-                      strokeLinecap="round"
-                    />
-                  )}
-                  {/* Kolesterol segment */}
-                  {healthTypeDistribution.kolesterol > 0 && (
-                    <circle
-                      cx="50" cy="50" r="40"
-                      fill="none"
-                      stroke="#eab308"
-                      strokeWidth="12"
-                      strokeDasharray={`${(healthTypeDistribution.kolesterol / Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)) * 251.2} 251.2`}
-                      strokeDashoffset={`-${(healthTypeDistribution.tensi / Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)) * 251.2}`}
-                      strokeLinecap="round"
-                    />
-                  )}
-                  {/* Asam Urat segment */}
-                  {healthTypeDistribution.asamurat > 0 && (
-                    <circle
-                      cx="50" cy="50" r="40"
-                      fill="none"
-                      stroke="#a855f7"
-                      strokeWidth="12"
-                      strokeDasharray={`${(healthTypeDistribution.asamurat / Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)) * 251.2} 251.2`}
-                      strokeDashoffset={`-${((healthTypeDistribution.tensi + healthTypeDistribution.kolesterol) / Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)) * 251.2}`}
-                      strokeLinecap="round"
-                    />
-                  )}
-                  {/* Gula Darah segment */}
-                  {healthTypeDistribution.guladarah > 0 && (
-                    <circle
-                      cx="50" cy="50" r="40"
-                      fill="none"
-                      stroke="#3b82f6"
-                      strokeWidth="12"
-                      strokeDasharray={`${(healthTypeDistribution.guladarah / Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)) * 251.2} 251.2`}
-                      strokeDashoffset={`-${((healthTypeDistribution.tensi + healthTypeDistribution.kolesterol + healthTypeDistribution.asamurat) / Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)) * 251.2}`}
-                      strokeLinecap="round"
-                    />
-                  )}
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-gray-800">{Object.values(healthTypeDistribution).reduce((a, b) => a + b, 0)}</p>
-                    <p className="text-[10px] text-gray-500">Total</p>
-                  </div>
-                </div>
-              </div>
-              {/* Legend */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <span className="text-xs text-gray-600">Tekanan Darah: {healthTypeDistribution.tensi}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <span className="text-xs text-gray-600">Kolesterol: {healthTypeDistribution.kolesterol}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                  <span className="text-xs text-gray-600">Asam Urat: {healthTypeDistribution.asamurat}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span className="text-xs text-gray-600">Gula Darah: {healthTypeDistribution.guladarah}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Chart 2: Per-RW Cards (like Partisipasi) */}
-          <div className="space-y-3">
-            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-              <Users className="w-4 h-4 text-indigo-600" />
-              Pemeriksaan per RW
-            </h3>
-            {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, target]) => {
-              const readings = healthReadings[rw] || {}
-              const count = readings[selectedMonth] || 0
-              const pctNum = target > 0 ? Math.min((count / target) * 100, 100) : 0
-              const pct = pctNum.toFixed(1)
-              const barColor = pctNum >= 80 ? 'bg-green-500' : pctNum >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-              const badgeColor = pctNum >= 80 ? 'bg-green-100 text-green-700' : pctNum >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-              return (
-                <div key={rw} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
-                        <Target className="w-4 h-4 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-800">RW {rw}</p>
-                        <p className="text-xs text-gray-500">{count} / {target} PMT</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${badgeColor}`}>{pct}%</span>
-                      <div className="relative">
-                        <button
-                          onClick={() => setRwExportDropdown(rwExportDropdown === rw ? null : rw)}
-                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Export"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        {rwExportDropdown === rw && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-                            <button
-                              onClick={() => { exportRWToPDF(rw); setRwExportDropdown(null); }}
-                              className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl"
-                            >
-                              <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
-                              </svg>
-                              <span className="text-sm text-gray-700">Export PDF</span>
-                            </button>
-                            <button
-                              onClick={() => { exportRWToExcel(rw); setRwExportDropdown(null); }}
-                              className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-                            >
-                              <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
-                              </svg>
-                              <span className="text-sm text-gray-700">Export Excel</span>
-                            </button>
-                            <button
-                              onClick={() => { exportRWToWhatsApp(rw); setRwExportDropdown(null); }}
-                              className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
-                            >
-                              <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                              </svg>
-                              <span className="text-sm text-gray-700">Export WhatsApp</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${barColor} rounded-full transition-all duration-500`}
-                      style={{ width: `${Math.min(pctNum, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Chart 3: Per-RW Line Chart */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Trafik Pemeriksaan per RW</span>
-              </div>
-              <span className="text-xs text-gray-500">Bulan: {monthLabels[selectedMonth]}</span>
-            </div>
-            <div className="relative h-40">
-              {/* Grid lines */}
-              <div className="absolute inset-0 flex flex-col justify-between">
-                <div className="border-b border-gray-200"></div>
-                <div className="border-b border-gray-200"></div>
-                <div className="border-b border-gray-200"></div>
-                <div className="border-b border-gray-200"></div>
-              </div>
-              {/* Chart */}
-              <svg className="w-full h-full" viewBox="0 0 300 150" preserveAspectRatio="none">
-                {/* Area fill */}
-                <defs>
-                  <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
-                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {(() => {
-                  const rwList = Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b))
-                  const dataPoints = rwList.map((rw, i) => {
-                    const readings = healthReadings[rw] || {}
-                    const count = readings[selectedMonth] || 0
-                    const maxVal = Math.max(...rwList.map(r => (healthReadings[r] || {})[selectedMonth] || 0), 1)
-                    const y = 140 - ((count / maxVal) * 120)
-                    const x = (i / (rwList.length - 1)) * 280 + 10
-                    return { x, y, count, rw }
-                  })
-                  const pathD = dataPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
-                  const areaD = `${pathD} L ${dataPoints[dataPoints.length - 1].x} 140 L ${dataPoints[0].x} 140 Z`
-                  return (
-                    <g>
-                      <path d={areaD} fill="url(#gradient)" />
-                      <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5,5" />
-                      {dataPoints.map((p, i) => (
-                        <g key={i}>
-                          <circle cx={p.x} cy={p.y} r={4} fill="#6366f1" stroke="#fff" strokeWidth="2" />
-                          <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="8" fill="#6b7280">{p.count}</text>
-                        </g>
-                      ))}
-                    </g>
-                  )
-                })()}
-              </svg>
-              {/* X-axis labels */}
-              <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
-                {Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b)).map((rw) => (
-                  <span key={rw} className="text-[8px] text-gray-400">
-                    RW {rw}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Table 1: Rekapitulasi Hasil Pemeriksaan */}
+        {/* Tables Section */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -1048,7 +811,7 @@ export default function MonitoringPage() {
               </button>
             </div>
             {/* Filters */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">RW</label>
                 <select
@@ -1090,17 +853,6 @@ export default function MonitoringPage() {
                   <option value="guladarah">Gula Darah</option>
                   <option value="asamurat">Asam Urat</option>
                 </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Tanggal</label>
-                <input
-                  type="date"
-                  value={filterDate}
-                  onChange={(e) => setFilterDate(e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  title="Filter Tanggal"
-                  placeholder="Pilih tanggal"
-                />
               </div>
             </div>
             {/* Table */}
@@ -1160,20 +912,6 @@ export default function MonitoringPage() {
               <button className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
                 Export
               </button>
-            </div>
-            {/* Month Filter */}
-            <div className="mb-4">
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Bulan</label>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full sm:w-48 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                title="Filter Bulan"
-              >
-                {months.map(m => (
-                  <option key={m} value={m}>{monthLabels[m]}</option>
-                ))}
-              </select>
             </div>
             {/* Table */}
             <div className="overflow-x-auto">
@@ -1322,7 +1060,6 @@ export default function MonitoringPage() {
               </table>
             </div>
           </div>
-        </div>
       </div>
     </div>
   )
