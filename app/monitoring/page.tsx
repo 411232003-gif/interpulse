@@ -1036,14 +1036,14 @@ export default function MonitoringPage() {
             </div>
           </div>
 
-          {/* New Chart 1: Grafik Hasil Pemeriksaan with Filters */}
+          {/* Table 1: Rekapitulasi Hasil Pemeriksaan */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Grafik Hasil Pemeriksaan</span>
+                <span className="font-semibold text-gray-800 text-sm">Rekapitulasi Hasil Pemeriksaan</span>
               </div>
-              <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+              <button className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
                 Export
               </button>
             </div>
@@ -1078,7 +1078,7 @@ export default function MonitoringPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Jenis Pemeriksaan</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Pemeriksaan</label>
                 <select
                   value={filterHealthType}
                   onChange={(e) => setFilterHealthType(e.target.value)}
@@ -1103,49 +1103,61 @@ export default function MonitoringPage() {
                 />
               </div>
             </div>
-            {/* Bar Chart */}
-            <div className="h-48">
-              {(() => {
-                const distribution = getHealthStatusDistribution()
-                const maxVal = Math.max(distribution.rendah, distribution.normal, distribution.batas, distribution.tinggi, 1)
-                const labels = ['Rendah', 'Normal', 'Batas', 'Tinggi']
-                const values = [distribution.rendah, distribution.normal, distribution.batas, distribution.tinggi]
-                const colors = ['rgba(54, 162, 235, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(255, 206, 86, 0.6)', 'rgba(255, 99, 132, 0.6)']
-                const borderColors = ['rgba(54, 162, 235, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 206, 86, 1)', 'rgba(255, 99, 132, 1)']
-                
-                return (
-                  <div className="flex items-end justify-around h-full gap-2">
-                    {labels.map((label, i) => {
-                      const height = (values[i] / maxVal) * 160
-                      return (
-                        <div key={label} className="flex flex-col items-center flex-1">
-                          <span className="text-xs font-medium text-gray-600 mb-1">{values[i]}</span>
-                          <div
-                            className="w-full rounded-t-lg transition-all duration-300"
-                            style={{
-                              height: `${height}px`,
-                              backgroundColor: colors[i],
-                              border: `2px solid ${borderColors[i]}`
-                            }}
-                          />
-                          <span className="text-xs text-gray-500 mt-2">{label}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Kategori Hasil</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Jumlah Warga</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Persentase</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const distribution = getHealthStatusDistribution()
+                    const total = distribution.rendah + distribution.normal + distribution.batas + distribution.tinggi
+                    const rows = [
+                      { label: 'Rendah', count: distribution.rendah, badge: 'bg-blue-100 text-blue-800' },
+                      { label: 'Normal', count: distribution.normal, badge: 'bg-green-100 text-green-800' },
+                      { label: 'Batas Tinggi', count: distribution.batas, badge: 'bg-yellow-100 text-yellow-800' },
+                      { label: 'Tinggi', count: distribution.tinggi, badge: 'bg-red-100 text-red-800' }
+                    ]
+                    return rows.map((row, i) => (
+                      <tr key={i} className="border-b">
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${row.badge}`}>{row.label}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">{row.count}</td>
+                        <td className="px-3 py-2 text-center">{total > 0 ? ((row.count / total) * 100).toFixed(2) : '0.00'}%</td>
+                      </tr>
+                    ))
+                  })()}
+                </tbody>
+                <tfoot className="bg-gray-50 font-bold">
+                  <tr>
+                    <td className="px-3 py-2 border-t">Total Pemeriksaan</td>
+                    <td className="px-3 py-2 text-center border-t">
+                      {(() => {
+                        const distribution = getHealthStatusDistribution()
+                        return distribution.rendah + distribution.normal + distribution.batas + distribution.tinggi
+                      })()}
+                    </td>
+                    <td className="px-3 py-2 text-center border-t">100%</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
 
-          {/* New Chart 2: Grafik Partisipasi Warga (Line Chart) */}
+          {/* Table 2: Rekapitulasi Partisipasi Warga */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Grafik Partisipasi Warga</span>
+                <span className="font-semibold text-gray-800 text-sm">Rekapitulasi Partisipasi Warga</span>
               </div>
-              <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+              <button className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
                 Export
               </button>
             </div>
@@ -1163,61 +1175,56 @@ export default function MonitoringPage() {
                 ))}
               </select>
             </div>
-            {/* Line Chart */}
-            <div className="h-48">
-              {(() => {
-                const participationData = getParticipationData()
-                const rwList = Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b))
-                const maxVal = Math.max(...Object.values(participationData), 1)
-                const dataPoints = rwList.map((rw, i) => {
-                  const count = participationData[rw] || 0
-                  const y = 160 - ((count / maxVal) * 140)
-                  const x = (i / (rwList.length - 1)) * 280 + 10
-                  return { x, y, count, rw }
-                })
-                const pathD = dataPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
-                const areaD = `${pathD} L ${dataPoints[dataPoints.length - 1].x} 160 L ${dataPoints[0].x} 160 Z`
-                
-                return (
-                  <div className="relative h-full">
-                    {/* Grid lines */}
-                    <div className="absolute inset-0 flex flex-col justify-between">
-                      <div className="border-b border-gray-200"></div>
-                      <div className="border-b border-gray-200"></div>
-                      <div className="border-b border-gray-200"></div>
-                      <div className="border-b border-gray-200"></div>
-                    </div>
-                    <svg className="w-full h-full" viewBox="0 0 300 180" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="participationGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
-                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      <path d={areaD} fill="url(#participationGradient)" />
-                      <path d={pathD} fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      {dataPoints.map((p, i) => (
-                        <g key={i}>
-                          <circle cx={p.x} cy={p.y} r={4} fill="#8b5cf6" stroke="#fff" strokeWidth="2" />
-                          <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="8" fill="#6b7280">{p.count}</text>
-                        </g>
-                      ))}
-                    </svg>
-                    {/* X-axis labels */}
-                    <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
-                      {rwList.map((rw) => (
-                        <span key={rw} className="text-[8px] text-gray-400">
-                          RW {rw}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })()}
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Wilayah</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Hadir / Partisipasi</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Total Target Warga</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Capaian</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([rw, target]) => {
+                    const attendance = attendanceData[rw]?.[selectedMonth] || 0
+                    const percentage = target > 0 ? ((attendance / target) * 100).toFixed(0) : '0'
+                    const percentageNum = parseFloat(percentage)
+                    const colorClass = percentageNum >= 80 ? 'text-green-600' : percentageNum >= 60 ? 'text-yellow-600' : 'text-red-600'
+                    return (
+                      <tr key={rw} className="border-b">
+                        <td className="px-3 py-2">RW {rw}</td>
+                        <td className="px-3 py-2 text-center">{attendance}</td>
+                        <td className="px-3 py-2 text-center">{target}</td>
+                        <td className={`px-3 py-2 text-center font-bold ${colorClass}`}>{percentage}%</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot className="bg-gray-50 font-bold">
+                  <tr>
+                    <td className="px-3 py-2 border-t">Total Kelurahan</td>
+                    <td className="px-3 py-2 text-center border-t">
+                      {Object.entries(rwTargets).reduce((sum, [rw]) => sum + (attendanceData[rw]?.[selectedMonth] || 0), 0)}
+                    </td>
+                    <td className="px-3 py-2 text-center border-t">
+                      {Object.values(rwTargets).reduce((sum, target) => sum + target, 0)}
+                    </td>
+                    <td className="px-3 py-2 text-center border-t">
+                      {(() => {
+                        const totalAttendance = Object.entries(rwTargets).reduce((sum, [rw]) => sum + (attendanceData[rw]?.[selectedMonth] || 0), 0)
+                        const totalTarget = Object.values(rwTargets).reduce((sum, target) => sum + target, 0)
+                        return totalTarget > 0 ? ((totalAttendance / totalTarget) * 100).toFixed(0) : '0'
+                      })()}%
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
 
-          {/* New Chart 3: Data Table with Filters */}
+          {/* Table 3: Data Kesehatan Warga */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
@@ -1245,7 +1252,7 @@ export default function MonitoringPage() {
                     type="text"
                     value={tableSearchTerm}
                     onChange={(e) => setTableSearchTerm(e.target.value)}
-                    placeholder="Cari..."
+                    placeholder="Cari data warga..."
                     className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-32"
                   />
                 </div>
@@ -1253,27 +1260,27 @@ export default function MonitoringPage() {
             </div>
             {/* Table */}
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm border border-gray-200">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">NIK</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Nama Warga</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Tensi (mmHg)</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Kolesterol (mg/dL)</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Asam Urat (mg/dL)</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Gula Darah (mg/dL)</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">NIK</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Nama Warga</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Tensi (mmHg)</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Kolesterol (mg/dL)</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Asam Urat (mg/dL)</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Gula Darah (mg/dL)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getTableData().slice(0, 10).map((row, i) => (
-                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-3 py-2 text-gray-600">{row.nik}</td>
-                      <td className="px-3 py-2 font-medium text-gray-800">{row.nama}</td>
+                    <tr key={i} className="border-b hover:bg-gray-50">
+                      <td className="px-3 py-2">{row.nik}</td>
+                      <td className="px-3 py-2 font-medium">{row.nama}</td>
                       <td className="px-3 py-2">
                         {row.tensi !== '-' ? (
                           <span className="flex items-center gap-1">
                             {row.tensi}
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getHealthStatus('tensi', row.tensi).textColor} ${getHealthStatus('tensi', row.tensi).color}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getHealthStatus('tensi', row.tensi).textColor} ${getHealthStatus('tensi', row.tensi).color}`}>
                               {getHealthStatus('tensi', row.tensi).status}
                             </span>
                           </span>
@@ -1283,7 +1290,7 @@ export default function MonitoringPage() {
                         {row.kolesterol !== '-' ? (
                           <span className="flex items-center gap-1">
                             {row.kolesterol}
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getHealthStatus('kolesterol', row.kolesterol).textColor} ${getHealthStatus('kolesterol', row.kolesterol).color}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getHealthStatus('kolesterol', row.kolesterol).textColor} ${getHealthStatus('kolesterol', row.kolesterol).color}`}>
                               {getHealthStatus('kolesterol', row.kolesterol).status}
                             </span>
                           </span>
@@ -1293,7 +1300,7 @@ export default function MonitoringPage() {
                         {row.asamurat !== '-' ? (
                           <span className="flex items-center gap-1">
                             {row.asamurat}
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getHealthStatus('asamurat', row.asamurat).textColor} ${getHealthStatus('asamurat', row.asamurat).color}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getHealthStatus('asamurat', row.asamurat).textColor} ${getHealthStatus('asamurat', row.asamurat).color}`}>
                               {getHealthStatus('asamurat', row.asamurat).status}
                             </span>
                           </span>
@@ -1303,7 +1310,7 @@ export default function MonitoringPage() {
                         {row.guladarah !== '-' ? (
                           <span className="flex items-center gap-1">
                             {row.guladarah}
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getHealthStatus('guladarah', row.guladarah).textColor} ${getHealthStatus('guladarah', row.guladarah).color}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getHealthStatus('guladarah', row.guladarah).textColor} ${getHealthStatus('guladarah', row.guladarah).color}`}>
                               {getHealthStatus('guladarah', row.guladarah).status}
                             </span>
                           </span>
