@@ -125,6 +125,9 @@ export default function PosbinduMonitoring() {
         // Merge residents and users, avoiding duplicates by NIK
         const mergedData = [...residentsData]
         usersData.forEach(user => {
+          // Exclude admin users from resident list
+          if (user.role === 'admin') return
+          
           if (user.nik && !mergedData.find(r => r.nik === user.nik)) {
             // Add user as resident if not already exists
             const age = user.birthDate ? calculateAge(user.birthDate) : 0
