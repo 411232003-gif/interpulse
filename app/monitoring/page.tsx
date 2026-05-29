@@ -38,6 +38,7 @@ export default function MonitoringPage() {
   const [filterDate, setFilterDate] = useState<string>('')
   
   // Filters for data table
+  const [tableFilterRW, setTableFilterRW] = useState<string>('all')
   const [tableFilterRT, setTableFilterRT] = useState<string>('all')
   const [tableSearchTerm, setTableSearchTerm] = useState<string>('')
 
@@ -243,6 +244,9 @@ export default function MonitoringPage() {
     const data: any[] = []
     
     Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
+      // Filter by RW
+      if (tableFilterRW !== 'all' && rw !== tableFilterRW) return
+      
       readings.forEach(reading => {
         const resident = residentsData[reading.userId] || residentsData[reading.nik] || {}
         
@@ -260,10 +264,19 @@ export default function MonitoringPage() {
         data.push({
           nik: resident.nik || reading.nik || '-',
           nama: resident.nama || reading.nama || '-',
-          tensi: reading.type === 'tensi' ? reading.value : '-',
-          kolesterol: reading.type === 'kolesterol' ? reading.value : '-',
-          asamurat: reading.type === 'asamurat' ? reading.value : '-',
-          guladarah: reading.type === 'guladarah' ? reading.value : '-',
+          tglLahir: resident.birthDate || '-',
+          umur: resident.umur || '-',
+          alamat: resident.alamat || '-',
+          jenisKelamin: resident.jenisKelamin || '-',
+          tb: tbbbData[resident.nik]?.tb || '-',
+          bb: tbbbData[resident.nik]?.bb || '-',
+          lp: tbbbData[resident.nik]?.lp || '-',
+          td: reading.type === 'tensi' ? reading.value : '-',
+          gds: reading.type === 'guladarah' ? reading.value : '-',
+          imt: tbbbData[resident.nik] ? (tbbbData[resident.nik].bb / ((tbbbData[resident.nik].tb / 100) ** 2)).toFixed(1) : '-',
+          ua: reading.type === 'asamurat' ? reading.value : '-',
+          col: reading.type === 'kolesterol' ? reading.value : '-',
+          nadi: reading.nadi || '-',
         })
       })
     })
@@ -855,50 +868,118 @@ export default function MonitoringPage() {
                 </select>
               </div>
             </div>
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border border-gray-200">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Kategori Hasil</th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Jumlah Warga</th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Persentase</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const distribution = getHealthStatusDistribution()
-                    const total = distribution.rendah + distribution.normal + distribution.batas + distribution.tinggi
-                    const rows = [
-                      { label: 'Rendah', count: distribution.rendah, badge: 'bg-blue-100 text-blue-800' },
-                      { label: 'Normal', count: distribution.normal, badge: 'bg-green-100 text-green-800' },
-                      { label: 'Batas Tinggi', count: distribution.batas, badge: 'bg-yellow-100 text-yellow-800' },
-                      { label: 'Tinggi', count: distribution.tinggi, badge: 'bg-red-100 text-red-800' }
-                    ]
-                    return rows.map((row, i) => (
-                      <tr key={i} className="border-b">
-                        <td className="px-3 py-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${row.badge}`}>{row.label}</span>
-                        </td>
-                        <td className="px-3 py-2 text-center">{row.count}</td>
-                        <td className="px-3 py-2 text-center">{total > 0 ? ((row.count / total) * 100).toFixed(2) : '0.00'}%</td>
-                      </tr>
-                    ))
-                  })()}
-                </tbody>
-                <tfoot className="bg-gray-50 font-bold">
-                  <tr>
-                    <td className="px-3 py-2 border-t">Total Pemeriksaan</td>
-                    <td className="px-3 py-2 text-center border-t">
-                      {(() => {
-                        const distribution = getHealthStatusDistribution()
-                        return distribution.rendah + distribution.normal + distribution.batas + distribution.tinggi
-                      })()}
-                    </td>
-                    <td className="px-3 py-2 text-center border-t">100%</td>
-                  </tr>
-                </tfoot>
-              </table>
+            {/* Pie Chart + Table */}
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Pie Chart */}
+              <div className="lg:w-1/3">
+                {(() => {
+                  const distribution = getHealthStatusDistribution()
+                  const total = distribution.rendah + distribution.normal + distribution.batas + distribution.tinggi
+                  const data = [
+                    { label: 'Rendah', count: distribution.rendah, color: '#3b82f6' },
+                    { label: 'Normal', count: distribution.normal, color: '#22c55e' },
+                    { label: 'Batas Tinggi', count: distribution.batas, color: '#eab308' },
+                    { label: 'Tinggi', count: distribution.tinggi, color: '#ef4444' }
+                  ]
+                  const colors = data.map(d => d.color)
+                  const counts = data.map(d => d.count)
+                  
+                  let cumulativePercent = 0
+                  const segments = data.map((d, i) => {
+                    const percent = total > 0 ? (d.count / total) * 100 : 0
+                    const startPercent = cumulativePercent
+                    cumulativePercent += percent
+                    return { ...d, percent, startPercent }
+                  })
+                  
+                  return (
+                    <div className="flex flex-col items-center">
+                      <div className="relative w-40 h-40">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="20" />
+                          {segments.map((seg, i) => (
+                            seg.count > 0 && (
+                              <circle
+                                key={i}
+                                cx="50" cy="50" r="40"
+                                fill="none"
+                                stroke={seg.color}
+                                strokeWidth="20"
+                                strokeDasharray={`${(seg.percent / 100) * 251.2} 251.2`}
+                                strokeDashoffset={`-${(seg.startPercent / 100) * 251.2}`}
+                                strokeLinecap="round"
+                              />
+                            )
+                          ))}
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-gray-800">{total}</p>
+                            <p className="text-[10px] text-gray-500">Total</p>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Legend */}
+                      <div className="mt-4 space-y-2">
+                        {segments.map((seg, i) => (
+                          seg.count > 0 && (
+                            <div key={i} className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: seg.color }}></div>
+                              <span className="text-xs text-gray-600">{seg.label}: {seg.count}</span>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+              
+              {/* Table */}
+              <div className="lg:w-2/3 overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Kategori Hasil</th>
+                      <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Jumlah Warga</th>
+                      <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Persentase</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const distribution = getHealthStatusDistribution()
+                      const total = distribution.rendah + distribution.normal + distribution.batas + distribution.tinggi
+                      const rows = [
+                        { label: 'Rendah', count: distribution.rendah, badge: 'bg-blue-100 text-blue-800' },
+                        { label: 'Normal', count: distribution.normal, badge: 'bg-green-100 text-green-800' },
+                        { label: 'Batas Tinggi', count: distribution.batas, badge: 'bg-yellow-100 text-yellow-800' },
+                        { label: 'Tinggi', count: distribution.tinggi, badge: 'bg-red-100 text-red-800' }
+                      ]
+                      return rows.map((row, i) => (
+                        <tr key={i} className="border-b">
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${row.badge}`}>{row.label}</span>
+                          </td>
+                          <td className="px-3 py-2 text-center">{row.count}</td>
+                          <td className="px-3 py-2 text-center">{total > 0 ? ((row.count / total) * 100).toFixed(2) : '0.00'}%</td>
+                        </tr>
+                      ))
+                    })()}
+                  </tbody>
+                  <tfoot className="bg-gray-50 font-bold">
+                    <tr>
+                      <td className="px-3 py-2 border-t">Total Pemeriksaan</td>
+                      <td className="px-3 py-2 text-center border-t">
+                        {(() => {
+                          const distribution = getHealthStatusDistribution()
+                          return distribution.rendah + distribution.normal + distribution.batas + distribution.tinggi
+                        })()}
+                      </td>
+                      <td className="px-3 py-2 text-center border-t">100%</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -971,6 +1052,20 @@ export default function MonitoringPage() {
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-600">RW</label>
+                  <select
+                    value={tableFilterRW}
+                    onChange={(e) => setTableFilterRW(e.target.value)}
+                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    title="Filter RW Tabel"
+                  >
+                    <option value="all">Semua RW</option>
+                    {Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b)).map(rw => (
+                      <option key={rw} value={rw}>RW {rw}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-600">RT</label>
                   <select
                     value={tableFilterRT}
@@ -998,62 +1093,44 @@ export default function MonitoringPage() {
             </div>
             {/* Table */}
             <div className="overflow-x-auto">
-              <table className="w-full text-sm border border-gray-200">
+              <table className="w-full text-xs border border-gray-200">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">NIK</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Nama Warga</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Tensi (mmHg)</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Kolesterol (mg/dL)</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Asam Urat (mg/dL)</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Gula Darah (mg/dL)</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">Nama</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">NIK</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">Tgl Lahir</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">Umur</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">Alamat</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">L/P</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">TB</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">BB</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">LP</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">TD</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">GDS</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">IMT</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">UA</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">COL</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">NADI</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getTableData().slice(0, 10).map((row, i) => (
                     <tr key={i} className="border-b hover:bg-gray-50">
-                      <td className="px-3 py-2">{row.nik}</td>
-                      <td className="px-3 py-2 font-medium">{row.nama}</td>
-                      <td className="px-3 py-2">
-                        {row.tensi !== '-' ? (
-                          <span className="flex items-center gap-1">
-                            {row.tensi}
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getHealthStatus('tensi', row.tensi).textColor} ${getHealthStatus('tensi', row.tensi).color}`}>
-                              {getHealthStatus('tensi', row.tensi).status}
-                            </span>
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="px-3 py-2">
-                        {row.kolesterol !== '-' ? (
-                          <span className="flex items-center gap-1">
-                            {row.kolesterol}
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getHealthStatus('kolesterol', row.kolesterol).textColor} ${getHealthStatus('kolesterol', row.kolesterol).color}`}>
-                              {getHealthStatus('kolesterol', row.kolesterol).status}
-                            </span>
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="px-3 py-2">
-                        {row.asamurat !== '-' ? (
-                          <span className="flex items-center gap-1">
-                            {row.asamurat}
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getHealthStatus('asamurat', row.asamurat).textColor} ${getHealthStatus('asamurat', row.asamurat).color}`}>
-                              {getHealthStatus('asamurat', row.asamurat).status}
-                            </span>
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="px-3 py-2">
-                        {row.guladarah !== '-' ? (
-                          <span className="flex items-center gap-1">
-                            {row.guladarah}
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getHealthStatus('guladarah', row.guladarah).textColor} ${getHealthStatus('guladarah', row.guladarah).color}`}>
-                              {getHealthStatus('guladarah', row.guladarah).status}
-                            </span>
-                          </span>
-                        ) : '-'}
-                      </td>
+                      <td className="px-2 py-2 font-medium">{row.nama}</td>
+                      <td className="px-2 py-2">{row.nik}</td>
+                      <td className="px-2 py-2">{row.tglLahir}</td>
+                      <td className="px-2 py-2">{row.umur}</td>
+                      <td className="px-2 py-2">{row.alamat}</td>
+                      <td className="px-2 py-2">{row.jenisKelamin}</td>
+                      <td className="px-2 py-2">{row.tb}</td>
+                      <td className="px-2 py-2">{row.bb}</td>
+                      <td className="px-2 py-2">{row.lp}</td>
+                      <td className="px-2 py-2">{row.td}</td>
+                      <td className="px-2 py-2">{row.gds}</td>
+                      <td className="px-2 py-2">{row.imt}</td>
+                      <td className="px-2 py-2">{row.ua}</td>
+                      <td className="px-2 py-2">{row.col}</td>
+                      <td className="px-2 py-2">{row.nadi}</td>
                     </tr>
                   ))}
                 </tbody>
