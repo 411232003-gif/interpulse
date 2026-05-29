@@ -244,6 +244,10 @@ export default function MonitoringPage() {
       readings.forEach(reading => {
         const resident = residentsData[reading.userId] || residentsData[reading.nik] || {}
         
+        // Filter by month
+        const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+        if (month !== selectedMonth) return
+        
         // Filter by RT
         if (tableFilterRT !== 'all' && resident.rt !== tableFilterRT) return
         

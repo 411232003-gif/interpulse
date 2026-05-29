@@ -27,12 +27,18 @@ async function generateResidents() {
   const residentsRef = db.collection('residents');
   const batch = db.batch();
   
-  const names = [
-    'Budi Santoso', 'Siti Aminah', 'Ahmad Dahlan', 'Dewi Sartika', 'Rudi Hartono',
-    'Lina Marlina', 'Joko Widodo', 'Rina Nose', 'Dedi Corbuzier', 'Putri Titian',
-    'Raffi Ahmad', 'Nagita Slavina', 'Andi Wijaya', 'Maya Estianty', 'Denny Cagur',
-    'Rina Wati', 'Bambang Pamungkas', 'Citra Kirana', 'Reza Rahadian', 'Maudy Ayunda'
+  const maleNames = [
+    'Budi Santoso', 'Ahmad Dahlan', 'Rudi Hartono', 'Joko Widodo', 'Dedi Corbuzier',
+    'Raffi Ahmad', 'Andi Wijaya', 'Denny Cagur', 'Bambang Pamungkas', 'Reza Rahadian'
   ];
+  
+  const femaleNames = [
+    'Siti Aminah', 'Dewi Sartika', 'Lina Marlina', 'Rina Nose', 'Putri Titian',
+    'Nagita Slavina', 'Maya Estianty', 'Rina Wati', 'Citra Kirana', 'Maudy Ayunda'
+  ];
+  
+  const allNames = [...maleNames, ...femaleNames];
+  const residentData = [];
   
   for (let i = 0; i < 20; i++) {
     const rw = Object.keys(rwTargets)[randomInt(0, Object.keys(rwTargets).length - 1)];
@@ -40,41 +46,45 @@ async function generateResidents() {
     const nik = `317${String(randomInt(100000000, 999999999))}`;
     const birthYear = randomInt(1950, 2000);
     const birthDate = `${birthYear}-${String(randomInt(1, 12)).padStart(2, '0')}-${String(randomInt(1, 28)).padStart(2, '0')}`;
+    const isMale = i < 10; // First 10 are male, next 10 are female
     
     const docRef = residentsRef.doc(nik);
     batch.set(docRef, {
-      nama: names[i],
+      nama: allNames[i],
       nik: nik,
       rw: rw,
       rt: rt,
       birthDate: birthDate,
       umur: 2026 - birthYear,
-      jenisKelamin: randomInt(0, 1) === 0 ? 'Laki-laki' : 'Perempuan',
-      alamat: `Jl. Duris Selatan No. ${randomInt(1, 100)}`,
+      jenisKelamin: isMale ? 'Laki-laki' : 'Perempuan',
+      alamat: `Jl. Duris Selatan No. ${randomInt(1, 100)}, RT ${rt}, RW ${rw}`,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
     
-    console.log(`✅ Resident: ${names[i]} - RW ${rw}/RT ${rt}`);
+    residentData.push({
+      nik: nik,
+      nama: allNames[i],
+      rw: rw,
+      rt: rt,
+      jenisKelamin: isMale ? 'Laki-laki' : 'Perempuan'
+    });
+    
+    console.log(`✅ Resident: ${allNames[i]} (${isMale ? 'L' : 'P'}) - RW ${rw}/RT ${rt}`);
   }
   
   await batch.commit();
   console.log('\n✨ Residents generated successfully!\n');
+  return residentData;
 }
 
 // Generate dummy health readings for all months
-async function generateHealthReadings() {
+async function generateHealthReadings(residentData) {
   console.log('🏥 Generating dummy health readings...\n');
   
   const healthRef = db.collection('healthReadings');
   const batch = db.batch();
   
   const healthTypes = ['kolesterol', 'tensi', 'guladarah', 'asamurat'];
-  const names = [
-    'Budi Santoso', 'Siti Aminah', 'Ahmad Dahlan', 'Dewi Sartika', 'Rudi Hartono',
-    'Lina Marlina', 'Joko Widodo', 'Rina Nose', 'Dedi Corbuzier', 'Putri Titian',
-    'Raffi Ahmad', 'Nagita Slavina', 'Andi Wijaya', 'Maya Estianty', 'Denny Cagur',
-    'Rina Wati', 'Bambang Pamungkas', 'Citra Kirana', 'Reza Rahadian', 'Maudy Ayunda'
-  ];
   
   let count = 0;
   
@@ -84,8 +94,7 @@ async function generateHealthReadings() {
         const numReadings = randomInt(5, 15);
         
         for (let i = 0; i < numReadings; i++) {
-          const name = names[randomInt(0, names.length - 1)];
-          const nik = `317${String(randomInt(100000000, 999999999))}`;
+          const resident = residentData[randomInt(0, residentData.length - 1)];
           const day = randomInt(1, 28);
           const timestamp = `2026-${months.indexOf(month) + 1}-${day}T${String(randomInt(8, 16)).padStart(2, '0')}:00:00`;
           
@@ -109,10 +118,10 @@ async function generateHealthReadings() {
           batch.set(docRef, {
             type: healthType,
             value: value,
-            nik: nik,
-            nama: name,
-            rw: rw,
-            rt: String(randomInt(1, 10)),
+            nik: resident.nik,
+            nama: resident.nama,
+            rw: resident.rw,
+            rt: resident.rt,
             timestamp: timestamp,
             source: 'posbindu',
             createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -129,18 +138,11 @@ async function generateHealthReadings() {
 }
 
 // Generate dummy attendance for all months
-async function generateAttendance() {
+async function generateAttendance(residentData) {
   console.log('📊 Generating dummy attendance...\n');
   
   const attendanceRef = db.collection('attendance');
   const batch = db.batch();
-  
-  const names = [
-    'Budi Santoso', 'Siti Aminah', 'Ahmad Dahlan', 'Dewi Sartika', 'Rudi Hartono',
-    'Lina Marlina', 'Joko Widodo', 'Rina Nose', 'Dedi Corbuzier', 'Putri Titian',
-    'Raffi Ahmad', 'Nagita Slavina', 'Andi Wijaya', 'Maya Estianty', 'Denny Cagur',
-    'Rina Wati', 'Bambang Pamungkas', 'Citra Kirana', 'Reza Rahadian', 'Maudy Ayunda'
-  ];
   
   let count = 0;
   
@@ -150,21 +152,18 @@ async function generateAttendance() {
       const attendance = Math.floor(target * (randomInt(60, 95) / 100));
       
       for (let i = 0; i < attendance; i++) {
-        const name = names[randomInt(0, names.length - 1)];
-        const nik = `317${String(randomInt(100000000, 999999999))}`;
+        const resident = residentData[randomInt(0, residentData.length - 1)];
         const day = randomInt(1, 28);
         const timestamp = `2026-${months.indexOf(month) + 1}-${day}T${String(randomInt(7, 10)).padStart(2, '0')}:00:00`;
-        const birthYear = randomInt(1950, 2000);
-        const umur = 2026 - birthYear;
         
         const docRef = attendanceRef.doc();
         batch.set(docRef, {
-          nama: name,
-          nik: nik,
-          rw: rw,
-          rt: String(randomInt(1, 10)),
-          umur: umur,
-          alamat: `Jl. Duris Selatan No. ${randomInt(1, 100)}`,
+          nama: resident.nama,
+          nik: resident.nik,
+          rw: resident.rw,
+          rt: resident.rt,
+          umur: 2026 - randomInt(1950, 2000),
+          alamat: `Jl. Duris Selatan No. ${randomInt(1, 100)}, RT ${resident.rt}, RW ${resident.rw}`,
           timestamp: timestamp,
           date: `2026-${months.indexOf(month) + 1}-${day}`,
           time: `${String(randomInt(7, 10)).padStart(2, '0')}:00`,
@@ -181,40 +180,32 @@ async function generateAttendance() {
 }
 
 // Generate dummy TB/BB data
-async function generateTBBB() {
+async function generateTBBB(residentData) {
   console.log('📏 Generating dummy TB/BB data...\n');
   
   const tbbbRef = db.collection('tbbb');
   const batch = db.batch();
   
-  const names = [
-    'Budi Santoso', 'Siti Aminah', 'Ahmad Dahlan', 'Dewi Sartika', 'Rudi Hartono',
-    'Lina Marlina', 'Joko Widodo', 'Rina Nose', 'Dedi Corbuzier', 'Putri Titian'
-  ];
-  
   let count = 0;
   
-  for (const rw of Object.keys(rwTargets)) {
-    for (let i = 0; i < 10; i++) {
-      const name = names[randomInt(0, names.length - 1)];
-      const nik = `317${String(randomInt(100000000, 999999999))}`;
-      const day = randomInt(1, 28);
-      const timestamp = `2026-${String(randomInt(1, 12)).padStart(2, '0')}-${day}T${String(randomInt(8, 16)).padStart(2, '0')}:00:00`;
-      
-      const docRef = tbbbRef.doc();
-      batch.set(docRef, {
-        nama: name,
-        nik: nik,
-        rw: rw,
-        rt: String(randomInt(1, 10)),
-        tb: randomInt(150, 180),
-        bb: randomInt(50, 90),
-        timestamp: timestamp,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      
-      count++;
-    }
+  for (const resident of residentData) {
+    const day = randomInt(1, 28);
+    const timestamp = `2026-${String(randomInt(1, 12)).padStart(2, '0')}-${day}T${String(randomInt(8, 16)).padStart(2, '0')}:00:00`;
+    
+    const docRef = tbbbRef.doc();
+    batch.set(docRef, {
+      nama: resident.nama,
+      nik: resident.nik,
+      rw: resident.rw,
+      rt: resident.rt,
+      tb: randomInt(150, 180),
+      bb: randomInt(50, 90),
+      lp: randomInt(70, 110),
+      timestamp: timestamp,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    count++;
   }
   
   await batch.commit();
@@ -227,18 +218,18 @@ async function generateAllDummyData() {
   console.log('=====================================\n');
   
   try {
-    await generateResidents();
-    await generateHealthReadings();
-    await generateAttendance();
-    await generateTBBB();
+    const residentData = await generateResidents();
+    await generateHealthReadings(residentData);
+    await generateAttendance(residentData);
+    await generateTBBB(residentData);
     
     console.log('=====================================');
     console.log('✨ All dummy data generated successfully!');
     console.log('\n📝 Summary:');
-    console.log('   - Residents: 20');
+    console.log('   - Residents: 20 (10 Laki-laki, 10 Perempuan)');
     console.log('   - Health Readings: ~1,920 (12 months × 4 RW × 4 types × ~10 readings)');
     console.log('   - Attendance: ~8,400 (12 months × 4 RW × ~175 attendance)');
-    console.log('   - TB/BB: 40');
+    console.log('   - TB/BB: 20 (1 per resident)');
     console.log('\n🎉 You can now test the monitoring page!');
     
   } catch (error) {
