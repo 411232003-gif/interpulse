@@ -198,8 +198,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const loginWithNIK = async (userId: string, password: string) => {
-    // Use userId directly as email (like original email login)
-    await signInWithEmailAndPassword(auth, userId, password)
+    // If userId doesn't contain @, append @interpulse.id
+    const email = userId.includes('@') ? userId : `${userId}@interpulse.id`
+    await signInWithEmailAndPassword(auth, email, password)
   }
 
   const createUserByAdmin = async (
