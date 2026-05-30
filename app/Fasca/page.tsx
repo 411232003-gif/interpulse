@@ -972,7 +972,7 @@ export default function CatatKesehatan() {
             <h3 className="font-bold text-red-700 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
               <span className="text-lg sm:text-xl">❤️</span> Tekanan Darah
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Sistolik</label>
                 <input
@@ -995,17 +995,24 @@ export default function CatatKesehatan() {
                 />
                 <p className="text-xs text-gray-500 mt-1">mmHg</p>
               </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Nadi</label>
-                <input
-                  type="number"
-                  value={data.nadi || ''}
-                  onChange={(e) => setData(prev => ({ ...prev, nadi: e.target.value }))}
-                  placeholder="72"
-                  className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">bpm</p>
-              </div>
+            </div>
+          </div>
+
+          {/* Nadi */}
+          <div className="bg-pink-50 rounded-xl p-3 sm:p-4 border border-pink-200">
+            <h3 className="font-bold text-pink-700 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
+              <span className="text-lg sm:text-xl">💓</span> Nadi
+            </h3>
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Detak Jantung</label>
+              <input
+                type="number"
+                value={data.nadi || ''}
+                onChange={(e) => setData(prev => ({ ...prev, nadi: e.target.value }))}
+                placeholder="72"
+                className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">bpm</p>
             </div>
           </div>
 
