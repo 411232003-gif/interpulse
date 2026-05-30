@@ -922,7 +922,7 @@ export default function CatatKesehatan() {
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center z-50 p-4">
       {/* Modern Notification */}
       {notification && (
         <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-right">
@@ -952,8 +952,8 @@ export default function CatatKesehatan() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 w-full max-w-2xl my-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto my-4">
+        <div className="flex items-center justify-between mb-4 sticky top-0 bg-white z-10 pb-2">
           <button onClick={handleCloseFascaModal} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-3 py-2 sm:px-4 rounded-xl active:scale-95 transition-all text-sm sm:text-base">← Kembali</button>
           <div className="text-center flex-1 px-2">
             <div className="flex justify-center mb-2 text-blue-600">
