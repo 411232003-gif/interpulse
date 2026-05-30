@@ -33,6 +33,7 @@ interface Resident {
   umur: number
   jenisKelamin: 'L' | 'P'
   alamat: string
+  password?: string
 }
 
 // Mock data for attendance
@@ -154,6 +155,7 @@ export default function PosbinduMonitoring() {
                 umur: age,
                 jenisKelamin: user.gender,
                 alamat: user.kelurahan,
+                password: user.password,
               } as Resident)
               seenIds.add(uniqueId)
             }
@@ -369,6 +371,7 @@ export default function PosbinduMonitoring() {
         gender: residentForm.jenisKelamin,
         kelurahan: residentForm.alamat,
         role: 'user',
+        password: password,
         createdAt: new Date().toISOString()
       })
 
@@ -932,6 +935,8 @@ export default function PosbinduMonitoring() {
             <button
               onClick={() => setNotification(null)}
               className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Tutup notifikasi"
+              title="Tutup notifikasi"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1153,6 +1158,8 @@ export default function PosbinduMonitoring() {
                           checked={selectedResidents.size === filteredResidents.length && filteredResidents.length > 0}
                           onChange={handleSelectAll}
                           className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          aria-label="Pilih semua warga"
+                          title="Pilih semua warga"
                         />
                         <span className="text-sm text-gray-600">Pilih Semua</span>
                       </div>
@@ -1168,6 +1175,8 @@ export default function PosbinduMonitoring() {
                               checked={selectedResidents.has(resident.id)}
                               onChange={() => handleSelectResident(resident.id)}
                               className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mt-1"
+                              aria-label={`Pilih ${resident.nama}`}
+                              title={`Pilih ${resident.nama}`}
                             />
                           )}
                           <div className="flex-1">
@@ -1178,6 +1187,9 @@ export default function PosbinduMonitoring() {
                               )}
                             </div>
                             <p className="text-xs text-gray-500">NIK: {resident.nik}</p>
+                            {resident.password && (
+                              <p className="text-xs text-blue-600 font-medium mt-0.5">PIN: {resident.password}</p>
+                            )}
                             <div className="flex gap-3 mt-1 text-xs text-gray-600">
                               <span>RW {resident.rw} / RT {resident.rt}</span>
                               <span>{resident.umur} tahun</span>
@@ -1537,10 +1549,10 @@ export default function PosbinduMonitoring() {
                   return (
                     <div key={month} className="flex flex-col items-center gap-1">
                       <span className="text-[9px] text-gray-500">{total}</span>
-                      <div className="w-full bg-gray-100 rounded-t" style={{ height: 64 }}>
+                      <div className="w-full bg-gray-100 rounded-t h-16">
                         <div
                           className="w-full rounded-t transition-all duration-500 bg-blue-500"
-                          style={{ height, marginTop: 64 - height }}
+                          style={{ height: `${height}px`, marginTop: `${64 - height}px` }}
                         />
                       </div>
                       <span className="text-[8px] text-gray-400">{monthLabels[month]}</span>

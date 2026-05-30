@@ -19,6 +19,7 @@ interface Resident {
   umur: number
   jenisKelamin: 'L' | 'P'
   alamat: string
+  password?: string
 }
 
 export default function AbsensiPage() {
@@ -95,6 +96,7 @@ export default function AbsensiPage() {
               umur: age,
               jenisKelamin: user.gender,
               alamat: user.kelurahan,
+              password: user.password,
             } as Resident)
           }
         })
@@ -262,6 +264,7 @@ export default function AbsensiPage() {
         gender: residentForm.jenisKelamin,
         kelurahan: residentForm.alamat,
         role: 'user',
+        password: password,
         createdAt: new Date().toISOString()
       })
 
@@ -430,6 +433,13 @@ export default function AbsensiPage() {
                       <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
                       <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                       <td className="px-4 py-3 text-gray-600">{r.umur} tahun</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {r.password ? (
+                          <span className="text-blue-600 font-medium text-xs">PIN: {r.password}</span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         {isPresentToday ? (
                           <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
@@ -438,12 +448,12 @@ export default function AbsensiPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button 
+                        <button
                           onClick={() => handleAttendance(r)}
                           disabled={isPresentToday}
                           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
-                            isPresentToday 
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                            isPresentToday
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-blue-600 text-white hover:bg-blue-700'
                           }`}
                         >
