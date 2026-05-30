@@ -366,25 +366,25 @@ export default function AbsensiPage() {
               <button onClick={() => router.push('/monev-posbindu')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
               <h1 className="text-2xl font-bold text-gray-800">Absensi Posbindu</h1>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => { setIsAddModalOpen(true); resetResidentForm(); }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Tambah Warga
-              </button>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
           </div>
 
           {/* Filters */}
           <div className="bg-gray-50 rounded-xl p-4 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <span className="font-semibold text-gray-700 text-sm">Filter</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-600" />
+                <span className="font-semibold text-gray-700 text-sm">Filter</span>
+              </div>
+              <button
+                onClick={() => { setIsAddModalOpen(true); resetResidentForm(); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Tambah Warga
+              </button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <select value={filterRW} onChange={e => setFilterRW(e.target.value)} aria-label="Filter RW" className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
