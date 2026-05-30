@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle, Download, FileText, MessageSquare, ChevronDown, Info, ArrowRight } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -53,6 +55,8 @@ export default function PosbinduMonitoring() {
   const [filterUmur, setFilterUmur] = useState<string>('')
   const [searchNama, setSearchNama] = useState('')
   const [residents, setResidents] = useState<Resident[]>([])
+  const [selectedResidents, setSelectedResidents] = useState<Set<string>>(new Set())
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingResident, setEditingResident] = useState<Resident | null>(null)
   const [residentForm, setResidentForm] = useState({
@@ -96,8 +100,12 @@ export default function PosbinduMonitoring() {
   })
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
   const [riwayatExportOpen, setRiwayatExportOpen] = useState(false)
-  const [showSuccessNotification, setShowSuccessNotification] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 4000)
+  }
   const [healthTypeFilter, setHealthTypeFilter] = useState<string>('all')
   const [healthTypeDropdownOpen, setHealthTypeDropdownOpen] = useState(false)
   const [healthReadings, setHealthReadings] = useState<Record<string, any>>({})
@@ -124,6 +132,8 @@ export default function PosbinduMonitoring() {
         
         // Merge residents and users, avoiding duplicates by NIK
         const mergedData = [...residentsData]
+        const seenIds = new Set(residentsData.map(r => r.id))
+        
         usersData.forEach(user => {
           // Exclude admin users from resident list
           if (user.role === 'admin') return
@@ -131,17 +141,22 @@ export default function PosbinduMonitoring() {
           if (user.nik && !mergedData.find(r => r.nik === user.nik)) {
             // Add user as resident if not already exists
             const age = user.birthDate ? calculateAge(user.birthDate) : 0
-            mergedData.push({
-              id: user.uid,
-              nama: user.name,
-              nik: user.nik,
-              rw: user.rw,
-              rt: user.rt,
-              birthDate: user.birthDate,
-              umur: age,
-              jenisKelamin: user.gender,
-              alamat: user.kelurahan,
-            } as Resident)
+            // Use a unique key combining uid and prefix to avoid conflicts
+            const uniqueId = `user_${user.uid}`
+            if (!seenIds.has(uniqueId)) {
+              mergedData.push({
+                id: uniqueId,
+                nama: user.name,
+                nik: user.nik,
+                rw: user.rw,
+                rt: user.rt,
+                birthDate: user.birthDate,
+                umur: age,
+                jenisKelamin: user.gender,
+                alamat: user.kelurahan,
+              } as Resident)
+              seenIds.add(uniqueId)
+            }
           }
         })
         
@@ -322,10 +337,50 @@ export default function PosbinduMonitoring() {
     return age
   }
 
+  const generatePIN = (): string => {
+    return Math.floor(100000 + Math.random() * 900000).toString()
+  }
+
   const handleAddResident = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
       const age = calculateAge(residentForm.birthDate)
+      const password = generatePIN()
+
+      // Store current admin token before creating new user
+      const adminToken = document.cookie.replace(/(?:(?:^|.*;\s*)firebaseIdToken\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+
+      // Create Firebase Auth user
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        `${residentForm.nik}@interpulse.id`,
+        password
+      )
+
+      // Add user to users collection
+      await addDoc(collection(db, 'users'), {
+        uid: userCredential.user.uid,
+        name: residentForm.nama,
+        nik: residentForm.nik,
+        email: `${residentForm.nik}@interpulse.id`,
+        rw: residentForm.rw,
+        rt: residentForm.rt,
+        birthDate: residentForm.birthDate,
+        gender: residentForm.jenisKelamin,
+        kelurahan: residentForm.alamat,
+        role: 'user',
+        createdAt: new Date().toISOString()
+      })
+
+      // Sign out from the new user account
+      await auth.signOut()
+
+      // Restore admin session by setting the cookie back
+      if (adminToken) {
+        document.cookie = `firebaseIdToken=${adminToken}; path=/; max-age=3600`
+      }
+
+      // Add resident to Firestore
       const newResident = {
         nama: residentForm.nama,
         nik: residentForm.nik,
@@ -337,14 +392,13 @@ export default function PosbinduMonitoring() {
         alamat: residentForm.alamat,
       }
       await addDoc(collection(db, 'residents'), newResident)
+
       setIsModalOpen(false)
       resetResidentForm()
-      setSuccessMessage('Data warga berhasil ditambahkan')
-      setShowSuccessNotification(true)
-      setTimeout(() => setShowSuccessNotification(false), 3000)
+      showNotification('success', `Warga berhasil ditambahkan! Username: ${residentForm.nik}, Password: ${password}`)
     } catch (error) {
       console.error('Error adding resident:', error)
-      alert('Gagal menambahkan data warga')
+      showNotification('error', 'Gagal menambahkan warga. Pastikan NIK belum terdaftar.')
     }
   }
 
@@ -367,12 +421,10 @@ export default function PosbinduMonitoring() {
       setIsModalOpen(false)
       setEditingResident(null)
       resetResidentForm()
-      setSuccessMessage('Data warga berhasil diperbarui')
-      setShowSuccessNotification(true)
-      setTimeout(() => setShowSuccessNotification(false), 3000)
+      showNotification('success', 'Data warga berhasil diperbarui')
     } catch (error) {
       console.error('Error updating resident:', error)
-      alert('Gagal memperbarui data warga')
+      showNotification('error', 'Gagal memperbarui data warga')
     }
   }
 
@@ -380,11 +432,54 @@ export default function PosbinduMonitoring() {
     if (!confirm('Apakah Anda yakin ingin menghapus data warga ini?')) return
     try {
       await deleteDoc(doc(db, 'residents', id))
-      alert('Data warga berhasil dihapus')
+      showNotification('success', 'Data warga berhasil dihapus')
     } catch (error) {
       console.error('Error deleting resident:', error)
-      alert('Gagal menghapus data warga')
+      showNotification('error', 'Gagal menghapus data warga')
     }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedResidents.size === 0) {
+      showNotification('info', 'Pilih minimal satu warga untuk dihapus')
+      return
+    }
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedResidents.size} data warga?`)) return
+
+    try {
+      for (const id of selectedResidents) {
+        await deleteDoc(doc(db, 'residents', id))
+      }
+      setSelectedResidents(new Set())
+      setIsSelectionMode(false)
+      showNotification('success', `${selectedResidents.size} data warga berhasil dihapus`)
+    } catch (error) {
+      console.error('Error bulk deleting residents:', error)
+      showNotification('error', 'Gagal menghapus data warga')
+    }
+  }
+
+  const handleSelectResident = (id: string) => {
+    const newSelected = new Set(selectedResidents)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedResidents(newSelected)
+  }
+
+  const handleSelectAll = () => {
+    if (selectedResidents.size === filteredResidents.length) {
+      setSelectedResidents(new Set())
+    } else {
+      setSelectedResidents(new Set(filteredResidents.map(r => r.id)))
+    }
+  }
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedResidents(new Set())
   }
 
   const openAddModal = () => {
@@ -413,10 +508,10 @@ export default function PosbinduMonitoring() {
     if (!confirm('Apakah Anda yakin ingin menghapus data absensi ini?')) return
     try {
       await deleteDoc(doc(db, 'attendance', id))
-      alert('Data absensi berhasil dihapus')
+      showNotification('success', 'Data absensi berhasil dihapus')
     } catch (error) {
       console.error('Error deleting attendance:', error)
-      alert('Gagal menghapus data absensi')
+      showNotification('error', 'Gagal menghapus data absensi')
     }
   }
 
@@ -448,10 +543,10 @@ export default function PosbinduMonitoring() {
       await updateDoc(doc(db, 'attendance', editingAttendance.id), updatedAttendance)
       setIsAttendanceEditModalOpen(false)
       setEditingAttendance(null)
-      alert('Data absensi berhasil diperbarui')
+      showNotification('success', 'Data absensi berhasil diperbarui')
     } catch (error) {
       console.error('Error updating attendance:', error)
-      alert('Gagal memperbarui data absensi')
+      showNotification('error', 'Gagal memperbarui data absensi')
     }
   }
 
@@ -505,6 +600,7 @@ export default function PosbinduMonitoring() {
   // Export to PDF
   const exportToPDF = () => {
     const doc = new jsPDF()
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     
     // Header with gradient background
     doc.setFillColor(37, 99, 235)
@@ -515,7 +611,7 @@ export default function PosbinduMonitoring() {
     doc.text('Data Warga Posbindu', 105, 20, { align: 'center' })
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan Duris Selatan - ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 105, 30, { align: 'center' })
+    doc.text(`Kelurahan ${kelurahan} - ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 105, 30, { align: 'center' })
     
     // Summary
     doc.setTextColor(0, 0, 0)
@@ -585,11 +681,12 @@ export default function PosbinduMonitoring() {
 
   // Export to WhatsApp
   const exportToWhatsApp = () => {
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     const total = filteredResidents.length
     const elderly = filteredResidents.filter(r => r.umur >= 60).length
     
     let message = `📊 *DATA WARGA POSBINDU*\n`
-    message += `🏥 Kelurahan Duris Selatan\n`
+    message += `🏥 Kelurahan ${kelurahan}\n`
     message += `📅 ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
@@ -615,6 +712,7 @@ export default function PosbinduMonitoring() {
   // Export Attendance to PDF
   const exportAttendanceToPDF = () => {
     const doc = new jsPDF()
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     
     doc.setFillColor(37, 99, 235)
     doc.rect(0, 0, 210, 40, 'F')
@@ -624,7 +722,7 @@ export default function PosbinduMonitoring() {
     doc.text('Riwayat Absensi', 105, 20, { align: 'center' })
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan Duris Selatan - ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 105, 30, { align: 'center' })
+    doc.text(`Kelurahan ${kelurahan} - ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 105, 30, { align: 'center' })
     
     const filteredAttendance = attendanceList
       .filter(att => {
@@ -710,6 +808,7 @@ export default function PosbinduMonitoring() {
 
   // Export Attendance to WhatsApp
   const exportAttendanceToWhatsApp = () => {
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     const filteredAttendance = attendanceList
       .filter(att => {
         if (attendanceFilter.rw && att.rw !== attendanceFilter.rw) return false
@@ -719,7 +818,7 @@ export default function PosbinduMonitoring() {
       })
     
     let message = `📊 *RIWAYAT ABSENSI POSBINDU*\n`
-    message += `🏥 Kelurahan Duris Selatan\n`
+    message += `🏥 Kelurahan ${kelurahan}\n`
     message += `📅 ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
@@ -803,25 +902,39 @@ export default function PosbinduMonitoring() {
       setShowAttendanceHistory(true)
       
       setCheckInForm({ nama: '', nik: '', umur: '', rt: '', rw: '', alamat: '' })
-      alert('Absensi berhasil disimpan!')
+      showNotification('success', 'Absensi berhasil disimpan!')
     } catch (error) {
       console.error('Error saving attendance:', error)
-      alert('Gagal menyimpan absensi')
+      showNotification('error', 'Gagal menyimpan absensi')
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Success Notification */}
-      {showSuccessNotification && (
+      {/* Modern Notification */}
+      {notification && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
-          <div className="bg-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 border-l-4 border-green-500">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] ${
+            notification.type === 'success' 
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white' 
+              : notification.type === 'error'
+              ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              {notification.type === 'success' && <CheckCircle className="w-6 h-6" />}
+              {notification.type === 'error' && <AlertCircle className="w-6 h-6" />}
+              {notification.type === 'info' && <Info className="w-6 h-6" />}
             </div>
-            <div>
-              <p className="font-semibold text-gray-800">{successMessage}</p>
+            <div className="flex-1">
+              <p className="font-semibold text-white">{notification.message}</p>
             </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
       )}
@@ -873,14 +986,37 @@ export default function PosbinduMonitoring() {
           <div className="space-y-4">
             {/* Summary + Export + Add Button */}
             <div className="flex items-center justify-between gap-3">
-              <div className="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl px-4 py-3 shadow-md flex-1">
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-white" />
-                  <div>
-                    <span className="text-white font-bold text-lg">{filteredResidents.length}</span>
-                    <span className="text-blue-100 text-xs ml-1">warga ditemukan</span>
+              <div className="flex items-center gap-2 flex-1">
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl px-4 py-3 shadow-md flex-1">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-white" />
+                    <div>
+                      <span className="text-white font-bold text-lg">{filteredResidents.length}</span>
+                      <span className="text-blue-100 text-xs ml-1">warga ditemukan</span>
+                    </div>
                   </div>
                 </div>
+                {selectedResidents.size === 0 && (
+                  <div className="flex items-center gap-2">
+                    {isSelectionMode ? (
+                      <button
+                        onClick={toggleSelectionMode}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                      >
+                        <X className="w-4 h-4" />
+                        Batal
+                      </button>
+                    ) : (
+                      <button
+                        onClick={toggleSelectionMode}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        Pilih
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {/* Export Dropdown */}
@@ -974,6 +1110,31 @@ export default function PosbinduMonitoring() {
               </div>
             </div>
 
+            {/* Bulk Actions Bar */}
+            {selectedResidents.size > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+                <p className="text-sm text-blue-800 font-medium">
+                  {selectedResidents.size} warga dipilih
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Hapus
+                  </button>
+                  <button
+                    onClick={toggleSelectionMode}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                  >
+                    <X className="w-4 h-4" />
+                    Batal
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Resident Cards */}
             <div className="space-y-3">
               {filteredResidents.length === 0 ? (
@@ -981,32 +1142,58 @@ export default function PosbinduMonitoring() {
                   <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Belum ada data warga</p>
                 </div>
-              ) : filteredResidents.map(resident => (
-                <div key={resident.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-gray-800">{resident.nama}</p>
-                        {resident.attendanceData && (
-                          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">Hadir</span>
-                        )}
+              ) : (
+                <>
+                  {isSelectionMode && (
+                    <>
+                      {/* Select All Checkbox */}
+                      <div className="flex items-center gap-2 px-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedResidents.size === filteredResidents.length && filteredResidents.length > 0}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-600">Pilih Semua</span>
                       </div>
-                      <p className="text-xs text-gray-500">NIK: {resident.nik}</p>
-                      <div className="flex gap-3 mt-1 text-xs text-gray-600">
-                        <span>RW {resident.rw} / RT {resident.rt}</span>
-                        <span>{resident.umur} tahun</span>
-                        <span>{resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span>
+                    </>
+                  )}
+                  {filteredResidents.map(resident => (
+                    <div key={resident.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3 flex-1">
+                          {isSelectionMode && (
+                            <input
+                              type="checkbox"
+                              checked={selectedResidents.has(resident.id)}
+                              onChange={() => handleSelectResident(resident.id)}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mt-1"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-gray-800">{resident.nama}</p>
+                              {resident.attendanceData && (
+                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">Hadir</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500">NIK: {resident.nik}</p>
+                            <div className="flex gap-3 mt-1 text-xs text-gray-600">
+                              <span>RW {resident.rw} / RT {resident.rt}</span>
+                              <span>{resident.umur} tahun</span>
+                              <span>{resident.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => openEditModal(resident)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteResident(resident.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => openEditModal(resident)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeleteResident(resident.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
 
                   {/* Health Data Section */}
                   {(resident.tbbbData || resident.healthData) && (
@@ -1047,6 +1234,8 @@ export default function PosbinduMonitoring() {
                   )}
                 </div>
               ))}
+                </>
+              )}
             </div>
 
           </div>

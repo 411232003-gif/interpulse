@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight, Users, TrendingUp, LogIn, CheckCircle, AlertCircle, XCircle, PlusCircle, Calendar, Ruler, Scale, FileText } from 'lucide-react'
+import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight, Users, TrendingUp, LogIn, CheckCircle, AlertCircle, XCircle, PlusCircle, Calendar, Ruler, Scale, FileText, Info } from 'lucide-react'
 import BigNumpad from '@/components/BigNumpad'
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -14,6 +14,7 @@ type Step = 'select' | 'input' | 'result'
 export default function Home() {
   const { user, loading, isAdmin, userProfile, isGuest } = useAuth()
   const [isMobile, setIsMobile] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [touchStart, setTouchStart] = useState(0)
   const [touchEnd, setTouchEnd] = useState(0)
@@ -31,6 +32,12 @@ export default function Home() {
   const [healthReadings, setHealthReadings] = useState<any[]>([])
   const [todayReadingsForResident, setTodayReadingsForResident] = useState<any[]>([])
   const [isResetting, setIsResetting] = useState(false)
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 4000)
+  }
 
   const healthConfig: Record<HealthType, { icon: string; title: string; color: string; fields: { key: string; label: string; unit: string }[] }> = {
     tensi: {
@@ -236,7 +243,7 @@ export default function Home() {
       setTodayReadingsForResident(prev => [...prev, newReading])
     } catch (error) {
       console.error('[Homepage] Error saving health reading:', error)
-      alert('Gagal menyimpan data. Coba lagi.')
+      showNotification('error', 'Gagal menyimpan data. Coba lagi.')
     } finally {
       setSaving(false)
     }
@@ -291,10 +298,10 @@ export default function Home() {
       setData({})
       setCurrentInput('')
       setInputIndex(0)
-      alert('Data hari ini berhasil dihapus')
+      showNotification('success', 'Data hari ini berhasil dihapus')
     } catch (error) {
       console.error('Error deleting today data:', error)
-      alert('Gagal menghapus data')
+      showNotification('error', 'Gagal menghapus data')
     } finally {
       setIsResetting(false)
     }
@@ -319,6 +326,7 @@ export default function Home() {
 
   // Detect mobile/desktop
   useEffect(() => {
+    setMounted(true)
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }
@@ -360,8 +368,8 @@ export default function Home() {
     }
   }
 
-  // Show loading while checking auth
-  if (loading) {
+  // Show loading while checking auth or mounting
+  if (loading || !mounted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
@@ -443,6 +451,35 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20 flex flex-col">
+      {/* Modern Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] ${
+            notification.type === 'success'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+              : notification.type === 'error'
+              ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              {notification.type === 'success' && <CheckCircle className="w-6 h-6" />}
+              {notification.type === 'error' && <AlertCircle className="w-6 h-6" />}
+              {notification.type === 'info' && <Info className="w-6 h-6" />}
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-white">{notification.message}</p>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Tutup notifikasi"
+            >
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-2 flex-1 flex flex-col">
         {/* Header */}
         <div className="mb-4 mt-3">
