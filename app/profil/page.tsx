@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import BackButton from '@/components/BackButton'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { User, Mail, Phone, Calendar, Ruler, Weight, Target, Settings, X, Save, Plus, Trash2, Edit3, Trophy, QrCode, Share2, LogOut, Eye, EyeOff } from 'lucide-react'
+import { User, Mail, Phone, Calendar, Ruler, Weight, Target, Settings, X, Save, Plus, Trash2, Edit3, Trophy, QrCode, Share2, LogOut, Eye, EyeOff, CheckCircle, AlertCircle, Info } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth, UserProfile } from '@/lib/auth-context'
 import { doc, updateDoc } from 'firebase/firestore'
@@ -66,6 +66,12 @@ export default function Profil() {
   const [editedProfile, setEditedProfile] = useState<UserProfile>(defaultProfile)
   const [mounted, setMounted] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 4000)
+  }
 
   // Health Data State
   const [healthData, setHealthData] = useState<HealthData[]>([
@@ -557,6 +563,35 @@ export default function Profil() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-teal-50 via-cyan-50 to-blue-50">
+      {/* Modern Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] ${
+            notification.type === 'success'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+              : notification.type === 'error'
+              ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              {notification.type === 'success' && <CheckCircle className="w-6 h-6" />}
+              {notification.type === 'error' && <AlertCircle className="w-6 h-6" />}
+              {notification.type === 'info' && <Info className="w-6 h-6" />}
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-white">{notification.message}</p>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Tutup notifikasi"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Profil Saya</h1>
@@ -792,14 +827,14 @@ export default function Profil() {
                   <p className="text-xs text-gray-500 text-center mb-3">
                     Scan QR code ini dengan kamera HP untuk login otomatis ke InterPulse
                   </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="w-full text-teal-600 border-teal-200 hover:bg-teal-50"
                     onClick={() => {
                       const loginUrl = `${appUrl}/login-qr?userId=${profile.uid}&email=${encodeURIComponent(profile.email)}`
                       navigator.clipboard.writeText(loginUrl)
-                      alert('Link login telah disalin ke clipboard!')
+                      showNotification('success', 'Link login telah disalin ke clipboard!')
                     }}
                   >
                     <Share2 className="w-4 h-4 mr-2" />

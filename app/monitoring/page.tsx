@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -21,7 +21,7 @@ const monthLabels: Record<string, string> = {
 }
 
 export default function MonitoringPage() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, userProfile } = useAuth()
   const [healthReadings, setHealthReadings] = useState<Record<string, Record<string, number>>>({})
   const [healthTypeDistribution, setHealthTypeDistribution] = useState<Record<string, number>>({})
   const [attendanceData, setAttendanceData] = useState<Record<string, Record<string, number>>>({})
@@ -31,6 +31,7 @@ export default function MonitoringPage() {
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
   const [rwExportDropdown, setRwExportDropdown] = useState<string | null>(null)
   const [attendanceExportDropdown, setAttendanceExportDropdown] = useState<string | null>(null)
+  const [tableExportDropdown, setTableExportDropdown] = useState(false)
   
   // Filters for health examination chart
   const [filterRW, setFilterRW] = useState<string>('all')
@@ -42,6 +43,73 @@ export default function MonitoringPage() {
   const [tableFilterRW, setTableFilterRW] = useState<string>('all')
   const [tableFilterRT, setTableFilterRT] = useState<string>('all')
   const [tableSearchTerm, setTableSearchTerm] = useState<string>('')
+
+  // Selection mode for Data Warga
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedResidents, setSelectedResidents] = useState<Set<string>>(new Set())
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingResident, setEditingResident] = useState<any>(null)
+
+  // Resident form state for editing
+  const [residentForm, setResidentForm] = useState({
+    nama: '',
+    nik: '',
+    rw: '',
+    rt: '',
+    birthDate: '',
+    jenisKelamin: 'L' as 'L' | 'P',
+    alamat: ''
+  })
+
+  // Toggle selection mode
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedResidents(new Set())
+  }
+
+  // Toggle resident selection
+  const toggleResidentSelection = (residentId: string) => {
+    const newSelection = new Set(selectedResidents)
+    if (newSelection.has(residentId)) {
+      newSelection.delete(residentId)
+    } else {
+      newSelection.add(residentId)
+    }
+    setSelectedResidents(newSelection)
+  }
+
+  // Edit resident
+  const editResident = (resident: any) => {
+    setEditingResident(resident)
+    setResidentForm({
+      nama: resident.nama || '',
+      nik: resident.nik || '',
+      rw: resident.rw || '',
+      rt: resident.rt || '',
+      birthDate: resident.birthDate || resident.tglLahir || '',
+      jenisKelamin: resident.jenisKelamin || 'L',
+      alamat: resident.alamat || ''
+    })
+    setShowEditModal(true)
+  }
+
+  // Save edited resident
+  const saveEditedResident = async (updatedData: any) => {
+    try {
+      const residentsRef = collection(db, 'residents')
+      const q = query(residentsRef, where('nik', '==', editingResident.nik))
+      const snapshot = await getDocs(q)
+      snapshot.forEach(async (docSnapshot) => {
+        await updateDoc(doc(db, 'residents', docSnapshot.id), updatedData)
+      })
+      setShowEditModal(false)
+      setEditingResident(null)
+      alert('Data warga berhasil diperbarui')
+    } catch (error) {
+      console.error('Error updating resident:', error)
+      alert('Gagal memperbarui data warga')
+    }
+  }
 
   // Fetch health readings data from healthReadings collection
   useEffect(() => {
@@ -266,6 +334,7 @@ export default function MonitoringPage() {
           umur: resident.umur || '-',
           alamat: resident.alamat || '-',
           jenisKelamin: resident.jenisKelamin || '-',
+          rw: resident.rw || rw,
           tb: tbbbData[resident.nik]?.tb || '-',
           bb: tbbbData[resident.nik]?.bb || '-',
           lp: tbbbData[resident.nik]?.lp || '-',
@@ -280,6 +349,45 @@ export default function MonitoringPage() {
     })
     
     return data
+  }
+
+  // Select all residents (defined after getTableData)
+  const selectAllResidents = () => {
+    const tableData = getTableData()
+    const allIds = tableData.map(row => row.nik || row.id)
+    setSelectedResidents(new Set(allIds))
+  }
+
+  // Deselect all residents
+  const deselectAllResidents = () => {
+    setSelectedResidents(new Set())
+  }
+
+  // Delete selected residents
+  const deleteSelectedResidents = async () => {
+    if (selectedResidents.size === 0) return
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedResidents.size} data warga?`)) {
+      return
+    }
+
+    try {
+      for (const residentId of selectedResidents) {
+        // Delete from residents collection
+        const residentsRef = collection(db, 'residents')
+        const q = query(residentsRef, where('nik', '==', residentId))
+        const snapshot = await getDocs(q)
+        snapshot.forEach(async (docSnapshot) => {
+          await deleteDoc(doc(db, 'residents', docSnapshot.id))
+        })
+      }
+      setSelectedResidents(new Set())
+      setIsSelectionMode(false)
+      alert('Data warga berhasil dihapus')
+    } catch (error) {
+      console.error('Error deleting residents:', error)
+      alert('Gagal menghapus data warga')
+    }
   }
 
   // Fetch detailed health readings for per-RW export
@@ -326,6 +434,7 @@ export default function MonitoringPage() {
 
   const exportToPDF = () => {
     const doc = new jsPDF()
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
 
     // Header
     doc.setFillColor(79, 70, 229)
@@ -336,7 +445,7 @@ export default function MonitoringPage() {
     doc.text('Monitoring Kesehatan', 105, 20, { align: 'center' })
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan Duris Selatan - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
 
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(10)
@@ -530,8 +639,9 @@ export default function MonitoringPage() {
   }
 
   const exportToWhatsApp = () => {
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     let message = `📊 *MONITORING KESEHATAN*\n`
-    message += `🏥 Kelurahan Duris Selatan\n`
+    message += `🏥 Kelurahan ${kelurahan}\n`
     message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
@@ -580,78 +690,142 @@ export default function MonitoringPage() {
   // Per-RW export functions for attendance
   const exportAttendanceToPDF = (rw: string) => {
     const doc = new jsPDF()
-    
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const tableData = getTableData().filter(row => row.rw === rw)
+
     // Header
     doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, 40, 'F')
+    doc.rect(0, 0, 210, 50, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
-    doc.text(`Partisipasi Warga RW ${rw}`, 105, 20, { align: 'center' })
+    doc.text('Data Kesehatan Warga', 105, 20, { align: 'center' })
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan Duris Selatan - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
-    
-    // Summary
+    doc.text(`Kelurahan ${kelurahan} - RW ${rw} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(10)
-    const attendance = attendanceData[rw]?.[selectedMonth] || 0
-    const target = rwTargets[rw] || 0
-    const percentage = target > 0 ? ((attendance / target) * 100).toFixed(1) : '0'
-    
-    doc.text(`Total Hadir: ${attendance}`, 14, 50)
-    doc.text(`Target Warga: ${target}`, 14, 58)
-    doc.text(`Capaian: ${percentage}%`, 14, 66)
-    
-    doc.save(`partisipasi-rw-${rw}-${selectedMonth}.pdf`)
+    doc.text(`Total Data: ${tableData.length}`, 14, 60)
+
+    // Table data
+    const pdfData = tableData.map(row => [
+      row.nama,
+      row.nik,
+      row.tglLahir,
+      row.umur,
+      row.alamat,
+      row.jenisKelamin,
+      row.tb,
+      row.bb,
+      row.lp,
+      row.td,
+      row.gds,
+      row.imt,
+      row.ua,
+      row.col,
+      row.nadi
+    ])
+
+    autoTable(doc, {
+      startY: 65,
+      head: [['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
+      body: pdfData,
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [79, 70, 229],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [238, 242, 255],
+      },
+    })
+
+    doc.save(`data-kesehatan-warga-rw-${rw}-${selectedMonth}.pdf`)
   }
 
   const exportAttendanceToExcel = (rw: string) => {
-    const attendance = attendanceData[rw]?.[selectedMonth] || 0
-    const target = rwTargets[rw] || 0
-    const percentage = target > 0 ? ((attendance / target) * 100).toFixed(1) : '0'
-    
-    const data = [
-      {
-        'Wilayah': `RW ${rw}`,
-        'Bulan': monthLabels[selectedMonth],
-        'Total Hadir': attendance,
-        'Target Warga': target,
-        'Capaian (%)': percentage
-      }
-    ]
-    
+    const tableData = getTableData().filter(row => row.rw === rw)
+
+    const data = tableData.map(row => ({
+      'Nama': row.nama,
+      'NIK': row.nik,
+      'Tgl Lahir': row.tglLahir,
+      'Umur': row.umur,
+      'Alamat': row.alamat,
+      'L/P': row.jenisKelamin,
+      'TB': row.tb,
+      'BB': row.bb,
+      'LP': row.lp,
+      'TD': row.td,
+      'GDS': row.gds,
+      'IMT': row.imt,
+      'UA': row.ua,
+      'COL': row.col,
+      'NADI': row.nadi
+    }))
+
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, `RW ${rw}`)
-    
+    XLSX.utils.book_append_sheet(wb, ws, `Data Kesehatan Warga RW ${rw}`)
+
     ws['!cols'] = [
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 6 },
+      { wch: 30 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 8 },
+      { wch: 8 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 6 },
     ]
-    
-    XLSX.writeFile(wb, `partisipasi-rw-${rw}-${selectedMonth}.xlsx`)
+
+    XLSX.writeFile(wb, `data-kesehatan-warga-rw-${rw}-${selectedMonth}.xlsx`)
   }
 
   const exportAttendanceToWhatsApp = (rw: string) => {
-    const attendance = attendanceData[rw]?.[selectedMonth] || 0
-    const target = rwTargets[rw] || 0
-    const percentage = target > 0 ? ((attendance / target) * 100).toFixed(1) : '0'
-    
-    let message = `📊 *PARTISIPASI WARGA RW ${rw}*\n`
-    message += `🏥 Kelurahan Duris Selatan\n`
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const tableData = getTableData().filter(row => row.rw === rw)
+
+    let message = `📊 *DATA KESEHATAN WARGA RW ${rw}*\n`
+    message += `🏥 Kelurahan ${kelurahan}\n`
     message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
-    message += `• Total Hadir: ${attendance}\n`
-    message += `• Target Warga: ${target}\n`
-    message += `• Capaian: ${percentage}%\n\n`
+    message += `• Total Data: ${tableData.length}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `🏥 *DATA KESEHATAN WARGA*\n\n`
+
+    if (tableData.length === 0) {
+      message += `Belum ada data kesehatan untuk RW ${rw}.\n`
+    } else {
+      tableData.forEach((row, index) => {
+        message += `${index + 1}. ${row.nama}\n`
+        message += `   NIK: ${row.nik}\n`
+        message += `   Umur: ${row.umur}\n`
+        message += `   Alamat: ${row.alamat}\n`
+        message += `   L/P: ${row.jenisKelamin}\n`
+        message += `   TB: ${row.tb} | BB: ${row.bb}\n`
+        message += `   TD: ${row.td} | GDS: ${row.gds}\n`
+        message += `   IMT: ${row.imt} | UA: ${row.ua}\n`
+        message += `   COL: ${row.col} | NADI: ${row.nadi}\n\n`
+      })
+    }
+
     message += `━━━━━━━━━━━━━━━━━━━━\n`
     message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
-    
+
     const encodedMessage = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
   }
@@ -659,6 +833,7 @@ export default function MonitoringPage() {
   // Per-RW export functions
   const exportRWToPDF = (rw: string) => {
     const doc = new jsPDF()
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     
     // Header
     doc.setFillColor(79, 70, 229)
@@ -669,7 +844,7 @@ export default function MonitoringPage() {
     doc.text(`Pemeriksaan Kesehatan RW ${rw}`, 105, 20, { align: 'center' })
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan Duris Selatan - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
     
     // Filter data for selected RW and month
     const rwData = healthReadingsDetails[rw] || []
@@ -753,6 +928,7 @@ export default function MonitoringPage() {
   }
 
   const exportRWToWhatsApp = (rw: string) => {
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     const rwData = healthReadingsDetails[rw] || []
     const monthData = rwData.filter(d => {
       const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
@@ -760,7 +936,7 @@ export default function MonitoringPage() {
     })
     
     let message = `📊 *PEMERIKSAAN KESEHATAN RW ${rw}*\n`
-    message += `🏥 Kelurahan Duris Selatan\n`
+    message += `🏥 Kelurahan ${kelurahan}\n`
     message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
@@ -783,6 +959,149 @@ export default function MonitoringPage() {
     
     const encodedMessage = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
+  }
+
+  // Export functions for Data Kesehatan Warga table
+  const exportTableToPDF = () => {
+    const doc = new jsPDF()
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const tableData = getTableData()
+    
+    // Header
+    doc.setFillColor(79, 70, 229)
+    doc.rect(0, 0, 210, 50, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Data Kesehatan Warga', 105, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+    
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(10)
+    doc.text(`Total Data: ${tableData.length}`, 14, 60)
+    
+    // Table data
+    const pdfData = tableData.map(row => [
+      row.nama,
+      row.nik,
+      row.tglLahir,
+      row.umur,
+      row.alamat,
+      row.jenisKelamin,
+      row.tb,
+      row.bb,
+      row.lp,
+      row.td,
+      row.gds,
+      row.imt,
+      row.ua,
+      row.col,
+      row.nadi
+    ])
+    
+    autoTable(doc, {
+      startY: 65,
+      head: [['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
+      body: pdfData,
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [79, 70, 229],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [238, 242, 255],
+      },
+    })
+    
+    doc.save(`data-kesehatan-warga-${selectedMonth}.pdf`)
+    setTableExportDropdown(false)
+  }
+
+  const exportTableToExcel = () => {
+    const tableData = getTableData()
+    
+    const data = tableData.map(row => ({
+      'Nama': row.nama,
+      'NIK': row.nik,
+      'Tgl Lahir': row.tglLahir,
+      'Umur': row.umur,
+      'Alamat': row.alamat,
+      'L/P': row.jenisKelamin,
+      'TB': row.tb,
+      'BB': row.bb,
+      'LP': row.lp,
+      'TD': row.td,
+      'GDS': row.gds,
+      'IMT': row.imt,
+      'UA': row.ua,
+      'COL': row.col,
+      'NADI': row.nadi
+    }))
+    
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Data Kesehatan Warga')
+    
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 6 },
+      { wch: 30 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 8 },
+      { wch: 8 },
+      { wch: 8 },
+      { wch: 8 },
+      { wch: 8 },
+      { wch: 8 }
+    ]
+    
+    XLSX.writeFile(wb, `data-kesehatan-warga-${selectedMonth}.xlsx`)
+    setTableExportDropdown(false)
+  }
+
+  const exportTableToWhatsApp = () => {
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const tableData = getTableData()
+    
+    let message = `📊 *DATA KESEHATAN WARGA*\n`
+    message += `🏥 Kelurahan ${kelurahan}\n`
+    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `📈 *RINGKASAN DATA*\n`
+    message += `• Total Warga: ${tableData.length}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `🏥 *DAFTAR WARGA*\n\n`
+    
+    tableData.slice(0, 20).forEach(row => {
+      message += `� ${row.nama}\n`
+      message += `🆔 NIK: ${row.nik}\n`
+      message += `🎂 Umur: ${row.umur}\n`
+      message += `📍 Alamat: ${row.alamat}\n`
+      message += `🏥 TB: ${row.tb} | BB: ${row.bb} | LP: ${row.lp}\n`
+      message += `💓 TD: ${row.td} | GDS: ${row.gds} | IMT: ${row.imt}\n\n`
+    })
+    
+    if (tableData.length > 20) {
+      message += `... dan ${tableData.length - 20} data lainnya\n\n`
+    }
+    
+    message += `━━━━━━━━━━━━━━━━━━━━\n`
+    message += `� InterPulse - Aplikasi Kesehatan Terpadu\n`
+    
+    const encodedMessage = encodeURIComponent(message)
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
+    setTableExportDropdown(false)
   }
 
   return (
@@ -1062,14 +1381,9 @@ export default function MonitoringPage() {
 
           {/* Table 2: Rekapitulasi Partisipasi Warga */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Rekapitulasi Partisipasi Warga</span>
-              </div>
-              <button className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                Export
-              </button>
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="w-4 h-4 text-indigo-600" />
+              <span className="font-semibold text-gray-800 text-sm">Rekapitulasi Partisipasi Warga</span>
             </div>
             {/* Table */}
             <div className="overflow-x-auto">
@@ -1170,6 +1484,48 @@ export default function MonitoringPage() {
                 <Activity className="w-4 h-4 text-indigo-600" />
                 <span className="font-semibold text-gray-800 text-sm">Data Kesehatan Warga</span>
               </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <button
+                    onClick={() => setTableExportDropdown(!tableExportDropdown)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    <Download className="w-3 h-3" />
+                    Export
+                  </button>
+                  {tableExportDropdown && (
+                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                      <button
+                        onClick={exportTableToPDF}
+                        className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl text-xs"
+                      >
+                        <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+                        </svg>
+                        <span className="text-gray-700">PDF</span>
+                      </button>
+                      <button
+                        onClick={exportTableToExcel}
+                        className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors text-xs"
+                      >
+                        <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
+                        </svg>
+                        <span className="text-gray-700">Excel</span>
+                      </button>
+                      <button
+                        onClick={exportTableToWhatsApp}
+                        className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl text-xs"
+                      >
+                        <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                        <span className="text-gray-700">WhatsApp</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-600">RW</label>
@@ -1257,6 +1613,112 @@ export default function MonitoringPage() {
               </table>
             </div>
           </div>
+
+          {/* Edit Modal */}
+          {showEditModal && editingResident && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-800">Edit Data Warga</h3>
+                  <button
+                    onClick={() => {
+                      setShowEditModal(false)
+                      setEditingResident(null)
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nama</label>
+                    <input
+                      type="text"
+                      value={residentForm.nama}
+                      onChange={(e) => setResidentForm({ ...residentForm, nama: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">NIK</label>
+                    <input
+                      type="text"
+                      value={residentForm.nik}
+                      disabled
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">RW</label>
+                      <input
+                        type="text"
+                        value={residentForm.rw}
+                        onChange={(e) => setResidentForm({ ...residentForm, rw: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">RT</label>
+                      <input
+                        type="text"
+                        value={residentForm.rt}
+                        onChange={(e) => setResidentForm({ ...residentForm, rt: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+                    <input
+                      type="date"
+                      value={residentForm.birthDate}
+                      onChange={(e) => setResidentForm({ ...residentForm, birthDate: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Kelamin</label>
+                    <select
+                      value={residentForm.jenisKelamin}
+                      onChange={(e) => setResidentForm({ ...residentForm, jenisKelamin: e.target.value as 'L' | 'P' })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="L">Laki-laki</option>
+                      <option value="P">Perempuan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
+                    <textarea
+                      value={residentForm.alamat}
+                      onChange={(e) => setResidentForm({ ...residentForm, alamat: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={() => {
+                        setShowEditModal(false)
+                        setEditingResident(null)
+                      }}
+                      className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={() => saveEditedResident(residentForm)}
+                      className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                    >
+                      Simpan
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
       </div>
     </div>
   )

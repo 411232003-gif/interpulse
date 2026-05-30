@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, Search, Filter, ArrowLeft, Ruler, Scale, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { Users, Search, Filter, ArrowLeft, Ruler, Scale, X, CheckCircle, AlertCircle, Info } from 'lucide-react'
 
 interface Resident {
   id: string
@@ -53,7 +53,12 @@ export default function InputTBBBPage() {
   const [lingkarPinggang, setLingkarPinggang] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 4000)
+  }
   const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
 
   // Calculate age from birthDate
@@ -191,7 +196,7 @@ export default function InputTBBBPage() {
   // Save TB/BB data
   const handleSave = async () => {
     if (!selectedResident || !tb || !bb) {
-      alert('Mohon isi tinggi badan dan berat badan')
+      showNotification('info', 'Mohon isi tinggi badan dan berat badan')
       return
     }
 
@@ -235,11 +240,10 @@ export default function InputTBBBPage() {
       }
 
       closeModal()
-      setShowSuccessBanner(true)
-      setTimeout(() => setShowSuccessBanner(false), 4000)
+      showNotification('success', 'Data tinggi badan dan berat badan tersimpan')
     } catch (error) {
       console.error('Error saving TB/BB:', error)
-      alert('Gagal menyimpan data')
+      showNotification('error', 'Gagal menyimpan data')
     } finally {
       setSaving(false)
     }
@@ -258,21 +262,28 @@ export default function InputTBBBPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 p-4 pb-24">
-      {/* Success Banner */}
-      {showSuccessBanner && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
-          <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4">
+      {/* Modern Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] ${
+            notification.type === 'success'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+              : notification.type === 'error'
+              ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-              <CheckCircle className="w-6 h-6" />
+              {notification.type === 'success' && <CheckCircle className="w-6 h-6" />}
+              {notification.type === 'error' && <AlertCircle className="w-6 h-6" />}
+              {notification.type === 'info' && <Info className="w-6 h-6" />}
             </div>
-            <div>
-              <p className="font-bold text-lg">Berhasil!</p>
-              <p className="text-sm text-white/90">Data tinggi badan dan berat badan tersimpan</p>
+            <div className="flex-1">
+              <p className="font-semibold text-white">{notification.message}</p>
             </div>
-            <button 
-              onClick={() => setShowSuccessBanner(false)}
-              aria-label="Tutup banner"
-              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Tutup notifikasi"
             >
               <X className="w-5 h-5" />
             </button>

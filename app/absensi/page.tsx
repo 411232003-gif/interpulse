@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, Search, Filter, ArrowLeft, CheckCircle, Calendar, X, AlertCircle } from 'lucide-react'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
+import { Users, Search, Filter, ArrowLeft, CheckCircle, Calendar, X, AlertCircle, Plus, Info } from 'lucide-react'
 
 interface Resident {
   id: string
@@ -29,7 +31,23 @@ export default function AbsensiPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [attendanceToday, setAttendanceToday] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 4000)
+  }
+  const [residentForm, setResidentForm] = useState({
+    nama: '',
+    nik: '',
+    rw: '',
+    rt: '',
+    birthDate: '',
+    jenisKelamin: 'L' as 'L' | 'P',
+    alamat: ''
+  })
+  const [generatedPassword, setGeneratedPassword] = useState('')
 
   // Calculate age from birthDate
   const calculateAge = (birthDate: string): number => {
@@ -202,12 +220,101 @@ export default function AbsensiPage() {
         await addDoc(collection(db, 'attendance'), attendanceData)
       }
       
-      setShowSuccessBanner(true)
-      setTimeout(() => setShowSuccessBanner(false), 4000)
+      showNotification('success', 'Absensi berhasil dicatat')
     } catch (error) {
       console.error('Error saving attendance:', error)
-      alert('Gagal menyimpan absensi')
+      showNotification('error', 'Gagal menyimpan absensi')
     }
+  }
+
+  // Generate random PIN (6 digits)
+  const generatePIN = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString()
+  }
+
+  // Handle add resident with auto username/password
+  const handleAddResident = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const age = calculateAge(residentForm.birthDate)
+      const password = generatePIN()
+      setGeneratedPassword(password)
+
+      // Store current admin token before creating new user
+      const adminToken = document.cookie.replace(/(?:(?:^|.*;\s*)firebaseIdToken\s*\=\s*([^;]*).*$)|^.*$/, "$1")
+
+      // Create Firebase Auth user
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        `${residentForm.nik}@interpulse.id`,
+        password
+      )
+
+      // Add user to users collection
+      await addDoc(collection(db, 'users'), {
+        uid: userCredential.user.uid,
+        name: residentForm.nama,
+        nik: residentForm.nik,
+        email: `${residentForm.nik}@interpulse.id`,
+        rw: residentForm.rw,
+        rt: residentForm.rt,
+        birthDate: residentForm.birthDate,
+        gender: residentForm.jenisKelamin,
+        kelurahan: residentForm.alamat,
+        role: 'user',
+        createdAt: new Date().toISOString()
+      })
+
+      // Sign out from the new user account
+      await auth.signOut()
+
+      // Restore admin session by setting the cookie back
+      if (adminToken) {
+        document.cookie = `firebaseIdToken=${adminToken}; path=/; max-age=3600`
+      }
+
+      // Add resident to Firestore
+      const newResident = {
+        nama: residentForm.nama,
+        nik: residentForm.nik,
+        rw: residentForm.rw,
+        rt: residentForm.rt,
+        birthDate: residentForm.birthDate,
+        umur: age,
+        jenisKelamin: residentForm.jenisKelamin,
+        alamat: residentForm.alamat,
+      }
+      await addDoc(collection(db, 'residents'), newResident)
+
+      setIsAddModalOpen(false)
+      setResidentForm({
+        nama: '',
+        nik: '',
+        rw: '',
+        rt: '',
+        birthDate: '',
+        jenisKelamin: 'L',
+        alamat: ''
+      })
+
+      showNotification('success', `Warga berhasil ditambahkan! Username: ${residentForm.nik}, Password: ${password}`)
+    } catch (error) {
+      console.error('Error adding resident:', error)
+      showNotification('error', 'Gagal menambahkan warga. Pastikan NIK belum terdaftar.')
+    }
+  }
+
+  const resetResidentForm = () => {
+    setResidentForm({
+      nama: '',
+      nik: '',
+      rw: '',
+      rt: '',
+      birthDate: '',
+      jenisKelamin: 'L',
+      alamat: ''
+    })
+    setGeneratedPassword('')
   }
 
   if (loading) {
@@ -223,21 +330,28 @@ export default function AbsensiPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pb-24">
-      {/* Success Banner */}
-      {showSuccessBanner && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
-          <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4">
+      {/* Modern Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] ${
+            notification.type === 'success'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+              : notification.type === 'error'
+              ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-              <CheckCircle className="w-6 h-6" />
+              {notification.type === 'success' && <CheckCircle className="w-6 h-6" />}
+              {notification.type === 'error' && <AlertCircle className="w-6 h-6" />}
+              {notification.type === 'info' && <Info className="w-6 h-6" />}
             </div>
-            <div>
-              <p className="font-bold text-lg">Berhasil!</p>
-              <p className="text-sm text-white/90">Absensi berhasil dicatat</p>
+            <div className="flex-1">
+              <p className="font-semibold text-white">{notification.message}</p>
             </div>
-            <button 
-              onClick={() => setShowSuccessBanner(false)}
-              aria-label="Tutup banner"
-              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Tutup notifikasi"
             >
               <X className="w-5 h-5" />
             </button>
@@ -252,8 +366,17 @@ export default function AbsensiPage() {
               <button onClick={() => router.push('/monev-posbindu')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
               <h1 className="text-2xl font-bold text-gray-800">Absensi Posbindu</h1>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setIsAddModalOpen(true); resetResidentForm(); }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                Tambah Warga
+              </button>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              </div>
             </div>
           </div>
 
@@ -336,6 +459,147 @@ export default function AbsensiPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Form for Add Resident */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-800">Tambah Data Warga</h3>
+                <button
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Tutup modal"
+                  aria-label="Tutup modal"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddResident} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap *</label>
+                    <input
+                      type="text"
+                      required
+                      value={residentForm.nama}
+                      onChange={(e) => setResidentForm({ ...residentForm, nama: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Masukkan nama lengkap"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">NIK *</label>
+                    <input
+                      type="text"
+                      required
+                      value={residentForm.nik}
+                      onChange={(e) => setResidentForm({ ...residentForm, nik: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Masukkan NIK (16 digit)"
+                      maxLength={16}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">RT *</label>
+                    <select
+                      required
+                      value={residentForm.rt}
+                      onChange={(e) => setResidentForm({ ...residentForm, rt: e.target.value })}
+                      aria-label="Pilih RT"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Pilih RT</option>
+                      {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rt => (
+                        <option key={rt} value={rt}>RT {rt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">RW *</label>
+                    <select
+                      required
+                      value={residentForm.rw}
+                      onChange={(e) => setResidentForm({ ...residentForm, rw: e.target.value })}
+                      aria-label="Pilih RW"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Pilih RW</option>
+                      {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map(rw => (
+                        <option key={rw} value={rw}>RW {rw}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Tanggal Lahir *</label>
+                    <input
+                      type="date"
+                      required
+                      value={residentForm.birthDate}
+                      onChange={(e) => setResidentForm({ ...residentForm, birthDate: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      aria-label="Tanggal Lahir"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin *</label>
+                    <select
+                      required
+                      value={residentForm.jenisKelamin}
+                      onChange={(e) => setResidentForm({ ...residentForm, jenisKelamin: e.target.value as 'L' | 'P' })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      aria-label="Jenis Kelamin"
+                    >
+                      <option value="L">Laki-laki</option>
+                      <option value="P">Perempuan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Alamat *</label>
+                    <input
+                      type="text"
+                      required
+                      value={residentForm.alamat}
+                      onChange={(e) => setResidentForm({ ...residentForm, alamat: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Masukkan alamat lengkap"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 font-medium mb-2">ℹ️ Informasi Akun</p>
+                  <p className="text-xs text-blue-700">Username akan dibuat otomatis menggunakan NIK. Password akan dibuat otomatis (PIN 6 digit) dan ditampilkan setelah data berhasil disimpan.</p>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Tambah Warga
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

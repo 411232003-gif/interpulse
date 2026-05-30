@@ -9,12 +9,12 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // Configuration
-const months = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+const months = ['januari', 'februari', 'maret', 'april'];
 const rwTargets = {
-  '01': 150,
-  '02': 200,
-  '03': 100,
-  '04': 200
+  '01': 120,
+  '02': 120,
+  '03': 120,
+  '04': 118
 };
 
 // Generate random number between min and max
@@ -29,28 +29,34 @@ async function generateResidents() {
   
   const maleNames = [
     'Budi Santoso', 'Ahmad Dahlan', 'Rudi Hartono', 'Joko Widodo', 'Dedi Corbuzier',
-    'Raffi Ahmad', 'Andi Wijaya', 'Denny Cagur', 'Bambang Pamungkas', 'Reza Rahadian'
+    'Raffi Ahmad', 'Andi Wijaya', 'Denny Cagur', 'Bambang Pamungkas', 'Reza Rahadian',
+    'Agus Setiawan', 'Bambang Sutrisno', 'Cahyo Purnomo', 'Dedi Kurniawan', 'Eko Prasetyo',
+    'Feri Irawan', 'Gunawan Santoso', 'Hendra Wijaya', 'I Made Suweta', 'Joko Susilo'
   ];
   
   const femaleNames = [
     'Siti Aminah', 'Dewi Sartika', 'Lina Marlina', 'Rina Nose', 'Putri Titian',
-    'Nagita Slavina', 'Maya Estianty', 'Rina Wati', 'Citra Kirana', 'Maudy Ayunda'
+    'Nagita Slavina', 'Maya Estianty', 'Rina Wati', 'Citra Kirana', 'Maudy Ayunda',
+    'Ani Suryani', 'Bella Safira', 'Citra Lestari', 'Dina Mariani', 'Eka Putri',
+    'Fitri Handayani', 'Gita Savitri', 'Haniifah', 'Indah Permata', 'Jihan Audy'
   ];
   
   const allNames = [...maleNames, ...femaleNames];
   const residentData = [];
+  const totalResidents = 478;
   
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < totalResidents; i++) {
     const rw = Object.keys(rwTargets)[randomInt(0, Object.keys(rwTargets).length - 1)];
     const rt = String(randomInt(1, 10));
     const nik = `317${String(randomInt(100000000, 999999999))}`;
     const birthYear = randomInt(1950, 2000);
     const birthDate = `${birthYear}-${String(randomInt(1, 12)).padStart(2, '0')}-${String(randomInt(1, 28)).padStart(2, '0')}`;
-    const isMale = i < 10; // First 10 are male, next 10 are female
+    const isMale = i % 2 === 0; // Alternate between male and female
+    const nameIndex = i % allNames.length;
     
     const docRef = residentsRef.doc(nik);
     batch.set(docRef, {
-      nama: allNames[i],
+      nama: allNames[nameIndex] + ` ${randomInt(1, 99)}`, // Add number to make unique
       nik: nik,
       rw: rw,
       rt: rt,
@@ -63,17 +69,19 @@ async function generateResidents() {
     
     residentData.push({
       nik: nik,
-      nama: allNames[i],
+      nama: allNames[nameIndex] + ` ${randomInt(1, 99)}`,
       rw: rw,
       rt: rt,
       jenisKelamin: isMale ? 'Laki-laki' : 'Perempuan'
     });
     
-    console.log(`✅ Resident: ${allNames[i]} (${isMale ? 'L' : 'P'}) - RW ${rw}/RT ${rt}`);
+    if (i % 50 === 0) {
+      console.log(`✅ Generated ${i}/${totalResidents} residents...`);
+    }
   }
   
   await batch.commit();
-  console.log('\n✨ Residents generated successfully!\n');
+  console.log(`\n✨ ${totalResidents} Residents generated successfully!\n`);
   return residentData;
 }
 
@@ -226,10 +234,10 @@ async function generateAllDummyData() {
     console.log('=====================================');
     console.log('✨ All dummy data generated successfully!');
     console.log('\n📝 Summary:');
-    console.log('   - Residents: 20 (10 Laki-laki, 10 Perempuan)');
-    console.log('   - Health Readings: ~1,920 (12 months × 4 RW × 4 types × ~10 readings)');
-    console.log('   - Attendance: ~8,400 (12 months × 4 RW × ~175 attendance)');
-    console.log('   - TB/BB: 20 (1 per resident)');
+    console.log('   - Residents: 478 (239 Laki-laki, 239 Perempuan)');
+    console.log('   - Health Readings: ~640 (4 months × 4 RW × 4 types × ~10 readings)');
+    console.log('   - Attendance: ~1,600 (4 months × 4 RW × ~100 attendance)');
+    console.log('   - TB/BB: 478 (1 per resident)');
     console.log('\n🎉 You can now test the monitoring page!');
     
   } catch (error) {

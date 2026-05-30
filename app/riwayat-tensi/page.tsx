@@ -21,6 +21,7 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
+  Info,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -105,6 +106,12 @@ export default function RiwayatKesehatan() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [deleteModal, setDeleteModal] = useState<{ show: boolean; id: string | null; isMultiple: boolean }>({ show: false, id: null, isMultiple: false })
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 4000)
+  }
 
   useEffect(() => {
     loadReadings()
@@ -541,7 +548,7 @@ export default function RiwayatKesehatan() {
   const shareAsText = (items: HealthReading[]) => {
     const text = formatForWhatsApp(items)
     navigator.clipboard.writeText(text).then(() => {
-      alert('Data telah disalin ke clipboard!')
+      showNotification('success', 'Data telah disalin ke clipboard!')
     })
   }
 
@@ -701,10 +708,39 @@ export default function RiwayatKesehatan() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pb-nav">
+      {/* Modern Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] ${
+            notification.type === 'success'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+              : notification.type === 'error'
+              ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              {notification.type === 'success' && <CheckCircle className="w-6 h-6" />}
+              {notification.type === 'error' && <AlertCircle className="w-6 h-6" />}
+              {notification.type === 'info' && <Info className="w-6 h-6" />}
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-white">{notification.message}</p>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Tutup notifikasi"
+            >
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
         <ArrowLeft className="w-6 h-6" />
       </Link>
-      
+
       <div className="mobile-container py-4 sm:py-6">
         {/* Header */}
         <div className="text-center mb-6 px-2">
@@ -870,10 +906,10 @@ export default function RiwayatKesehatan() {
                       const reading = readings.find(r => r.id === selectedId)
                       if (reading) {
                         // TODO: Implement edit modal/functionality
-                        alert('Fitur edit akan ditambahkan')
+                        showNotification('info', 'Fitur edit akan ditambahkan')
                       }
                     } else {
-                      alert('Pilih hanya satu data untuk diedit')
+                      showNotification('info', 'Pilih hanya satu data untuk diedit')
                     }
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-colors"

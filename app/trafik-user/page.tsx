@@ -109,17 +109,32 @@ export default function TrafikUser() {
     if (!userProfile) return
     
     const doc = new jsPDF()
-    doc.setFontSize(18)
-    doc.text(`Trafik Kesehatan - RW ${userProfile.rw}`, 14, 20)
+    const kelurahan = userProfile.kelurahan || 'Duri Selatan'
+    
+    // Header with gradient background
+    doc.setFillColor(20, 184, 166)
+    doc.rect(0, 0, 210, 50, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Trafik Kesehatan', 105, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan ${kelurahan} - RW ${userProfile.rw}`, 105, 30, { align: 'center' })
+    doc.text(`${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 38, { align: 'center' })
+    
+    // User info
+    doc.setTextColor(0, 0, 0)
     doc.setFontSize(11)
-    doc.text(`Nama: ${userProfile.name}`, 14, 30)
-    doc.text(`NIK: ${userProfile.nik}`, 14, 38)
-    doc.text(`RW: ${userProfile.rw}`, 14, 46)
-    doc.text(`Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 14, 54)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Nama: ${userProfile.name}`, 14, 65)
+    doc.text(`NIK: ${userProfile.nik}`, 14, 73)
+    doc.text(`RW: ${userProfile.rw}`, 14, 81)
     
     // RW-level data
     doc.setFontSize(14)
-    doc.text(`Trafik Kesehatan RW ${userProfile.rw}`, 14, 68)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Trafik Kesehatan RW ${userProfile.rw}`, 14, 95)
     const rwTableData = months.map(m => [
       monthLabels[m],
       rwHealthData[m] || 0
@@ -128,7 +143,10 @@ export default function TrafikUser() {
     autoTable(doc, {
       head: [['Bulan', 'Jumlah Pemeriksaan']],
       body: rwTableData,
-      startY: 75,
+      startY: 100,
+      theme: 'grid',
+      headStyles: { fillColor: [20, 184, 166] },
+      styles: { fontSize: 10 }
     })
     
     // Personal data
@@ -137,8 +155,9 @@ export default function TrafikUser() {
       return month === selectedMonth
     })
     
-    const finalY = (doc as any).lastAutoTable.finalY + 10
+    const finalY = (doc as any).lastAutoTable.finalY + 15
     doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
     doc.text('Data Kesehatan Pribadi', 14, finalY)
     
     const personalTableData = userMonthData.map(r => [
@@ -153,6 +172,9 @@ export default function TrafikUser() {
       head: [['Tanggal', 'Jenis', 'Nilai']],
       body: personalTableData,
       startY: finalY + 8,
+      theme: 'grid',
+      headStyles: { fillColor: [20, 184, 166] },
+      styles: { fontSize: 10 }
     })
     
     doc.save(`trafik-rw${userProfile.rw}-${userProfile.name}.pdf`)
@@ -161,6 +183,8 @@ export default function TrafikUser() {
 
   const exportToExcel = () => {
     if (!userProfile) return
+    
+    const kelurahan = userProfile.kelurahan || 'Duri Selatan'
     
     const excelData = healthReadings.map(r => ({
       Tanggal: new Date(r.timestamp).toLocaleDateString('id-ID'),
@@ -174,6 +198,15 @@ export default function TrafikUser() {
     const ws = XLSX.utils.json_to_sheet(excelData)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Data Kesehatan Pribadi')
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 15 }
+    ]
+    
     XLSX.writeFile(wb, `trafik-rw${userProfile.rw}-${userProfile.name}.xlsx`)
     setShowExportDropdown(false)
   }
@@ -181,13 +214,21 @@ export default function TrafikUser() {
   const exportToWhatsApp = () => {
     if (!userProfile) return
     
-    let message = `*Trafik Kesehatan - RW ${userProfile.rw}*\n`
-    message += `Nama: ${userProfile.name}\n`
-    message += `NIK: ${userProfile.nik}\n`
-    message += `Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
-    message += `*Trafik RW ${userProfile.rw} Bulan Ini:*\n`
-    message += `Total Pemeriksaan: ${rwHealthData[selectedMonth] || 0}\n\n`
-    message += `*Data Kesehatan Pribadi Bulan Ini:*\n\n`
+    const kelurahan = userProfile.kelurahan || 'Duri Selatan'
+    
+    let message = `📊 *TRAFIK KESEHATAN*\n`
+    message += `🏥 Kelurahan ${kelurahan}\n`
+    message += `📍 RW ${userProfile.rw}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `👤 *DATA DIRI*\n`
+    message += `• Nama: ${userProfile.name}\n`
+    message += `• NIK: ${userProfile.nik}\n`
+    message += `• Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `📈 *TRAFIK RW ${userProfile.rw} BULAN INI*\n`
+    message += `• Total Pemeriksaan: ${rwHealthData[selectedMonth] || 0}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `🏥 *DATA KESEHATAN PRIBADI*\n\n`
     
     const userMonthData = healthReadings.filter(r => {
       const month = new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
@@ -205,6 +246,9 @@ export default function TrafikUser() {
                    `${r.nilai || '-'} mg/dL`}\n\n`
       })
     }
+    
+    message += `━━━━━━━━━━━━━━━━━━━━\n`
+    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
     
     const encodedMessage = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')

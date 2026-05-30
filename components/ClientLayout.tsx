@@ -8,7 +8,7 @@ import { GlobalAudioProvider } from '@/contexts/GlobalAudioContext'
 import { useAuth } from '@/lib/auth-context'
 
 const publicRoutes = [
-  '/login', '/register', '/complete-profile', '/login-qr',
+  '/login', '/register', '/login-qr',
   '/video-edukasi', '/Fasca', '/kalori-tracker', '/deteksi-jantung', '/musik-relaksasi', '/sehat-sentosa', '/monitoring', '/partisipasi'
 ]
 
@@ -28,13 +28,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       
       if (user && (pathname === '/login' || pathname === '/register')) {
         router.push('/')
-        return
-      }
-
-      // Check if user has incomplete profile (no NIK) and redirect to complete-profile
-      // Admin users can bypass this requirement
-      if (user && userProfile && !userProfile.nik && userProfile.role !== 'admin' && pathname !== '/complete-profile' && !isPublicRoute) {
-        router.push('/complete-profile')
         return
       }
     }

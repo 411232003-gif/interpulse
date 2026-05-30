@@ -7,11 +7,10 @@ import { Home, User, Activity, Heart, Flame, Music, History, PlayCircle, Grid3x3
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 
-// Admin nav: Beranda + Monev Posbindu + Riwayat Kesehatan + Profil
+// Admin nav: Beranda + Monev Posbindu + Profil
 const adminNavItems = [
   { href: '/', label: 'Beranda', icon: Home },
   { href: '/monev-posbindu', label: 'Monev Posbindu', icon: BarChart3 },
-  { href: '/riwayat-tensi', label: 'Riwayat Kesehatan', icon: History },
   { href: '/profil', label: 'Profil', icon: User },
 ]
 

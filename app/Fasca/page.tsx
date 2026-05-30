@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import BigNumpad from '@/components/BigNumpad'
-import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope, Download, MoreVertical, FileText, Table, MessageCircle, PlusCircle, Edit2, Trash2 } from 'lucide-react'
+import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope, Download, MoreVertical, FileText, Table, MessageCircle, PlusCircle, Edit2, Trash2, Info } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -60,6 +60,12 @@ export default function CatatKesehatan() {
   const [data, setData] = useState<Record<string, string>>({})
   const [result, setResult] = useState<any>(null)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 4000)
+  }
   const exportDropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -566,7 +572,7 @@ export default function CatatKesehatan() {
       setTodayReadingsForResident(prev => [...prev, newReading])
     } catch (error) {
       console.error('Error saving health reading:', error)
-      alert('Gagal menyimpan data. Coba lagi.')
+      showNotification('error', 'Gagal menyimpan data. Coba lagi.')
     } finally {
       setSaving(false)
     }
@@ -626,10 +632,10 @@ export default function CatatKesehatan() {
       setData({})
       setCurrentInput('')
       setInputIndex(0)
-      alert('Data hari ini berhasil dihapus')
+      showNotification('success', 'Data hari ini berhasil dihapus')
     } catch (error) {
       console.error('Error deleting today data:', error)
-      alert('Gagal menghapus data')
+      showNotification('error', 'Gagal menghapus data')
     } finally {
       setIsResetting(false)
     }
@@ -861,6 +867,35 @@ export default function CatatKesehatan() {
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      {/* Modern Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-right">
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] ${
+            notification.type === 'success'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+              : notification.type === 'error'
+              ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              {notification.type === 'success' && <CheckCircle className="w-6 h-6" />}
+              {notification.type === 'error' && <AlertCircle className="w-6 h-6" />}
+              {notification.type === 'info' && <Info className="w-6 h-6" />}
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-white">{notification.message}</p>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Tutup notifikasi"
+            >
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md my-4">
         <div className="flex items-center justify-between mb-4">
           <button onClick={handleBack} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-4 py-2 rounded-xl active:scale-95 transition-all">← Kembali</button>

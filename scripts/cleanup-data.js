@@ -12,33 +12,42 @@ const db = admin.firestore();
 async function deleteCollection(collectionName) {
   console.log(`Deleting collection: ${collectionName}...`);
   
-  const snapshot = await db.collection(collectionName).get();
-  
-  if (snapshot.empty) {
-    console.log(`  Collection ${collectionName} is empty.`);
-    return 0;
-  }
-  
   let count = 0;
   let batchCount = 0;
   let batch = db.batch();
   
-  for (const doc of snapshot.docs) {
-    batch.delete(doc.ref);
-    count++;
-    batchCount++;
+  const snapshot = await db.collection(collectionName).limit(50).get();
+  
+  while (!snapshot.empty) {
+    for (const doc of snapshot.docs) {
+      batch.delete(doc.ref);
+      count++;
+      batchCount++;
+      
+      // Firebase batch allows max 500 operations
+      if (batchCount === 500) {
+        await batch.commit();
+        console.log(`  Deleted ${count} documents...`);
+        batchCount = 0;
+        batch = db.batch();
+        // Add delay to avoid quota exceeded
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
     
-    // Firebase batch allows max 500 operations
-    if (batchCount === 500) {
+    if (batchCount > 0) {
       await batch.commit();
-      console.log(`  Deleted ${count} documents...`);
       batchCount = 0;
       batch = db.batch();
+      // Add delay to avoid quota exceeded
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
-  }
-  
-  if (batchCount > 0) {
-    await batch.commit();
+    
+    // Get next batch
+    const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+    const nextSnapshot = await db.collection(collectionName).startAfter(lastDoc).limit(50).get();
+    snapshot.empty = nextSnapshot.empty;
+    snapshot.docs = nextSnapshot.docs;
   }
   
   console.log(`  ✓ Deleted ${count} documents from ${collectionName}`);
