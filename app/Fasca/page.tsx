@@ -236,7 +236,7 @@ export default function CatatKesehatan() {
     setShowExportDropdown(false)
   }
 
-  const healthConfig: Record<HealthType, { icon: string; title: string; color: string; fields: { key: string; label: string; unit: string }[] }> = {
+  const healthConfig: Record<string, { icon: string; title: string; color: string; fields: { key: string; label: string; unit: string }[] }> = {
     tensi: {
       icon: '❤️',
       title: 'Tekanan Darah',
