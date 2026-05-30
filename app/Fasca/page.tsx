@@ -11,7 +11,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 
-type HealthType = 'tensi' | 'kolesterol' | 'asamurat' | 'guladarah'
+type HealthType = 'tensi' | 'kolesterol' | 'asamurat' | 'guladarah' | 'all'
 type Step = 'select' | 'input' | 'result'
 
 interface Resident {
@@ -59,6 +59,7 @@ export default function CatatKesehatan() {
   const [saving, setSaving] = useState(false)
   const [data, setData] = useState<Record<string, string>>({})
   const [result, setResult] = useState<any>(null)
+  const [showAllForm, setShowAllForm] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
@@ -350,17 +351,17 @@ export default function CatatKesehatan() {
   console.log('[Fasca] Total residents:', residents.length, 'Filtered residents:', filteredResidents.length)
 
   const sortedResidents = filteredResidents.sort((a, b) => {
-    // Get latest health reading timestamp for each resident
-    const getLatestHealthTimestamp = (nik: string) => {
-      const residentReadings = healthReadings.filter(r => r.userId === nik && r.source === 'posbindu')
-      if (residentReadings.length === 0) return 0
-      return Math.max(...residentReadings.map(r => new Date(r.timestamp).getTime()))
+    // Get latest TB/BB timestamp for each resident
+    const getLatestTBBBTimestamp = (nik: string) => {
+      const residentTBBB = tbbbData.filter(tb => tb.nik === nik)
+      if (residentTBBB.length === 0) return 0
+      return Math.max(...residentTBBB.map(tb => new Date(tb.timestamp).getTime()))
     }
 
-    const aTimestamp = getLatestHealthTimestamp(a.nik)
-    const bTimestamp = getLatestHealthTimestamp(b.nik)
+    const aTimestamp = getLatestTBBBTimestamp(a.nik)
+    const bTimestamp = getLatestTBBBTimestamp(b.nik)
 
-    // Sort by latest health input (newest first)
+    // Sort by latest TB/BB input (newest first)
     return bTimestamp - aTimestamp
   })
 
@@ -451,6 +452,7 @@ export default function CatatKesehatan() {
 
     const userInfo = {
       uid: selectedResident.id,
+      nik: selectedResident.nik,
       name: selectedResident.nama,
       rt: selectedResident.rt,
       rw: selectedResident.rw,
@@ -461,115 +463,223 @@ export default function CatatKesehatan() {
     console.log('[Fasca] userInfo:', userInfo)
     console.log('[Fasca] userProfile.uid:', userProfile?.uid)
     console.log('[Fasca] Match check:', selectedResident.id === userProfile?.uid)
-    
-    let newReading: any
-    let validationResult: any
-
-    if (healthType === 'tensi') {
-      const sys = parseInt(allData.sistolik)
-      const dia = parseInt(allData.diastolik)
-      const nadi = parseInt(allData.nadi)
-      newReading = { 
-        type: 'tensi', 
-        ...allData, 
-        timestamp, 
-        userId: userInfo.uid,
-        userName: userInfo.name, 
-        rt: userInfo.rt, 
-        rw: userInfo.rw, 
-        kelurahan: userInfo.kelurahan,
-        source: 'posbindu'
-      }
-      validationResult = validateBloodPressure(sys, dia)
-      validationResult.values = [
-        { label: 'Sistolik', value: sys, unit: 'mmHg' },
-        { label: 'Diastolik', value: dia, unit: 'mmHg' },
-        { label: 'Nadi', value: nadi, unit: 'bpm' }
-      ]
-    } else if (healthType === 'guladarah') {
-      const nilai = parseInt(allData.nilai)
-      newReading = { 
-        type: 'guladarah', 
-        ...allData, 
-        timestamp, 
-        userId: userInfo.uid,
-        userName: userInfo.name, 
-        rt: userInfo.rt, 
-        rw: userInfo.rw, 
-        kelurahan: userInfo.kelurahan,
-        source: 'posbindu'
-      }
-      validationResult = validateBloodSugar(nilai)
-      validationResult.values = [
-        { label: 'Gula Darah', value: nilai, unit: 'mg/dL' }
-      ]
-    } else if (healthType === 'kolesterol') {
-      const total = parseInt(allData.total)
-      const ldl = parseInt(allData.ldl)
-      const hdl = parseInt(allData.hdl)
-      const trigliserida = parseInt(allData.trigliserida)
-      newReading = { 
-        type: 'kolesterol', 
-        ...allData, 
-        timestamp, 
-        userId: userInfo.uid,
-        userName: userInfo.name, 
-        rt: userInfo.rt, 
-        rw: userInfo.rw, 
-        kelurahan: userInfo.kelurahan,
-        source: 'posbindu'
-      }
-      validationResult = validateCholesterol(total)
-      validationResult.values = [
-        { label: 'Total', value: total, unit: 'mg/dL' },
-        { label: 'LDL', value: ldl, unit: 'mg/dL' },
-        { label: 'HDL', value: hdl, unit: 'mg/dL' },
-        { label: 'Trigliserida', value: trigliserida, unit: 'mg/dL' }
-      ]
-    } else if (healthType === 'asamurat') {
-      const nilai = parseFloat(allData.nilai)
-      newReading = {
-        type: 'asamurat',
-        ...allData,
-        timestamp,
-        userId: userInfo.uid,
-        userName: userInfo.name,
-        rt: userInfo.rt,
-        rw: userInfo.rw,
-        kelurahan: userInfo.kelurahan,
-        source: 'posbindu'
-      }
-
-      validationResult = validateUricAcid(nilai, selectedResident.jenisKelamin)
-      validationResult.values = [
-        { label: 'Asam Urat', value: nilai, unit: 'mg/dL' }
-      ]
-      
-    } else {
-      const val = parseInt(allData.nilai)
-      newReading = { 
-        type: 'guladarah', 
-        value: allData.nilai, 
-        condition: 'puasa', 
-        timestamp, 
-        userId: userInfo.uid,
-        userName: userInfo.name, 
-        rt: userInfo.rt, 
-        rw: userInfo.rw, 
-        kelurahan: userInfo.kelurahan,
-        source: 'posbindu'
-      }
-      
-      if (val < 100) validationResult = { status: 'normal', title: 'Gula Darah Normal', color: 'text-green-700', bgColor: 'bg-gradient-to-br from-green-100 to-green-200', icon: <CheckCircle className="w-24 h-24 text-green-600" />, message: `${val} mg/dL`, advice: 'Gula darah normal. Pertahankan!' }
-      else if (val < 126) validationResult = { status: 'warning', title: 'Prediabetes', color: 'text-yellow-700', bgColor: 'bg-gradient-to-br from-yellow-100 to-yellow-200', icon: <AlertCircle className="w-24 h-24 text-yellow-600" />, message: `${val} mg/dL`, advice: 'Prediabetes. Kurangi gula dan karbohidrat.' }
-      else validationResult = { status: 'danger', title: 'Diabetes', color: 'text-red-700', bgColor: 'bg-gradient-to-br from-red-100 to-red-200', icon: <XCircle className="w-24 h-24 text-red-600" />, message: `${val} mg/dL`, advice: 'Diabetes! Segera ke dokter.' }
-    }
+    console.log('[Fasca] healthType:', healthType)
+    console.log('[Fasca] allData:', allData)
 
     try {
-      await addDoc(collection(db, 'healthReadings'), newReading)
-      setResult(validationResult)
-      setStep('result')
-      setTodayReadingsForResident(prev => [...prev, newReading])
+      if (healthType === 'all') {
+        // Save all health readings at once
+        const readings: any[] = []
+
+        // Tekanan Darah
+        if (allData.sistolik && allData.diastolik) {
+          const sys = parseInt(allData.sistolik)
+          const dia = parseInt(allData.diastolik)
+          const nadi = parseInt(allData.nadi || '0')
+          readings.push({
+            type: 'tensi',
+            sistolik: allData.sistolik,
+            diastolik: allData.diastolik,
+            nadi: allData.nadi,
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          })
+        }
+
+        // Gula Darah
+        if (allData.guladarah) {
+          readings.push({
+            type: 'guladarah',
+            nilai: allData.guladarah,
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          })
+        }
+
+        // Asam Urat
+        if (allData.asamurat) {
+          readings.push({
+            type: 'asamurat',
+            nilai: allData.asamurat,
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          })
+        }
+
+        // Kolesterol
+        if (allData.kolesterol_total) {
+          readings.push({
+            type: 'kolesterol',
+            total: allData.kolesterol_total,
+            ldl: allData.kolesterol_ldl || '0',
+            hdl: allData.kolesterol_hdl || '0',
+            trigliserida: allData.kolesterol_trigliserida || '0',
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          })
+        }
+
+        // Save all readings
+        for (const reading of readings) {
+          await addDoc(collection(db, 'healthReadings'), reading)
+        }
+
+        setResult({
+          title: 'Data Berhasil Disimpan',
+          color: 'text-green-600',
+          bgColor: 'bg-green-50',
+          icon: <CheckCircle className="w-16 h-16 text-green-600" />,
+          message: `${readings.length} jenis pemeriksaan telah disimpan`,
+          advice: 'Data kesehatan warga telah tercatat dan akan sinkron ke bagian trafik user',
+          values: readings.map((r, i) => ({
+            label: r.type === 'tensi' ? 'Tekanan Darah' :
+                   r.type === 'guladarah' ? 'Gula Darah' :
+                   r.type === 'asamurat' ? 'Asam Urat' : 'Kolesterol',
+            value: r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}` : r.nilai || r.total,
+            unit: r.type === 'tensi' ? 'mmHg' : 'mg/dL'
+          }))
+        })
+        setStep('result')
+        setTodayReadingsForResident(prev => [...prev, ...readings])
+      } else {
+        // Original single type save logic
+        let newReading: any
+        let validationResult: any
+
+        if (healthType === 'tensi') {
+          const sys = parseInt(allData.sistolik)
+          const dia = parseInt(allData.diastolik)
+          const nadi = parseInt(allData.nadi)
+          newReading = {
+            type: 'tensi',
+            ...allData,
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          }
+          validationResult = validateBloodPressure(sys, dia)
+          validationResult.values = [
+            { label: 'Sistolik', value: sys, unit: 'mmHg' },
+            { label: 'Diastolik', value: dia, unit: 'mmHg' },
+            { label: 'Nadi', value: nadi, unit: 'bpm' }
+          ]
+        } else if (healthType === 'guladarah') {
+          const nilai = parseInt(allData.nilai)
+          newReading = {
+            type: 'guladarah',
+            ...allData,
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          }
+          validationResult = validateBloodSugar(nilai)
+          validationResult.values = [
+            { label: 'Gula Darah', value: nilai, unit: 'mg/dL' }
+          ]
+        } else if (healthType === 'kolesterol') {
+          const total = parseInt(allData.total)
+          const ldl = parseInt(allData.ldl)
+          const hdl = parseInt(allData.hdl)
+          const trigliserida = parseInt(allData.trigliserida)
+          newReading = {
+            type: 'kolesterol',
+            ...allData,
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          }
+          validationResult = validateCholesterol(total)
+          validationResult.values = [
+            { label: 'Total', value: total, unit: 'mg/dL' },
+            { label: 'LDL', value: ldl, unit: 'mg/dL' },
+            { label: 'HDL', value: hdl, unit: 'mg/dL' },
+            { label: 'Trigliserida', value: trigliserida, unit: 'mg/dL' }
+          ]
+        } else if (healthType === 'asamurat') {
+          const nilai = parseFloat(allData.nilai)
+          newReading = {
+            type: 'asamurat',
+            ...allData,
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          }
+
+          validationResult = validateUricAcid(nilai, selectedResident.jenisKelamin)
+          validationResult.values = [
+            { label: 'Asam Urat', value: nilai, unit: 'mg/dL' }
+          ]
+
+        } else {
+          const val = parseInt(allData.nilai)
+          newReading = {
+            type: 'guladarah',
+            value: allData.nilai,
+            condition: 'puasa',
+            timestamp,
+            userId: userInfo.uid,
+            nik: userInfo.nik,
+            userName: userInfo.name,
+            rt: userInfo.rt,
+            rw: userInfo.rw,
+            kelurahan: userInfo.kelurahan,
+            source: 'posbindu'
+          }
+
+          if (val < 100) validationResult = { status: 'normal', title: 'Gula Darah Normal', color: 'text-green-700', bgColor: 'bg-gradient-to-br from-green-100 to-green-200', icon: <CheckCircle className="w-24 h-24 text-green-600" />, message: `${val} mg/dL`, advice: 'Gula darah normal. Pertahankan!' }
+          else if (val < 126) validationResult = { status: 'warning', title: 'Prediabetes', color: 'text-yellow-700', bgColor: 'bg-gradient-to-br from-yellow-100 to-yellow-200', icon: <AlertCircle className="w-24 h-24 text-yellow-600" />, message: `${val} mg/dL`, advice: 'Prediabetes. Kurangi gula dan karbohidrat.' }
+          else validationResult = { status: 'danger', title: 'Diabetes', color: 'text-red-700', bgColor: 'bg-gradient-to-br from-red-100 to-red-200', icon: <XCircle className="w-24 h-24 text-red-600" />, message: `${val} mg/dL`, advice: 'Diabetes! Segera ke dokter.' }
+        }
+
+        await addDoc(collection(db, 'healthReadings'), newReading)
+        setResult(validationResult)
+        setStep('result')
+        setTodayReadingsForResident(prev => [...prev, newReading])
+      }
     } catch (error) {
       console.error('Error saving health reading:', error)
       showNotification('error', 'Gagal menyimpan data. Coba lagi.')
@@ -611,10 +721,33 @@ export default function CatatKesehatan() {
     setTodayReadingsForResident([])
     const todayData = getTodayReadings(resident.id)
     setShowFascaModal(true)
+    // Directly open all-in-one form
+    setHealthType('all')
+    setStep('input')
+    setData({})
     if (todayData.readings.length > 0) {
       // Store all today's readings for THIS resident only
       console.log('[Fasca] Setting today readings for resident:', resident.id, todayData.readings)
       setTodayReadingsForResident(todayData.readings)
+      // Pre-fill data from today's readings
+      const prefilledData: Record<string, string> = {}
+      todayData.readings.forEach(reading => {
+        if (reading.type === 'tensi') {
+          prefilledData.sistolik = reading.sistolik
+          prefilledData.diastolik = reading.diastolik
+          prefilledData.nadi = reading.nadi
+        } else if (reading.type === 'guladarah') {
+          prefilledData.guladarah = reading.nilai
+        } else if (reading.type === 'asamurat') {
+          prefilledData.asamurat = reading.nilai
+        } else if (reading.type === 'kolesterol') {
+          prefilledData.kolesterol_total = reading.total
+          prefilledData.kolesterol_ldl = reading.ldl
+          prefilledData.kolesterol_hdl = reading.hdl
+          prefilledData.kolesterol_trigliserida = reading.trigliserida
+        }
+      })
+      setData(prefilledData)
     } else {
       console.log('[Fasca] No today readings for resident:', resident.id)
     }
@@ -710,17 +843,19 @@ export default function CatatKesehatan() {
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">TB (cm)</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">BB (kg)</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">LP (cm)</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Nadi (bpm)</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedResidents.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi dan input TB/BB hari ini</td>
+                        <td colSpan={10} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi dan input TB/BB hari ini</td>
                       </tr>
                     ) : sortedResidents.map(r => {
                       const todayTBBB = getTodayTBBB(r.nik)
                       const todayData = getTodayReadings(r.id)
+                      const todayNadi = todayData.readings.find(reading => reading.type === 'tensi')?.nadi || '-'
                       return (
                         <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
@@ -731,6 +866,7 @@ export default function CatatKesehatan() {
                           <td className="px-4 py-3 text-gray-600">{todayTBBB?.tinggiBadan || '-'}</td>
                           <td className="px-4 py-3 text-gray-600">{todayTBBB?.beratBadan || '-'}</td>
                           <td className="px-4 py-3 text-gray-600">{todayTBBB?.lingkarPinggang || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600">{todayNadi}</td>
                           <td className="px-4 py-3 text-center">
                             <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
                               <Stethoscope className="w-3.5 h-3.5" />
@@ -753,86 +889,6 @@ export default function CatatKesehatan() {
   // Fasca Modal
   const config = healthType ? healthConfig[healthType] : null
   const currentField = config?.fields[inputIndex]
-
-  if (step === 'select') {
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-800">Input Kesehatan: {selectedResident?.nama}</h2>
-            <button onClick={handleCloseFascaModal} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-          </div>
-
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl mb-3 shadow-lg">
-              <Activity className="w-8 h-8 text-white" />
-            </div>
-            <p className="text-gray-600">Pilih jenis pemeriksaan</p>
-            {todayReadingsForResident.length > 0 && (
-              <p className="text-xs text-green-600 mt-2">Data hari ini sudah ada</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {(Object.keys(healthConfig) as HealthType[]).map((type) => {
-              const existingReading = todayReadingsForResident.find(r => r.type === type)
-              return (
-                <button
-                  key={type}
-                  onClick={() => { 
-                    setHealthType(type); 
-                    setStep('input'); 
-                    setInputIndex(0); 
-                    setCurrentInput('');
-                    // Pre-fill data if exists for today
-                    if (existingReading) {
-                      const config = healthConfig[type]
-                      const prefilledData: Record<string, string> = {}
-                      config.fields.forEach((field) => {
-                        prefilledData[field.key] = existingReading[field.key] || ''
-                      })
-                      setData(prefilledData)
-                      setInputIndex(config.fields.length - 1)
-                    } else {
-                      setData({})
-                    }
-                  }}
-                  className={`p-4 rounded-xl bg-gradient-to-br ${healthConfig[type].color} text-white shadow-lg active:scale-95 transition-all text-left`}
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="text-3xl">{healthConfig[type].icon}</span>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-sm">{healthConfig[type].title}</h3>
-                      {existingReading && (
-                        <p className="text-xs mt-1 opacity-90">
-                          {type === 'tensi' && `${existingReading.sistolik}/${existingReading.diastolik} mmHg`}
-                          {type === 'kolesterol' && `${existingReading.total} mg/dL`}
-                          {type === 'asamurat' && `${existingReading.nilai} mg/dL`}
-                          {type === 'guladarah' && `${existingReading.nilai} mg/dL`}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {todayReadingsForResident.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <button
-                onClick={handleResetTodayData}
-                disabled={isResetting}
-                className="w-full px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isResetting ? 'Menghapus...' : 'Reset Data Hari Ini'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
 
   if (step === 'result' && result) {
     return (
@@ -896,51 +952,163 @@ export default function CatatKesehatan() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md my-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 w-full max-w-2xl my-4">
         <div className="flex items-center justify-between mb-4">
-          <button onClick={handleBack} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-4 py-2 rounded-xl active:scale-95 transition-all">← Kembali</button>
-          <div className="bg-blue-100 text-blue-700 text-xl font-bold px-4 py-2 rounded-xl">{inputIndex + 1}/{config?.fields.length}</div>
-          <button onClick={handleCloseFascaModal} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-        </div>
-
-        <div className="text-center mb-4">
-          <div className="flex justify-center mb-2 text-blue-600">
-            <span className="text-5xl">{config?.icon}</span>
+          <button onClick={handleCloseFascaModal} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-3 py-2 sm:px-4 rounded-xl active:scale-95 transition-all text-sm sm:text-base">← Kembali</button>
+          <div className="text-center flex-1 px-2">
+            <div className="flex justify-center mb-2 text-blue-600">
+              <span className="text-4xl sm:text-5xl">📋</span>
+            </div>
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-800">Input Kesehatan: {selectedResident?.nama}</h2>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-1">{currentField?.label}</h2>
-          <p className="text-gray-600">{config?.title} - Step {inputIndex + 1}</p>
-          <p className="text-sm text-gray-500 mt-1">Warga: {selectedResident?.nama}</p>
-          {todayReadingsForResident.length > 0 && (
-            <p className="text-xs text-green-600 mt-1">Data hari ini tersimpan</p>
-          )}
+          <div className="w-8 sm:w-16"></div>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl p-6 mb-4 border-2 border-blue-300">
-          <div className="text-center">
-            <p className="text-6xl font-bold text-blue-700 min-h-[80px] flex items-center justify-center">
-              {currentInput || (todayReadingsForResident.length > 0 && currentField?.key && data[currentField.key] ? data[currentField.key] : '---')}
-            </p>
-            <p className="text-xl text-gray-600 mt-4">{currentField?.unit}</p>
+        <form onSubmit={(e) => {
+          e.preventDefault()
+          saveData(data)
+        }} className="space-y-3 sm:space-y-4">
+          {/* Tekanan Darah */}
+          <div className="bg-red-50 rounded-xl p-3 sm:p-4 border border-red-200">
+            <h3 className="font-bold text-red-700 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
+              <span className="text-lg sm:text-xl">❤️</span> Tekanan Darah
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Sistolik</label>
+                <input
+                  type="number"
+                  value={data.sistolik || ''}
+                  onChange={(e) => setData(prev => ({ ...prev, sistolik: e.target.value }))}
+                  placeholder="120"
+                  className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">mmHg</p>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Diastolik</label>
+                <input
+                  type="number"
+                  value={data.diastolik || ''}
+                  onChange={(e) => setData(prev => ({ ...prev, diastolik: e.target.value }))}
+                  placeholder="80"
+                  className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">mmHg</p>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Nadi</label>
+                <input
+                  type="number"
+                  value={data.nadi || ''}
+                  onChange={(e) => setData(prev => ({ ...prev, nadi: e.target.value }))}
+                  placeholder="72"
+                  className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">bpm</p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="flex gap-2 mb-4">
-          {config?.fields.map((_, i) => (
-            <div key={i} className={`flex-1 h-2 rounded-full ${i <= inputIndex ? 'bg-blue-500' : 'bg-gray-300'}`} />
-          ))}
-        </div>
+          {/* Gula Darah */}
+          <div className="bg-blue-50 rounded-xl p-3 sm:p-4 border border-blue-200">
+            <h3 className="font-bold text-blue-700 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
+              <span className="text-lg sm:text-xl">🍯</span> Gula Darah (GDS)
+            </h3>
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Nilai Gula Darah</label>
+              <input
+                type="number"
+                value={data.guladarah || ''}
+                onChange={(e) => setData(prev => ({ ...prev, guladarah: e.target.value }))}
+                placeholder="100"
+                className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+            </div>
+          </div>
 
-        <BigNumpad onNumberClick={handleNumber} onDelete={handleDelete} onClear={handleClear} />
+          {/* Asam Urat */}
+          <div className="bg-orange-50 rounded-xl p-3 sm:p-4 border border-orange-200">
+            <h3 className="font-bold text-orange-700 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
+              <span className="text-lg sm:text-xl">🔥</span> Asam Urat (UA)
+            </h3>
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Nilai Asam Urat</label>
+              <input
+                type="number"
+                value={data.asamurat || ''}
+                onChange={(e) => setData(prev => ({ ...prev, asamurat: e.target.value }))}
+                placeholder="6"
+                className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+            </div>
+          </div>
 
-        <button
-          onClick={handleNext}
-          disabled={currentInput.length === 0}
-          className={`w-full mt-4 text-2xl font-bold py-5 rounded-2xl shadow-lg active:scale-95 transition-all ${
-            currentInput.length === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
-          }`}
-        >
-          {inputIndex === (config?.fields.length || 1) - 1 ? 'Simpan & Lihat Hasil' : 'Lanjut →'}
-        </button>
+          {/* Kolesterol */}
+          <div className="bg-yellow-50 rounded-xl p-3 sm:p-4 border border-yellow-200">
+            <h3 className="font-bold text-yellow-700 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
+              <span className="text-lg sm:text-xl">🧈</span> Kolesterol (COL)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Total</label>
+                <input
+                  type="number"
+                  value={data.kolesterol_total || ''}
+                  onChange={(e) => setData(prev => ({ ...prev, kolesterol_total: e.target.value }))}
+                  placeholder="200"
+                  className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">LDL</label>
+                <input
+                  type="number"
+                  value={data.kolesterol_ldl || ''}
+                  onChange={(e) => setData(prev => ({ ...prev, kolesterol_ldl: e.target.value }))}
+                  placeholder="100"
+                  className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">HDL</label>
+                <input
+                  type="number"
+                  value={data.kolesterol_hdl || ''}
+                  onChange={(e) => setData(prev => ({ ...prev, kolesterol_hdl: e.target.value }))}
+                  placeholder="50"
+                  className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Trigliserida</label>
+                <input
+                  type="number"
+                  value={data.kolesterol_trigliserida || ''}
+                  onChange={(e) => setData(prev => ({ ...prev, kolesterol_trigliserida: e.target.value }))}
+                  placeholder="150"
+                  className="w-full px-2 sm:px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={saving}
+            className={`w-full text-lg sm:text-xl font-bold py-3 sm:py-4 rounded-2xl shadow-lg active:scale-95 transition-all ${
+              saving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+            }`}
+          >
+            {saving ? 'Menyimpan...' : 'Simpan & Lihat Hasil'}
+          </button>
+        </form>
       </div>
     </div>
   )

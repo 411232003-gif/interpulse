@@ -955,6 +955,15 @@ export default function PosbinduMonitoring() {
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h1 className="text-2xl font-bold">{isAdmin ? 'Monitoring dan Evaluasi' : 'Absensi Posbindu'}</h1>
+          {isAdmin && (
+            <button
+              onClick={() => router.push('/Fasca')}
+              className="ml-auto px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm font-medium"
+              title="Input Kesehatan Warga"
+            >
+              Input Kesehatan
+            </button>
+          )}
         </div>
         <p className="text-blue-100 text-sm ml-10">{isAdmin ? 'Pantau kesehatan warga dan partisipasi lansia' : 'Silakan isi form absensi saat datang ke Posbindu'}</p>
       </div>

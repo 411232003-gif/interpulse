@@ -422,7 +422,7 @@ export default function AbsensiPage() {
               <tbody>
                 {filteredResidents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
                   </tr>
                 ) : filteredResidents.map(r => {
                   const isPresentToday = attendanceToday.has(r.nik)
@@ -433,13 +433,6 @@ export default function AbsensiPage() {
                       <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
                       <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                       <td className="px-4 py-3 text-gray-600">{r.umur} tahun</td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {r.password ? (
-                          <span className="text-blue-600 font-medium text-xs">PIN: {r.password}</span>
-                        ) : (
-                          <span className="text-gray-400 text-xs">-</span>
-                        )}
-                      </td>
                       <td className="px-4 py-3 text-center">
                         {isPresentToday ? (
                           <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
