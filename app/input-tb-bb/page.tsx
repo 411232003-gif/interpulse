@@ -333,15 +333,14 @@ export default function InputTBBBPage() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">NIK</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">RW/RT</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Jenis Kelamin</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Usia</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">TB/BB/LP</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAttendance.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang hadir hari ini</td>
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang hadir hari ini</td>
                   </tr>
                 ) : filteredAttendance.map(att => {
                   const todayTBBB = getTodayTBBB(att.nik)
@@ -351,14 +350,23 @@ export default function InputTBBBPage() {
                       <td className="px-4 py-3 font-medium text-gray-800">{att.nama}</td>
                       <td className="px-4 py-3 text-gray-600">{att.nik}</td>
                       <td className="px-4 py-3 text-gray-600">RW {att.rw} / RT {att.rt}</td>
-                      <td className="px-4 py-3 text-gray-600">-</td>
-                      <td className="px-4 py-3 text-gray-600">{att.umur} tahun</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {hasTBBB ? (
+                          <div className="text-xs">
+                            <div>TB: {todayTBBB.tinggiBadan} cm</div>
+                            <div>BB: {todayTBBB.beratBadan} kg</div>
+                            {todayTBBB.lingkarPinggang && <div>LP: {todayTBBB.lingkarPinggang} cm</div>}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-center">
-                        <button 
+                        <button
                           onClick={() => openModal(att)}
                           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
-                            hasTBBB 
-                              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                            hasTBBB
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
                               : 'bg-green-600 text-white hover:bg-green-700'
                           }`}
                         >
