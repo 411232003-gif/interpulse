@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { PlayCircle, Activity, History, Heart, Loader2, ChevronLeft, ChevronRight, Users, TrendingUp, LogIn, CheckCircle, AlertCircle, XCircle, PlusCircle, Calendar, Ruler, Scale, FileText, Info } from 'lucide-react'
 import BigNumpad from '@/components/BigNumpad'
+import NotificationBell from '@/components/NotificationBell'
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -483,19 +484,22 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-2 flex-1 flex flex-col">
         {/* Header */}
         <div className="mb-4 mt-3">
-          <div className="text-center">
-            <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2`}>
-              Selamat Datang 👋
-            </h1>
-            <p className={`${isMobile ? 'text-xs' : 'text-base'} text-gray-600`}>
-              {isGuest ? 'Tamu' : user ? (userProfile?.name || 'Pengguna') : 'Tamu'}, ayo jaga kesehatanmu
-            </p>
-            {!user && !isGuest && (
-              <Link href="/login" className={`inline-flex items-center gap-2 mt-2 ${isMobile ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} bg-teal-600 text-white font-medium rounded-full hover:bg-teal-700 transition-colors`}>
-                <LogIn className={isMobile ? 'w-3 h-3' : 'w-4 h-4'} />
-                Masuk untuk fitur lengkap
-              </Link>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
+              <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2`}>
+                Selamat Datang 👋
+              </h1>
+              <p className={`${isMobile ? 'text-xs' : 'text-base'} text-gray-600`}>
+                {isGuest ? 'Tamu' : user ? (userProfile?.name || 'Pengguna') : 'Tamu'}, ayo jaga kesehatanmu
+              </p>
+              {!user && !isGuest && (
+                <Link href="/login" className={`inline-flex items-center gap-2 mt-2 ${isMobile ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} bg-teal-600 text-white font-medium rounded-full hover:bg-teal-700 transition-colors`}>
+                  <LogIn className={isMobile ? 'w-3 h-3' : 'w-4 h-4'} />
+                  Masuk untuk fitur lengkap
+                </Link>
+              )}
+            </div>
+            {user && !isAdmin && <NotificationBell />}
           </div>
         </div>
 

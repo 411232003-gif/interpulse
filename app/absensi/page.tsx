@@ -186,14 +186,14 @@ export default function AbsensiPage() {
       const todayStr = today.toISOString().split('T')[0]
       const currentMonth = today.toLocaleString('id-ID', { month: 'long' }).toLowerCase()
       const currentYear = today.getFullYear()
-      
+
       // Check if attendance record exists for this NIK in current month
       const existingAttendanceQuery = query(
         collection(db, 'attendance'),
         where('nik', '==', resident.nik)
       )
       const existingSnapshot = await getDocs(existingAttendanceQuery)
-      
+
       let existingDocId = null
       existingSnapshot.docs.forEach(doc => {
         const d = doc.data()
@@ -203,7 +203,7 @@ export default function AbsensiPage() {
           existingDocId = doc.id
         }
       })
-      
+
       const attendanceData = {
         nama: resident.nama,
         nik: resident.nik,
@@ -215,15 +215,41 @@ export default function AbsensiPage() {
         date: new Date().toLocaleDateString('id-ID'),
         time: new Date().toLocaleTimeString('id-ID'),
       }
-      
+
       if (existingDocId) {
         // Update existing record
         await updateDoc(doc(db, 'attendance', existingDocId), attendanceData)
       } else {
         // Create new record
         await addDoc(collection(db, 'attendance'), attendanceData)
+
+        // Add notification to user
+        try {
+          // Get user UID from users collection
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('nik', '==', resident.nik)
+          )
+          const usersSnapshot = await getDocs(usersQuery)
+
+          if (!usersSnapshot.empty) {
+            const userDoc = usersSnapshot.docs[0]
+            const userId = userDoc.id
+
+            await addDoc(collection(db, 'notifications'), {
+              userId: userId,
+              type: 'attendance',
+              message: `Anda telah diabsen hari ini (${today.toLocaleDateString('id-ID')})`,
+              timestamp: new Date().toISOString(),
+              read: false
+            })
+          }
+        } catch (notifError) {
+          console.error('Error adding notification:', notifError)
+          // Don't fail attendance if notification fails
+        }
       }
-      
+
       showNotification('success', 'Absensi berhasil dicatat')
     } catch (error) {
       console.error('Error saving attendance:', error)
