@@ -246,7 +246,7 @@ export default function MonitoringPage() {
   // Fetch TB/BB data
   const [tbbbData, setTbbbData] = useState<Record<string, any>>({})
   useEffect(() => {
-    const tbbbRef = collection(db, 'tbbb')
+    const tbbbRef = collection(db, 'tb-bb')
     const unsubscribe = onSnapshot(tbbbRef, (snapshot) => {
       const data: Record<string, any> = {}
       snapshot.docs.forEach(doc => {
