@@ -264,14 +264,7 @@ export default function TrafikUser() {
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-6 flex items-center gap-4">
-          <button
-            onClick={() => router.push('/monev-posbindu')}
-            className="p-2 rounded-lg bg-white shadow-md hover:bg-gray-50 transition-colors"
-            title="Kembali ke Monev Posbindu"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
+        <div className="mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Trafik Kesehatan</h1>
             <p className="text-gray-600 mt-1">Riwayat kesehatan pribadi dan trafik RW {userProfile?.rw}</p>
