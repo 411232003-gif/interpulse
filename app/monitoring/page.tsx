@@ -304,26 +304,32 @@ export default function MonitoringPage() {
   // Calculate health status distribution for filtered data
   const getHealthStatusDistribution = () => {
     const distribution = { rendah: 0, normal: 0, batas: 0, tinggi: 0 }
-    
+
     Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
       if (filterRW !== 'all' && rw !== filterRW) return
-      
+
       readings.forEach(reading => {
         if (reading.type !== filterHealthType) return
-        
+
         const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
         if (month !== selectedMonth) return
-        
+
+        // Only count if resident still exists
+        const residentExists = Object.values(residentsData).some((r: any) =>
+          r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
+        )
+        if (!residentExists) return
+
         const value = reading.value || 0
         const status = getHealthStatus(filterHealthType, value)
-        
+
         if (status.status === 'Normal') distribution.normal++
         else if (status.status === 'Batas') distribution.batas++
         else if (status.status === 'Tinggi') distribution.tinggi++
         else distribution.rendah++
       })
     })
-    
+
     return distribution
   }
 
