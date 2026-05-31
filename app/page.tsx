@@ -515,6 +515,8 @@ export default function Home() {
             <div
               className="flex transition-transform duration-500 ease-in-out carousel-slide"
               style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
+              role="group"
+              aria-label="Banner carousel"
             >
               {bannerImages.map((image, index) => (
                 <div key={index} className="w-full flex-shrink-0 relative">
@@ -571,6 +573,8 @@ export default function Home() {
             <div
               className="flex transition-transform duration-500 ease-in-out carousel-slide"
               style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
+              role="group"
+              aria-label="Banner carousel"
             >
               {bannerImages.map((image, index) => (
                 <div key={index} className="w-full flex-shrink-0 relative">

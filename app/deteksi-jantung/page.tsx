@@ -892,9 +892,10 @@ export default function HealthTools() {
                       Tetap tekan jari di atas kamera dan flash. Jangan bergerak.
                     </p>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-red-500 h-2 rounded-full transition-all duration-100"
                         style={{ width: `${(ppgData.length / 50) * 100}%` }}
+                        aria-hidden="true"
                       />
                     </div>
                     <p className="text-xs text-gray-500 mt-2">{ppgData.length}/50 frame</p>
@@ -1031,9 +1032,10 @@ export default function HealthTools() {
                   <span>{Math.round((currentFreqIndex / HEARING_FREQUENCIES.length) * 100)}%</span>
                 </div>
                 <div className="h-2 bg-gray-200 rounded-full">
-                  <div 
+                  <div
                     className="h-2 bg-blue-500 rounded-full transition-all"
                     style={{ width: `${((currentFreqIndex) / HEARING_FREQUENCIES.length) * 100}%` }}
+                    aria-hidden="true"
                   />
                 </div>
               </div>

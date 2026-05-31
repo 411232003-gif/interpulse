@@ -1364,7 +1364,12 @@ export default function MonitoringPage() {
                         {segments.map((seg, i) => (
                           seg.count > 0 && (
                             <div key={i} className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: seg.color }}></div>
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: seg.color }}
+                                role="presentation"
+                                aria-hidden="true"
+                              ></div>
                               <span className="text-xs text-gray-600">{seg.label}: {seg.count}</span>
                             </div>
                           )

@@ -353,6 +353,7 @@ export default function TrafikUser() {
                       style={{ height: `${Math.max(height, 5)}%` }}
                       role="img"
                       aria-label={`Grafik ${monthLabels[month]}: ${value} pemeriksaan`}
+                      aria-hidden="true"
                     />
                     <p className="text-xs text-gray-600 mt-2">{monthLabels[month]}</p>
                     <p className="text-xs font-semibold text-gray-800">{value}</p>
