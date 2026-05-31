@@ -38,4 +38,6 @@ next-env.d.ts
 # firebase service account keys (sensitive)
 scripts/firebase-service-account.json
 scripts/serviceAccountKey.json
-*.json
+
+# scripts dependencies
+scripts/node_modules
