@@ -369,6 +369,9 @@ export default function MonitoringPage() {
         return month === selectedMonth
       })
 
+      // Only include resident if they have health readings in the selected month
+      if (monthReadings.length === 0) return
+
       // Get values from readings
       const tensiReading = monthReadings.find((r: any) => r.type === 'tensi')
       const gdsReading = monthReadings.find((r: any) => r.type === 'guladarah')
