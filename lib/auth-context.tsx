@@ -208,11 +208,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     profile: Partial<Omit<UserProfile, 'uid' | 'email' | 'role' | 'createdAt'>>
   ) => {
-    // Use userId directly as email (like original system)
-    const { user: newUser } = await createUserWithEmailAndPassword(auth, userId, password)
+    // If userId doesn't contain @, append @interpulse.id (consistent with loginWithNIK)
+    const email = userId.includes('@') ? userId : `${userId}@interpulse.id`
+    const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password)
     const userProfileData: UserProfile = {
       uid: newUser.uid,
-      email: userId,
+      email: email,
       role: 'user',
       createdAt: new Date().toISOString(),
       name: '',
