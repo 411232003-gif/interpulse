@@ -134,9 +134,13 @@ export default function MonitoringPage() {
         const rw = d.rw
         if (rw && data[rw]) {
           const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+          // Only count if resident still exists (check by NIK or userId)
+          const residentExists = Object.values(residentsData).some((r: any) =>
+            r.nik === d.nik || r.id === d.userId || r.id === d.residentId
+          )
           // Create unique key based on timestamp, type, and nik to avoid duplicates
           const uniqueKey = `${d.timestamp}-${d.type}-${d.nik}`
-          if (!uniqueReadings.has(uniqueKey) && data[rw][month] !== undefined) {
+          if (residentExists && !uniqueReadings.has(uniqueKey) && data[rw][month] !== undefined) {
             uniqueReadings.add(uniqueKey)
             data[rw][month]++
           }
@@ -146,7 +150,7 @@ export default function MonitoringPage() {
       setHealthReadings(data)
     })
     return () => unsubscribe()
-  }, [])
+  }, [residentsData])
 
   // Calculate health type distribution for selected month using useMemo
   const healthTypeDistribution = useMemo(() => {
@@ -175,26 +179,32 @@ export default function MonitoringPage() {
     const attendanceRef = collection(db, 'attendance')
     const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
       const data: Record<string, Record<string, number>> = {}
-      
+
       Object.keys(rwTargets).forEach(rw => {
         data[rw] = {}
         months.forEach(m => { data[rw][m] = 0 })
       })
-      
+
       snapshot.docs.forEach(doc => {
         const d = doc.data()
         if (!d || !d.timestamp) return
         const rw = d.rw
         if (rw && data[rw]) {
           const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-          if (data[rw][month] !== undefined) data[rw][month]++
+          // Only count if resident still exists (check by NIK or userId)
+          const residentExists = Object.values(residentsData).some((r: any) =>
+            r.nik === d.nik || r.id === d.userId || r.id === d.residentId
+          )
+          if (residentExists && data[rw][month] !== undefined) {
+            data[rw][month]++
+          }
         }
       })
-      
+
       setAttendanceData(data)
     })
     return () => unsubscribe()
-  }, [])
+  }, [residentsData])
 
   // Fetch residents data for names and NIK
   useEffect(() => {
