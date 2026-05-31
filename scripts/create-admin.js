@@ -23,16 +23,16 @@ async function createAdminUser(email, password, nama, nik, rw, rt) {
 
     console.log('✓ User created in Authentication:', userRecord.uid);
 
-    // Create user document in Firestore
-    await db.collection('users').doc(userRecord.uid).set({
+    // Create admin document in Firestore (separate collection)
+    await db.collection('admins').doc(userRecord.uid).set({
       uid: userRecord.uid,
       email: email,
-      nama: nama,
+      name: nama,
       nik: nik,
       rw: rw,
       rt: rt,
-      role: 'admin',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
 
     console.log('✓ User document created in Firestore');

@@ -72,17 +72,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for QR code login first
     const checkQRLogin = async () => {
       const qrLoginData = localStorage.getItem('interpulse_user')
-      
+
       if (qrLoginData) {
         try {
           const loginData = JSON.parse(qrLoginData)
-          
+
           // Verify login is recent (within 24 hours)
           const loginTime = new Date(loginData.loginTime)
           const now = new Date()
           const hoursDiff = (now.getTime() - loginTime.getTime()) / (1000 * 60 * 60)
-          
+
           if (hoursDiff < 24) {
+            // Check if user is admin first
+            const adminDoc = await getDoc(doc(db, 'admins', loginData.uid))
+            if (adminDoc.exists()) {
+              const adminData = adminDoc.data()
+              setUserProfile({
+                uid: adminData.uid,
+                email: adminData.email,
+                nik: adminData.nik || '',
+                name: adminData.name || '',
+                phone: adminData.phone || '',
+                birthDate: '',
+                height: 0,
+                weight: 0,
+                targetWeight: 0,
+                gender: '',
+                rt: adminData.rt || '',
+                rw: adminData.rw || '',
+                kelurahan: adminData.adminKelurahan || '',
+                role: 'admin',
+                createdAt: adminData.createdAt || new Date().toISOString()
+              })
+              // Create a mock Firebase user object
+              setUser({
+                uid: loginData.uid,
+                email: loginData.email,
+                displayName: loginData.name,
+              } as FirebaseUser)
+              setLoading(false)
+              return
+            }
+
             // Fetch user profile from Firestore
             const profileDoc = await getDoc(doc(db, 'users', loginData.uid))
             if (profileDoc.exists()) {
@@ -106,11 +137,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem('interpulse_user')
         }
       }
-      
+
       // Fall back to Firebase Auth
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         setUser(firebaseUser)
-        
+
         if (firebaseUser) {
           // Get and set auth token cookie
           try {
@@ -119,7 +150,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } catch (err) {
             console.error('Error getting token:', err)
           }
-          
+
+          // Check if user is admin first
+          try {
+            const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid))
+            if (adminDoc.exists()) {
+              const adminData = adminDoc.data()
+              setUserProfile({
+                uid: adminData.uid,
+                email: adminData.email,
+                nik: adminData.nik || '',
+                name: adminData.name || '',
+                phone: adminData.phone || '',
+                birthDate: '',
+                height: 0,
+                weight: 0,
+                targetWeight: 0,
+                gender: '',
+                rt: adminData.rt || '',
+                rw: adminData.rw || '',
+                kelurahan: adminData.adminKelurahan || '',
+                role: 'admin',
+                createdAt: adminData.createdAt || new Date().toISOString()
+              })
+              setLoading(false)
+              return
+            }
+          } catch (adminErr) {
+            console.error('Error checking admin collection:', adminErr)
+          }
+
           // Fetch user profile from Firestore
           try {
             const profileDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
@@ -183,13 +243,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserProfile(null)
           clearAuthCookie()
         }
-        
+
         setLoading(false)
       })
 
       return () => unsubscribe()
     }
-    
+
     checkQRLogin()
   }, [])
 
