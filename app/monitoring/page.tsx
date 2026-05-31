@@ -29,7 +29,7 @@ export default function MonitoringPage() {
   const [attendanceData, setAttendanceData] = useState<Record<string, Record<string, number>>>({})
   const [healthReadingsDetails, setHealthReadingsDetails] = useState<Record<string, any[]>>({})
   const [residentsData, setResidentsData] = useState<Record<string, any>>({})
-  const [selectedMonth, setSelectedMonth] = useState('april')
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('id-ID', { month: 'long' }).toLowerCase())
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
   const [rwExportDropdown, setRwExportDropdown] = useState<string | null>(null)
   const [attendanceExportDropdown, setAttendanceExportDropdown] = useState<string | null>(null)
@@ -413,7 +413,7 @@ export default function MonitoringPage() {
         imt: imt,
         ua: uaReading?.nilai || '-',
         col: colReading?.total || '-',
-        nadi: '-',
+        nadi: tensiReading?.nadi || '-',
       })
     })
 
