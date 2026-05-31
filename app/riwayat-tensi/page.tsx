@@ -178,6 +178,7 @@ export default function RiwayatKesehatan() {
           // Filter out readings from admin users
           data = data.filter(reading => {
             const userId = reading.userId || reading.nik
+            if (!userId) return true // Keep if no userId/nik
             return !adminUIDs.has(userId)
           })
         }
