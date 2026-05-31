@@ -397,6 +397,26 @@ export default function PosbinduMonitoring() {
       // Update resident document
       await updateDoc(doc(db, 'residents', editingResident.id), updatedResident)
 
+      // Sync to users collection if user exists
+      try {
+        const usersQuery = query(collection(db, 'users'), where('nik', '==', editingResident.nik))
+        const usersSnapshot = await getDocs(usersQuery)
+
+        if (!usersSnapshot.empty) {
+          const userDoc = usersSnapshot.docs[0]
+          await updateDoc(doc(db, 'users', userDoc.id), {
+            name: residentForm.nama,
+            nik: residentForm.nik,
+            rt: residentForm.rt,
+            rw: residentForm.rw,
+            alamat: residentForm.alamat
+          })
+        }
+      } catch (syncError) {
+        console.error('Error syncing to users collection:', syncError)
+        // Don't fail the entire operation if sync fails
+      }
+
       // Update PIN (required)
       if (residentForm.password && residentForm.password.length === 6) {
         const response = await fetch('/api/update-pin', {
