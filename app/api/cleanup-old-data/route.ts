@@ -83,9 +83,10 @@ export async function POST(request: NextRequest) {
 
     const { db } = getFirebaseAdmin()
 
-    // Calculate cutoff date (2 months ago)
+    // Calculate cutoff date (1 month ago - data from previous month is deleted at start of current month)
     const cutoffDate = new Date()
-    cutoffDate.setMonth(cutoffDate.getMonth() - 2)
+    cutoffDate.setMonth(cutoffDate.getMonth() - 1)
+    cutoffDate.setDate(1) // Set to 1st of the month to ensure clear cutoff
 
     console.log(`Starting cleanup for data older than ${cutoffDate.toISOString()}`)
 
