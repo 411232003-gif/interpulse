@@ -42,6 +42,8 @@ interface BaseHealthReading {
   timestamp: string
   notes?: string
   userName?: string
+  userId?: string
+  nik?: string
   rt?: string
   rw?: string
   kelurahan?: string
