@@ -1,24 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import admin from 'firebase-admin'
 
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  const serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID || 'interpulse-6a17a',
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+// Helper function to initialize Firebase Admin
+function getFirebaseAdmin() {
+  if (!admin.apps.length) {
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+
+    if (!privateKey || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PROJECT_ID) {
+      throw new Error('Missing Firebase environment variables')
+    }
+
+    const serviceAccount = {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: privateKey,
+    }
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount as any),
+    })
   }
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount as any),
-  })
+  return {
+    db: admin.firestore(),
+    auth: admin.auth()
+  }
 }
-
-const db = admin.firestore()
-const auth = admin.auth()
 
 export async function POST(request: NextRequest) {
   try {
+    const { db, auth } = getFirebaseAdmin()
+
     const body = await request.json()
     const { nik, newPin } = body
 
