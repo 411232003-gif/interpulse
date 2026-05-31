@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
@@ -25,7 +25,6 @@ export default function MonitoringPage() {
   const router = useRouter()
   const { isAdmin, userProfile } = useAuth()
   const [healthReadings, setHealthReadings] = useState<Record<string, Record<string, number>>>({})
-  const [healthTypeDistribution, setHealthTypeDistribution] = useState<Record<string, number>>({})
   const [attendanceData, setAttendanceData] = useState<Record<string, Record<string, number>>>({})
   const [healthReadingsDetails, setHealthReadingsDetails] = useState<Record<string, any[]>>({})
   const [residentsData, setResidentsData] = useState<Record<string, any>>({})
@@ -149,41 +148,27 @@ export default function MonitoringPage() {
     return () => unsubscribe()
   }, [])
 
-  // Calculate health type distribution for selected month
-  useEffect(() => {
-    const typeDist: Record<string, number> = { tensi: 0, kolesterol: 0, asamurat: 0, guladarah: 0 }
+  // Calculate health type distribution for selected month using useMemo
+  const healthTypeDistribution = useMemo(() => {
+    const filteredTypeDist: Record<string, number> = { tensi: 0, kolesterol: 0, asamurat: 0, guladarah: 0 }
+    const uniqueReadings = new Set<string>()
 
-    Object.entries(healthReadings).forEach(([rw, monthsData]) => {
-      const count = monthsData[selectedMonth] || 0
-      // For simplicity, distribute the count evenly among types if we don't have type data per month
-      // In a real implementation, you'd need to track type per reading
+    Object.values(healthReadingsDetails).flat().forEach(d => {
+      if (!d || !d.timestamp) return
+      // Only include data from posbindu (admin input)
+      if (d.source !== 'posbindu') return
+      const type = d.type
+      const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+      // Create unique key based on timestamp, type, and nik to avoid duplicates
+      const uniqueKey = `${d.timestamp}-${d.type}-${d.nik}`
+      if (type && filteredTypeDist[type] !== undefined && month === selectedMonth && !uniqueReadings.has(uniqueKey)) {
+        uniqueReadings.add(uniqueKey)
+        filteredTypeDist[type]++
+      }
     })
 
-    // For now, calculate from all readings (you may need to modify data structure to track type per month)
-    const healthReadingsRef = collection(db, 'healthReadings')
-    const unsubscribe = onSnapshot(healthReadingsRef, (snapshot) => {
-      const filteredTypeDist: Record<string, number> = { tensi: 0, kolesterol: 0, asamurat: 0, guladarah: 0 }
-      const uniqueReadings = new Set<string>()
-
-      snapshot.docs.forEach(doc => {
-        const d = doc.data()
-        if (!d || !d.timestamp) return
-        // Only include data from posbindu (admin input)
-        if (d.source !== 'posbindu') return
-        const type = d.type
-        const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-        // Create unique key based on timestamp, type, and nik to avoid duplicates
-        const uniqueKey = `${d.timestamp}-${d.type}-${d.nik}`
-        if (type && filteredTypeDist[type] !== undefined && month === selectedMonth && !uniqueReadings.has(uniqueKey)) {
-          uniqueReadings.add(uniqueKey)
-          filteredTypeDist[type]++
-        }
-      })
-
-      setHealthTypeDistribution(filteredTypeDist)
-    })
-    return () => unsubscribe()
-  }, [selectedMonth])
+    return filteredTypeDist
+  }, [selectedMonth, healthReadingsDetails])
 
   // Fetch attendance data from attendance collection
   useEffect(() => {
