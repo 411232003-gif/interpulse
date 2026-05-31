@@ -42,12 +42,22 @@ export default function TrafikUser() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as HealthReading[]
+      // Filter to only include data from posbindu (admin input) to avoid duplicates
+      const filteredData = data.filter(d => d.source === 'posbindu')
+      // Remove duplicates based on timestamp and type
+      const uniqueData = filteredData.filter((item, index, self) =>
+        index === self.findIndex((t) =>
+          t.timestamp === item.timestamp && t.type === item.type
+        )
+      )
       console.log('[TrafikUser] User health readings loaded:', {
         userNIK: userProfile.nik,
         count: data.length,
-        items: data.map(d => ({ type: d.type, timestamp: d.timestamp, source: d.source, rw: d.rw }))
+        filteredCount: filteredData.length,
+        uniqueCount: uniqueData.length,
+        items: uniqueData.map(d => ({ type: d.type, timestamp: d.timestamp, source: d.source, rw: d.rw }))
       })
-      setHealthReadings(data)
+      setHealthReadings(uniqueData)
     })
 
     return () => unsubscribe()

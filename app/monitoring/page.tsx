@@ -122,13 +122,23 @@ export default function MonitoringPage() {
         months.forEach(m => { data[rw][m] = 0 })
       })
 
+      // Track unique readings to avoid duplicates
+      const uniqueReadings = new Set<string>()
+
       snapshot.docs.forEach(doc => {
         const d = doc.data()
         if (!d || !d.timestamp) return
+        // Only include data from posbindu (admin input)
+        if (d.source !== 'posbindu') return
         const rw = d.rw
         if (rw && data[rw]) {
           const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-          if (data[rw][month] !== undefined) data[rw][month]++
+          // Create unique key based on timestamp, type, and nik to avoid duplicates
+          const uniqueKey = `${d.timestamp}-${d.type}-${d.nik}`
+          if (!uniqueReadings.has(uniqueKey) && data[rw][month] !== undefined) {
+            uniqueReadings.add(uniqueKey)
+            data[rw][month]++
+          }
         }
       })
 
@@ -151,13 +161,19 @@ export default function MonitoringPage() {
     const healthReadingsRef = collection(db, 'healthReadings')
     const unsubscribe = onSnapshot(healthReadingsRef, (snapshot) => {
       const filteredTypeDist: Record<string, number> = { tensi: 0, kolesterol: 0, asamurat: 0, guladarah: 0 }
+      const uniqueReadings = new Set<string>()
 
       snapshot.docs.forEach(doc => {
         const d = doc.data()
         if (!d || !d.timestamp) return
+        // Only include data from posbindu (admin input)
+        if (d.source !== 'posbindu') return
         const type = d.type
         const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-        if (type && filteredTypeDist[type] !== undefined && month === selectedMonth) {
+        // Create unique key based on timestamp, type, and nik to avoid duplicates
+        const uniqueKey = `${d.timestamp}-${d.type}-${d.nik}`
+        if (type && filteredTypeDist[type] !== undefined && month === selectedMonth && !uniqueReadings.has(uniqueKey)) {
+          uniqueReadings.add(uniqueKey)
           filteredTypeDist[type]++
         }
       })
@@ -442,26 +458,35 @@ export default function MonitoringPage() {
     const healthReadingsRef = collection(db, 'healthReadings')
     const unsubscribe = onSnapshot(healthReadingsRef, (snapshot) => {
       const data: Record<string, any[]> = {}
-      
+
       Object.keys(rwTargets).forEach(rw => {
         data[rw] = []
       })
-      
+
+      // Track unique readings to avoid duplicates
+      const uniqueReadings = new Set<string>()
+
       snapshot.docs.forEach(doc => {
         const d = doc.data()
         if (!d || !d.timestamp) return
+        // Only include data from posbindu (admin input)
+        if (d.source !== 'posbindu') return
         let rw = d.rw
-        
+
         // Normalize RW to match rwTargets format (01, 02, etc.)
         if (rw !== undefined) {
           rw = String(rw).padStart(2, '0')
         }
-        
-        if (rw && data[rw]) {
+
+        // Create unique key based on timestamp, type, and nik to avoid duplicates
+        const uniqueKey = `${d.timestamp}-${d.type}-${d.nik}`
+
+        if (rw && data[rw] && !uniqueReadings.has(uniqueKey)) {
+          uniqueReadings.add(uniqueKey)
           data[rw].push({ ...d, id: doc.id })
         }
       })
-      
+
       setHealthReadingsDetails(data)
     })
     return () => unsubscribe()
