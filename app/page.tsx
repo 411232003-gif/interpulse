@@ -698,11 +698,11 @@ export default function Home() {
           })}
         </div>
 
-        {/* Additional Features Section - only for non-admin, non-guest, and desktop */}
-        {!isAdmin && !isGuest && !isMobile && (
+        {/* Additional Features Section - only for non-admin, non-guest */}
+        {!isAdmin && !isGuest && (
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-5 text-center">Fitur Lainnya</h2>
-            <div className="grid grid-cols-3 gap-5">
+            <h2 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-gray-800 mb-5 text-center`}>Fitur Lainnya</h2>
+            <div className={isMobile ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-3 gap-5'}>
               <Link href="/kalori-tracker" className="flex flex-col items-center gap-3 p-5 rounded-xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-all border border-orange-200">
                 <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 p-2.5">
                   <Activity className="w-full h-full text-white" />
