@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import admin from 'firebase-admin'
-import serviceAccount from '@/../../scripts/firebase-service-account.json'
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
+  const serviceAccount = {
+    projectId: process.env.FIREBASE_PROJECT_ID || 'interpulse-6a17a',
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  }
+
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount as any),
-    projectId: 'interpulse-6a17a'
   })
 }
 
