@@ -2,14 +2,15 @@ import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
-// Firebase config - InterPulse Project
+// Firebase config - InterPulse Project (New)
 const firebaseConfig = {
-  apiKey: "AIzaSyAZGmLomPkBtrt4vwPOWBF_wx1bkiHJma0",
-  authDomain: "interpulse.firebaseapp.com",
-  projectId: "interpulse",
-  storageBucket: "interpulse.firebasestorage.app",
-  messagingSenderId: "181983238569",
-  appId: "1:181983238569:web:3088543f5bea471a9c8cb8"
+  apiKey: "AIzaSyB_tFnJVqpJgNhruE3bCCGjhAd6ZHGCAXg",
+  authDomain: "interpulse-6a17a.firebaseapp.com",
+  projectId: "interpulse-6a17a",
+  storageBucket: "interpulse-6a17a.firebasestorage.app",
+  messagingSenderId: "243666576516",
+  appId: "1:243666576516:web:3779ce4b395d42b5758ed1",
+  measurementId: "G-SXR6DBJ29D"
 };
 
 // Initialize Firebase

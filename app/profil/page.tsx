@@ -272,60 +272,37 @@ export default function Profil() {
     console.log('[Profile] handleSave called, authProfile:', authProfile)
     if (!authProfile?.uid) {
       console.error('[Profile] No authProfile.uid found')
+      showNotification('error', 'Gagal menyimpan profil: User tidak terdeteksi. Silakan login ulang.')
       return
     }
-    
+
     setSaving(true)
     console.log('[Profile] Saving profile data:', editedProfile)
     try {
-      // Update Firestore - only save relevant fields based on role
+      // Update Firestore - only save simplified fields
       const userRef = doc(db, 'users', authProfile.uid)
       console.log('[Profile] Updating document:', authProfile.uid)
-      
+
       const updateData: any = {
         name: editedProfile.name,
+        email: editedProfile.email,
         phone: editedProfile.phone,
-        birthDate: editedProfile.birthDate,
-        height: editedProfile.height,
-        weight: editedProfile.weight,
-        targetWeight: editedProfile.targetWeight,
-        gender: editedProfile.gender,
+        kelurahan: editedProfile.kelurahan || '',
       }
-      
-      // Only add location fields based on role
-      if (editedProfile.role === 'admin') {
-        updateData.adminKelurahan = editedProfile.adminKelurahan || ''
-      } else {
-        updateData.rt = editedProfile.rt || ''
-        updateData.rw = editedProfile.rw || ''
-        updateData.kelurahan = editedProfile.kelurahan || ''
-      }
-      
+
       console.log('[Profile] Update data prepared:', updateData)
       await updateDoc(userRef, updateData)
       console.log('[Profile] Firestore update successful')
-      
+
       setProfile({ ...editedProfile })
       setIsEditing(false)
       await refreshProfile()
       console.log('[Profile] Profile refreshed')
-      
-      if ((window as any).showNotification) {
-        (window as any).showNotification({
-          type: 'success',
-          title: 'Profil Berhasil Disimpan',
-          message: 'Perubahan profil Anda telah berhasil disimpan'
-        })
-      }
+
+      showNotification('success', 'Profil berhasil disimpan')
     } catch (error) {
       console.error('[Profile] Error saving profile:', error)
-      if ((window as any).showNotification) {
-        (window as any).showNotification({
-          type: 'error',
-          title: 'Gagal Menyimpan Profil',
-          message: 'Terjadi kesalahan saat menyimpan profil. Coba lagi.'
-        })
-      }
+      showNotification('error', 'Gagal menyimpan profil. Coba lagi.')
     } finally {
       setSaving(false)
       console.log('[Profile] Saving state reset')
@@ -668,59 +645,12 @@ export default function Profil() {
                       <input id="edit-email" type="email" value={editedProfile.email} onChange={(e) => handleChange('email', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                     </div>
                     <div>
-                      <label htmlFor="edit-phone" className="text-sm font-medium text-gray-700 mb-1 block">Telepon</label>
+                      <label htmlFor="edit-phone" className="text-sm font-medium text-gray-700 mb-1 block">No Telepon</label>
                       <input id="edit-phone" type="tel" value={editedProfile.phone} onChange={(e) => handleChange('phone', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                     </div>
                     <div>
-                      <label htmlFor="edit-birthDate" className="text-sm font-medium text-gray-700 mb-1 block">Tanggal Lahir</label>
-                      <input id="edit-birthDate" type="date" value={editedProfile.birthDate} onChange={(e) => handleChange('birthDate', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
-                    </div>
-                    <div>
-                      <label htmlFor="edit-gender" className="text-sm font-medium text-gray-700 mb-1 block">Jenis Kelamin</label>
-                      <select id="edit-gender" value={editedProfile.gender} onChange={(e) => handleChange('gender', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 bg-white">
-                        <option value="Laki-laki">Laki-laki</option>
-                        <option value="Perempuan">Perempuan</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="edit-height" className="text-sm font-medium text-gray-700 mb-1 block">Tinggi (cm)</label>
-                        <input id="edit-height" type="number" value={editedProfile.height} onChange={(e) => handleChange('height', parseInt(e.target.value) || 0)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
-                      </div>
-                      <div>
-                        <label htmlFor="edit-weight" className="text-sm font-medium text-gray-700 mb-1 block">Berat (kg)</label>
-                        <input id="edit-weight" type="number" value={editedProfile.weight} onChange={(e) => handleChange('weight', parseInt(e.target.value) || 0)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
-                      </div>
-                    </div>
-                    <div className="border-t pt-4 mt-4">
-                      <p className="text-sm font-medium text-gray-700 mb-3">Alamat Kelurahan</p>
-                      {editedProfile.role === 'admin' ? (
-                        <div className="p-4 bg-blue-50 rounded-lg">
-                          <label htmlFor="edit-admin-kelurahan" className="text-sm font-medium text-blue-700 mb-2 block">Alamat Kelurahan (Admin)</label>
-                          <input id="edit-admin-kelurahan" type="text" value={editedProfile.adminKelurahan || ''} onChange={(e) => handleChange('adminKelurahan', e.target.value)} className="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Isi alamat kelurahan" />
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-4">
-                          <div>
-                            <label htmlFor="edit-rt" className="text-sm text-gray-600 mb-1 block">RT</label>
-                            <select id="edit-rt" value={editedProfile.rt || ''} onChange={(e) => handleChange('rt', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 bg-white">
-                              <option value="">Pilih RT</option>
-                              {Array.from({ length: 20 }, (_, i) => {
-                                const value = String(i + 1).padStart(3, '0')
-                                return <option key={value} value={value}>{value}</option>
-                              })}
-                            </select>
-                          </div>
-                          <div>
-                            <label htmlFor="edit-rw" className="text-sm text-gray-600 mb-1 block">RW</label>
-                            <input id="edit-rw" type="text" value={editedProfile.rw} onChange={(e) => handleChange('rw', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="01" />
-                          </div>
-                          <div>
-                            <label htmlFor="edit-kelurahan" className="text-sm text-gray-600 mb-1 block">Kelurahan</label>
-                            <input id="edit-kelurahan" type="text" value={editedProfile.kelurahan} onChange={(e) => handleChange('kelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" />
-                          </div>
-                        </div>
-                      )}
+                      <label htmlFor="edit-kelurahan" className="text-sm font-medium text-gray-700 mb-1 block">Alamat Kelurahan</label>
+                      <input id="edit-kelurahan" type="text" value={editedProfile.kelurahan || ''} onChange={(e) => handleChange('kelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Isi alamat kelurahan" />
                     </div>
                     <div className="flex gap-3 pt-4">
                       <Button variant="outline" className="flex-1" onClick={handleCancel}>
@@ -762,40 +692,16 @@ export default function Profil() {
                     <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                       <div className="bg-green-100 p-3 rounded-full"><Phone className="w-6 h-6 text-green-600" /></div>
                       <div className="flex-1">
-                        <p className="text-sm text-gray-500">Telepon</p>
+                        <p className="text-sm text-gray-500">No Telepon</p>
                         <p className="font-semibold text-gray-900">{profile.phone}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="bg-purple-100 p-3 rounded-full"><Calendar className="w-6 h-6 text-purple-600" /></div>
+                      <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">📍</span></div>
                       <div className="flex-1">
-                        <p className="text-sm text-gray-500">Lahir</p>
-                        <p className="font-semibold text-gray-900">{new Date(profile.birthDate).toLocaleDateString('id-ID')} ({calculateAge(profile.birthDate)} th)</p>
+                        <p className="text-sm text-gray-500">Alamat Kelurahan</p>
+                        <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
                       </div>
-                    </div>
-                    <div className="border-t pt-4 mt-4">
-                      {profile.role === 'admin' ? (
-                        <>
-                          <p className="text-sm text-gray-500 mb-2">Alamat Kelurahan</p>
-                          <div className="flex items-center space-x-4 p-4 bg-blue-50 rounded-lg">
-                            <div className="bg-blue-100 p-3 rounded-full"><span className="text-blue-600 text-xs font-bold">ADMIN</span></div>
-                            <div className="flex-1">
-                              <p className="font-semibold text-gray-900">{profile.adminKelurahan || 'Belum diisi'}</p>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm text-gray-500 mb-2">Alamat Kelurahan</p>
-                          <div className="flex items-center space-x-4 p-4 bg-teal-50 rounded-lg">
-                            <div className="bg-teal-100 p-3 rounded-full"><span className="text-teal-600 text-xs font-bold">RT/RW</span></div>
-                            <div className="flex-1">
-                              <p className="font-semibold text-gray-900">RT {profile.rt} / RW {profile.rw}</p>
-                              <p className="text-sm text-gray-600">{profile.kelurahan}</p>
-                            </div>
-                          </div>
-                        </>
-                      )}
                     </div>
                   </>
                 )}

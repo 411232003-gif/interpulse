@@ -737,7 +737,7 @@ export default function RiwayatKesehatan() {
         </div>
       )}
 
-      <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
+      <Link href="/monev-posbindu" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke Monev Posbindu">
         <ArrowLeft className="w-6 h-6" />
       </Link>
 
