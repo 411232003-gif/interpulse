@@ -328,8 +328,8 @@ export default function MonitoringPage() {
     return data
   }
 
-  // Get filtered table data
-  const getTableData = () => {
+  // Get filtered table data using useMemo
+  const tableData = useMemo(() => {
     const data: any[] = []
     const uniqueResidents = new Set<string>()
 
@@ -403,11 +403,10 @@ export default function MonitoringPage() {
     })
 
     return data
-  }
+  }, [selectedMonth, residentsData, tbbbData, healthReadingsDetails, tableFilterRW, tableFilterRT, tableSearchTerm])
 
-  // Select all residents (defined after getTableData)
+  // Select all residents
   const selectAllResidents = () => {
-    const tableData = getTableData()
     const allIds = tableData.map(row => row.nik || row.id)
     setSelectedResidents(new Set(allIds))
   }
@@ -777,7 +776,7 @@ export default function MonitoringPage() {
   const exportAttendanceToPDF = (rw: string) => {
     const doc = new jsPDF()
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const tableData = getTableData().filter(row => row.rw === rw)
+    const filteredTableData = tableData.filter(row => row.rw === rw)
 
     // Header
     doc.setFillColor(79, 70, 229)
@@ -835,9 +834,9 @@ export default function MonitoringPage() {
   }
 
   const exportAttendanceToExcel = (rw: string) => {
-    const tableData = getTableData().filter(row => row.rw === rw)
+    const filteredTableData = tableData.filter(row => row.rw === rw)
 
-    const data = tableData.map(row => ({
+    const data = filteredTableData.map(row => ({
       'Nama': row.nama,
       'NIK': row.nik,
       'Tgl Lahir': row.tglLahir,
@@ -882,21 +881,21 @@ export default function MonitoringPage() {
 
   const exportAttendanceToWhatsApp = (rw: string) => {
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const tableData = getTableData().filter(row => row.rw === rw)
+    const filteredTableData = tableData.filter(row => row.rw === rw)
 
     let message = `📊 *DATA KESEHATAN WARGA RW ${rw}*\n`
     message += `🏥 Kelurahan ${kelurahan}\n`
     message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
-    message += `• Total Data: ${tableData.length}\n\n`
+    message += `• Total Data: ${filteredTableData.length}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `🏥 *DATA KESEHATAN WARGA*\n\n`
 
-    if (tableData.length === 0) {
+    if (filteredTableData.length === 0) {
       message += `Belum ada data kesehatan untuk RW ${rw}.\n`
     } else {
-      tableData.forEach((row, index) => {
+      filteredTableData.forEach((row, index) => {
         message += `${index + 1}. ${row.nama}\n`
         message += `   NIK: ${row.nik}\n`
         message += `   Umur: ${row.umur}\n`
@@ -1051,7 +1050,7 @@ export default function MonitoringPage() {
   const exportTableToPDF = () => {
     const doc = new jsPDF()
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const tableData = getTableData()
+    const filteredTableData = tableData
     
     // Header
     doc.setFillColor(79, 70, 229)
@@ -1110,9 +1109,9 @@ export default function MonitoringPage() {
   }
 
   const exportTableToExcel = () => {
-    const tableData = getTableData()
+    const filteredTableData = tableData
     
-    const data = tableData.map(row => ({
+    const data = filteredTableData.map(row => ({
       'Nama': row.nama,
       'NIK': row.nik,
       'Tgl Lahir': row.tglLahir,
@@ -1158,18 +1157,18 @@ export default function MonitoringPage() {
 
   const exportTableToWhatsApp = () => {
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const tableData = getTableData()
+    const filteredTableData = tableData
     
     let message = `📊 *DATA KESEHATAN WARGA*\n`
     message += `🏥 Kelurahan ${kelurahan}\n`
     message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
-    message += `• Total Warga: ${tableData.length}\n\n`
+    message += `• Total Warga: ${filteredTableData.length}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `🏥 *DAFTAR WARGA*\n\n`
     
-    tableData.slice(0, 20).forEach(row => {
+    filteredTableData.slice(0, 20).forEach(row => {
       message += `� ${row.nama}\n`
       message += `🆔 NIK: ${row.nik}\n`
       message += `🎂 Umur: ${row.umur}\n`
@@ -1178,8 +1177,8 @@ export default function MonitoringPage() {
       message += `💓 TD: ${row.td} | GDS: ${row.gds} | IMT: ${row.imt}\n\n`
     })
     
-    if (tableData.length > 20) {
-      message += `... dan ${tableData.length - 20} data lainnya\n\n`
+    if (filteredTableData.length > 20) {
+      message += `... dan ${filteredTableData.length - 20} data lainnya\n\n`
     }
     
     message += `━━━━━━━━━━━━━━━━━━━━\n`
@@ -1689,7 +1688,7 @@ export default function MonitoringPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {getTableData().slice(0, 10).map((row, i) => (
+                  {tableData.slice(0, 10).map((row, i) => (
                     <tr key={i} className="border-b hover:bg-gray-50">
                       <td className="px-2 py-2 font-medium">{row.nama}</td>
                       <td className="px-2 py-2">{row.nik}</td>
