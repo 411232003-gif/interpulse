@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -21,6 +22,7 @@ const monthLabels: Record<string, string> = {
 }
 
 export default function MonitoringPage() {
+  const router = useRouter()
   const { isAdmin, userProfile } = useAuth()
   const [healthReadings, setHealthReadings] = useState<Record<string, Record<string, number>>>({})
   const [healthTypeDistribution, setHealthTypeDistribution] = useState<Record<string, number>>({})
@@ -1180,8 +1182,19 @@ export default function MonitoringPage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-b-3xl shadow-lg">
-        <h1 className="text-2xl font-bold">Laporan</h1>
-        <p className="text-indigo-100 text-sm mt-1">Pantau data kesehatan warga</p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            aria-label="Kembali"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold">Laporan</h1>
+            <p className="text-indigo-100 text-sm mt-1">Pantau data kesehatan warga</p>
+          </div>
+        </div>
       </div>
 
       <div className="px-4 mt-6 space-y-4">
