@@ -6,8 +6,6 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
 import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle, Download, FileText, MessageSquare, ChevronDown, Info, ArrowRight } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -69,6 +67,7 @@ export default function PosbinduMonitoring() {
     umur: '',
     jenisKelamin: 'L',
     alamat: '',
+    password: '',
   })
 
   // Check-in form state
@@ -346,62 +345,36 @@ export default function PosbinduMonitoring() {
   const handleAddResident = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const age = calculateAge(residentForm.birthDate)
-      const password = generatePIN()
-
-      // Store current admin token before creating new user
-      const adminToken = document.cookie.replace(/(?:(?:^|.*;\s*)firebaseIdToken\s*\=\s*([^;]*).*$)|^.*$/, "$1")
-
-      // Create Firebase Auth user
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        `${residentForm.nik}@interpulse.id`,
-        password
-      )
-
-      // Add user to users collection
-      await addDoc(collection(db, 'users'), {
-        uid: userCredential.user.uid,
-        name: residentForm.nama,
-        nik: residentForm.nik,
-        email: `${residentForm.nik}@interpulse.id`,
-        rw: residentForm.rw,
-        rt: residentForm.rt,
-        birthDate: residentForm.birthDate,
-        gender: residentForm.jenisKelamin,
-        kelurahan: residentForm.alamat,
-        role: 'user',
-        password: password,
-        createdAt: new Date().toISOString()
+      const response = await fetch('/api/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nama: residentForm.nama,
+          nik: residentForm.nik,
+          rw: residentForm.rw,
+          rt: residentForm.rt,
+          birthDate: residentForm.birthDate,
+          jenisKelamin: residentForm.jenisKelamin,
+          alamat: residentForm.alamat
+        })
       })
 
-      // Sign out from the new user account
-      await auth.signOut()
+      const data = await response.json()
 
-      // Restore admin session by setting the cookie back
-      if (adminToken) {
-        document.cookie = `firebaseIdToken=${adminToken}; path=/; max-age=3600`
+      if (!data.success) {
+        throw new Error(data.error || 'Gagal menambahkan warga')
       }
-
-      // Add resident to Firestore
-      const newResident = {
-        nama: residentForm.nama,
-        nik: residentForm.nik,
-        rw: residentForm.rw,
-        rt: residentForm.rt,
-        birthDate: residentForm.birthDate,
-        umur: age,
-        jenisKelamin: residentForm.jenisKelamin,
-        alamat: residentForm.alamat,
-      }
-      await addDoc(collection(db, 'residents'), newResident)
 
       setIsModalOpen(false)
       resetResidentForm()
-      showNotification('success', `Warga berhasil ditambahkan! Username: ${residentForm.nik}, Password: ${password}`)
-    } catch (error) {
+
+      // Show detailed notification
+      showNotification('success', `Akun user berhasil dibuat! Nama: ${data.user.name}, NIK: ${data.user.nik}, PIN: ${data.user.password}. User dapat login dengan NIK dan PIN tersebut.`)
+    } catch (error: any) {
       console.error('Error adding resident:', error)
-      showNotification('error', 'Gagal menambahkan warga. Pastikan NIK belum terdaftar.')
+      showNotification('error', error.message || 'Gagal menambahkan warga. Pastikan NIK belum terdaftar.')
     }
   }
 
@@ -420,11 +393,34 @@ export default function PosbinduMonitoring() {
         jenisKelamin: residentForm.jenisKelamin,
         alamat: residentForm.alamat,
       }
+
+      // Update resident document
       await updateDoc(doc(db, 'residents', editingResident.id), updatedResident)
+
+      // Update PIN (required)
+      if (residentForm.password && residentForm.password.length === 6) {
+        const response = await fetch('/api/update-pin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ nik: residentForm.nik, newPin: residentForm.password })
+        })
+
+        const data = await response.json()
+        if (!data.success) {
+          showNotification('error', 'Data warga diperbarui, tetapi PIN gagal diupdate')
+        } else {
+          showNotification('success', 'Data warga dan PIN berhasil diperbarui')
+        }
+      } else {
+        showNotification('error', 'PIN wajib diisi (6 digit)')
+        return
+      }
+
       setIsModalOpen(false)
       setEditingResident(null)
       resetResidentForm()
-      showNotification('success', 'Data warga berhasil diperbarui')
     } catch (error) {
       console.error('Error updating resident:', error)
       showNotification('error', 'Gagal memperbarui data warga')
@@ -432,13 +428,32 @@ export default function PosbinduMonitoring() {
   }
 
   const handleDeleteResident = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus data warga ini?')) return
+    if (!confirm('Apakah Anda yakin ingin menghapus data warga ini? Ini akan menghapus semua data user termasuk akun login.')) return
     try {
-      await deleteDoc(doc(db, 'residents', id))
-      showNotification('success', 'Data warga berhasil dihapus')
-    } catch (error) {
+      const resident = residents.find(r => r.id === id)
+      if (!resident || !resident.nik) {
+        showNotification('error', 'Data warga tidak ditemukan')
+        return
+      }
+
+      const response = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nik: resident.nik })
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Gagal menghapus user')
+      }
+
+      showNotification('success', 'Data warga dan akun user berhasil dihapus')
+    } catch (error: any) {
       console.error('Error deleting resident:', error)
-      showNotification('error', 'Gagal menghapus data warga')
+      showNotification('error', error.message || 'Gagal menghapus data warga')
     }
   }
 
@@ -447,15 +462,50 @@ export default function PosbinduMonitoring() {
       showNotification('info', 'Pilih minimal satu warga untuk dihapus')
       return
     }
-    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedResidents.size} data warga?`)) return
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedResidents.size} data warga? Ini akan menghapus semua data user termasuk akun login.`)) return
 
     try {
+      let successCount = 0
+      let failCount = 0
+
       for (const id of selectedResidents) {
-        await deleteDoc(doc(db, 'residents', id))
+        const resident = residents.find(r => r.id === id)
+        if (!resident || !resident.nik) {
+          failCount++
+          continue
+        }
+
+        try {
+          const response = await fetch('/api/delete-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ nik: resident.nik })
+          })
+
+          const data = await response.json()
+          if (data.success) {
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (error) {
+          console.error('Error deleting user:', error)
+          failCount++
+        }
       }
+
       setSelectedResidents(new Set())
       setIsSelectionMode(false)
-      showNotification('success', `${selectedResidents.size} data warga berhasil dihapus`)
+
+      if (failCount === 0) {
+        showNotification('success', `${successCount} data warga dan akun user berhasil dihapus`)
+      } else if (successCount === 0) {
+        showNotification('error', 'Gagal menghapus semua data warga')
+      } else {
+        showNotification('error', `${successCount} berhasil dihapus, ${failCount} gagal`)
+      }
     } catch (error) {
       console.error('Error bulk deleting residents:', error)
       showNotification('error', 'Gagal menghapus data warga')
@@ -502,6 +552,7 @@ export default function PosbinduMonitoring() {
       umur: resident.umur.toString(),
       jenisKelamin: resident.jenisKelamin,
       alamat: resident.alamat,
+      password: resident.password || '',
     })
     setIsModalOpen(true)
   }
@@ -563,6 +614,7 @@ export default function PosbinduMonitoring() {
       umur: '',
       jenisKelamin: 'L',
       alamat: '',
+      password: '',
     })
   }
 
@@ -1260,7 +1312,7 @@ export default function PosbinduMonitoring() {
               <form onSubmit={editingResident ? handleEditResident : handleAddResident} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap</label>
                     <input
                       type="text"
                       required
@@ -1271,7 +1323,7 @@ export default function PosbinduMonitoring() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">NIK *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">NIK</label>
                     <input
                       type="text"
                       required
@@ -1286,7 +1338,7 @@ export default function PosbinduMonitoring() {
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">RT *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">RT</label>
                     <select
                       required
                       value={residentForm.rt}
@@ -1301,7 +1353,7 @@ export default function PosbinduMonitoring() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">RW *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">RW</label>
                     <select
                       required
                       value={residentForm.rw}
@@ -1316,7 +1368,7 @@ export default function PosbinduMonitoring() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Tanggal Lahir *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Tanggal Lahir</label>
                     <div className="relative">
                       <input
                         type="date"
@@ -1337,7 +1389,7 @@ export default function PosbinduMonitoring() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin</label>
                     <select
                       required
                       value={residentForm.jenisKelamin}
@@ -1350,7 +1402,7 @@ export default function PosbinduMonitoring() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Alamat *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
                     <input
                       type="text"
                       required
@@ -1359,6 +1411,22 @@ export default function PosbinduMonitoring() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Alamat lengkap"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">PIN (6 digit)</label>
+                    <input
+                      type="text"
+                      required
+                      value={residentForm.password}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 6)
+                        setResidentForm({ ...residentForm, password: value })
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Masukkan 6 digit PIN"
+                      maxLength={6}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Masukkan 6 digit PIN untuk user.</p>
                   </div>
                 </div>
 
@@ -1402,7 +1470,7 @@ export default function PosbinduMonitoring() {
 
               <form onSubmit={handleEditAttendance} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nama *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nama</label>
                   <input
                     type="text"
                     required
@@ -1438,7 +1506,7 @@ export default function PosbinduMonitoring() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">RT *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">RT</label>
                     <select
                       required
                       value={attendanceForm.rt}
@@ -1453,7 +1521,7 @@ export default function PosbinduMonitoring() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">RW *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">RW</label>
                     <select
                       required
                       value={attendanceForm.rw}

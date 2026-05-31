@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
 import { Users, Search, Filter, ArrowLeft, CheckCircle, Calendar, X, AlertCircle, Plus, Info } from 'lucide-react'
 
 interface Resident {
@@ -82,8 +80,12 @@ export default function AbsensiPage() {
         })) as any[]
 
         // Merge residents and users, avoiding duplicates by NIK
+        // Filter out admin users (role: 'admin')
         const mergedData = [...residentsData]
         usersData.forEach(user => {
+          // Skip admin users
+          if (user.role === 'admin') return
+
           if (user.nik && !mergedData.find(r => r.nik === user.nik)) {
             const age = user.birthDate ? calculateAge(user.birthDate) : 0
             mergedData.push({
@@ -159,8 +161,8 @@ export default function AbsensiPage() {
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Akses Ditolak</h2>
           <p className="text-gray-600 mb-6">Halaman ini hanya dapat diakses oleh admin.</p>
-          <button onClick={() => router.push('/monev-posbindu')} className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium">
-            Kembali ke Monev Posbindu
+          <button onClick={() => router.push('/')} className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium">
+            Kembali ke Beranda
           </button>
         </div>
       </div>
@@ -238,56 +240,27 @@ export default function AbsensiPage() {
   const handleAddResident = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const age = calculateAge(residentForm.birthDate)
-      const password = generatePIN()
-      setGeneratedPassword(password)
-
-      // Store current admin token before creating new user
-      const adminToken = document.cookie.replace(/(?:(?:^|.*;\s*)firebaseIdToken\s*\=\s*([^;]*).*$)|^.*$/, "$1")
-
-      // Create Firebase Auth user
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        `${residentForm.nik}@interpulse.id`,
-        password
-      )
-
-      // Add user to users collection
-      await addDoc(collection(db, 'users'), {
-        uid: userCredential.user.uid,
-        name: residentForm.nama,
-        nik: residentForm.nik,
-        email: `${residentForm.nik}@interpulse.id`,
-        rw: residentForm.rw,
-        rt: residentForm.rt,
-        birthDate: residentForm.birthDate,
-        gender: residentForm.jenisKelamin,
-        kelurahan: residentForm.alamat,
-        role: 'user',
-        password: password,
-        createdAt: new Date().toISOString()
+      const response = await fetch('/api/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nama: residentForm.nama,
+          nik: residentForm.nik,
+          rw: residentForm.rw,
+          rt: residentForm.rt,
+          birthDate: residentForm.birthDate,
+          jenisKelamin: residentForm.jenisKelamin,
+          alamat: residentForm.alamat
+        })
       })
 
-      // Sign out from the new user account
-      await auth.signOut()
+      const data = await response.json()
 
-      // Restore admin session by setting the cookie back
-      if (adminToken) {
-        document.cookie = `firebaseIdToken=${adminToken}; path=/; max-age=3600`
+      if (!data.success) {
+        throw new Error(data.error || 'Gagal menambahkan warga')
       }
-
-      // Add resident to Firestore
-      const newResident = {
-        nama: residentForm.nama,
-        nik: residentForm.nik,
-        rw: residentForm.rw,
-        rt: residentForm.rt,
-        birthDate: residentForm.birthDate,
-        umur: age,
-        jenisKelamin: residentForm.jenisKelamin,
-        alamat: residentForm.alamat,
-      }
-      await addDoc(collection(db, 'residents'), newResident)
 
       setIsAddModalOpen(false)
       setResidentForm({
@@ -300,10 +273,11 @@ export default function AbsensiPage() {
         alamat: ''
       })
 
-      showNotification('success', `Warga berhasil ditambahkan! Username: ${residentForm.nik}, Password: ${password}`)
-    } catch (error) {
+      // Show detailed notification
+      showNotification('success', `Akun user berhasil dibuat! Nama: ${data.user.name}, NIK: ${data.user.nik}, PIN: ${data.user.password}. User dapat login dengan NIK dan PIN tersebut.`)
+    } catch (error: any) {
       console.error('Error adding resident:', error)
-      showNotification('error', 'Gagal menambahkan warga. Pastikan NIK belum terdaftar.')
+      showNotification('error', error.message || 'Gagal menambahkan warga. Pastikan NIK belum terdaftar.')
     }
   }
 
@@ -366,7 +340,7 @@ export default function AbsensiPage() {
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <button onClick={() => router.push('/monev-posbindu')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
+              <button onClick={() => router.push('/')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
               <h1 className="text-2xl font-bold text-gray-800">Absensi Posbindu</h1>
             </div>
             <div className="text-right">

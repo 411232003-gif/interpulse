@@ -196,27 +196,51 @@ export default function MonitoringPage() {
   // Fetch residents data for names and NIK
   useEffect(() => {
     const residentsRef = collection(db, 'residents')
-    const unsubscribe = onSnapshot(residentsRef, (snapshot) => {
-      const data: Record<string, any> = {}
-      const nameMap: Record<string, any> = {} // For name-based matching
-      snapshot.docs.forEach(doc => {
-        const d = doc.data()
-        // Use document ID (which should be Firebase Auth UID), NIK, and uid field as keys
-        data[doc.id] = { ...d, id: doc.id }
-        if (d.nik) {
-          data[d.nik] = { ...d, id: doc.id }
-        }
-        if (d.uid) {
-          data[d.uid] = { ...d, id: doc.id }
-        }
-        // Also store by name for fallback matching
-        if (d.nama) {
-          nameMap[d.nama.toLowerCase()] = { ...d, id: doc.id }
+    const usersRef = collection(db, 'users')
+
+    // First fetch users to get admin UIDs
+    const unsubscribeUsers = onSnapshot(usersRef, (usersSnapshot) => {
+      const adminUIDs = new Set<string>()
+      usersSnapshot.docs.forEach(doc => {
+        const user = doc.data()
+        if (user.role === 'admin') {
+          adminUIDs.add(doc.id)
+          if (user.nik) adminUIDs.add(user.nik)
         }
       })
-      setResidentsData({ ...data, ...nameMap })
+
+      // Then fetch residents and filter out admin users
+      const unsubscribeResidents = onSnapshot(residentsRef, (snapshot) => {
+        const data: Record<string, any> = {}
+        const nameMap: Record<string, any> = {} // For name-based matching
+        snapshot.docs.forEach(doc => {
+          const d = doc.data()
+
+          // Skip if this resident is an admin
+          if (adminUIDs.has(doc.id) || (d.nik && adminUIDs.has(d.nik)) || (d.uid && adminUIDs.has(d.uid))) {
+            return
+          }
+
+          // Use document ID (which should be Firebase Auth UID), NIK, and uid field as keys
+          data[doc.id] = { ...d, id: doc.id }
+          if (d.nik) {
+            data[d.nik] = { ...d, id: doc.id }
+          }
+          if (d.uid) {
+            data[d.uid] = { ...d, id: doc.id }
+          }
+          // Also store by name for fallback matching
+          if (d.nama) {
+            nameMap[d.nama.toLowerCase()] = { ...d, id: doc.id }
+          }
+        })
+        setResidentsData({ ...data, ...nameMap })
+      })
+
+      return () => unsubscribeResidents()
     })
-    return () => unsubscribe()
+
+    return () => unsubscribeUsers()
   }, [])
 
   // Fetch TB/BB data
@@ -367,23 +391,46 @@ export default function MonitoringPage() {
   const deleteSelectedResidents = async () => {
     if (selectedResidents.size === 0) return
 
-    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedResidents.size} data warga?`)) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedResidents.size} data warga? Ini akan menghapus semua data user termasuk akun login.`)) {
       return
     }
 
     try {
+      let successCount = 0
+      let failCount = 0
+
       for (const residentId of selectedResidents) {
-        // Delete from residents collection
-        const residentsRef = collection(db, 'residents')
-        const q = query(residentsRef, where('nik', '==', residentId))
-        const snapshot = await getDocs(q)
-        snapshot.forEach(async (docSnapshot) => {
-          await deleteDoc(doc(db, 'residents', docSnapshot.id))
-        })
+        try {
+          const response = await fetch('/api/delete-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ nik: residentId })
+          })
+
+          const data = await response.json()
+          if (data.success) {
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (error) {
+          console.error('Error deleting user:', error)
+          failCount++
+        }
       }
+
       setSelectedResidents(new Set())
       setIsSelectionMode(false)
-      alert('Data warga berhasil dihapus')
+
+      if (failCount === 0) {
+        alert(`${successCount} data warga dan akun user berhasil dihapus`)
+      } else if (successCount === 0) {
+        alert('Gagal menghapus semua data warga')
+      } else {
+        alert(`${successCount} berhasil dihapus, ${failCount} gagal`)
+      }
     } catch (error) {
       console.error('Error deleting residents:', error)
       alert('Gagal menghapus data warga')
@@ -1626,6 +1673,8 @@ export default function MonitoringPage() {
                       setEditingResident(null)
                     }}
                     className="text-gray-400 hover:text-gray-600"
+                    aria-label="Tutup modal"
+                    title="Tutup modal"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1638,6 +1687,8 @@ export default function MonitoringPage() {
                       value={residentForm.nama}
                       onChange={(e) => setResidentForm({ ...residentForm, nama: e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      aria-label="Nama warga"
+                      placeholder="Masukkan nama lengkap"
                     />
                   </div>
                   <div>
@@ -1647,6 +1698,8 @@ export default function MonitoringPage() {
                       value={residentForm.nik}
                       disabled
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500"
+                      aria-label="NIK warga"
+                      placeholder="NIK tidak dapat diubah"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -1657,6 +1710,8 @@ export default function MonitoringPage() {
                         value={residentForm.rw}
                         onChange={(e) => setResidentForm({ ...residentForm, rw: e.target.value })}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        aria-label="RW"
+                        placeholder="01"
                       />
                     </div>
                     <div>
@@ -1666,6 +1721,8 @@ export default function MonitoringPage() {
                         value={residentForm.rt}
                         onChange={(e) => setResidentForm({ ...residentForm, rt: e.target.value })}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        aria-label="RT"
+                        placeholder="01"
                       />
                     </div>
                   </div>
@@ -1676,6 +1733,7 @@ export default function MonitoringPage() {
                       value={residentForm.birthDate}
                       onChange={(e) => setResidentForm({ ...residentForm, birthDate: e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      aria-label="Tanggal lahir"
                     />
                   </div>
                   <div>
@@ -1684,6 +1742,8 @@ export default function MonitoringPage() {
                       value={residentForm.jenisKelamin}
                       onChange={(e) => setResidentForm({ ...residentForm, jenisKelamin: e.target.value as 'L' | 'P' })}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      aria-label="Jenis kelamin"
+                      title="Pilih jenis kelamin"
                     >
                       <option value="L">Laki-laki</option>
                       <option value="P">Perempuan</option>
@@ -1694,6 +1754,8 @@ export default function MonitoringPage() {
                     <textarea
                       value={residentForm.alamat}
                       onChange={(e) => setResidentForm({ ...residentForm, alamat: e.target.value })}
+                      aria-label="Alamat"
+                      placeholder="Masukkan alamat lengkap"
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       rows={3}
                     />

@@ -148,16 +148,38 @@ export default function RiwayatKesehatan() {
         setIsLoading(false)
         return
       }
-      
+
       // Subscribe to real-time updates
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
         console.log('[Riwayat] Snapshot received:', snapshot.docs.length, 'documents')
         console.log('[Riwayat] User profile:', userProfile)
         console.log('[Riwayat] Screen size:', window.innerWidth, 'x', window.innerHeight)
-        const data: HealthReading[] = snapshot.docs.map(doc => ({
+
+        // If admin, filter out readings from admin users
+        let data: HealthReading[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as HealthReading[]
+
+        if (isAdmin) {
+          // Fetch admin UIDs to filter out
+          const usersSnapshot = await getDocs(collection(db, 'users'))
+          const adminUIDs = new Set<string>()
+          usersSnapshot.docs.forEach(doc => {
+            const user = doc.data()
+            if (user.role === 'admin') {
+              adminUIDs.add(doc.id)
+              if (user.nik) adminUIDs.add(user.nik)
+            }
+          })
+
+          // Filter out readings from admin users
+          data = data.filter(reading => {
+            const userId = reading.userId || reading.nik
+            return !adminUIDs.has(userId)
+          })
+        }
+
         console.log('[Riwayat] Data loaded:', data.length, 'items')
         setReadings(data)
         setIsLoading(false)
@@ -165,7 +187,7 @@ export default function RiwayatKesehatan() {
         console.error('Error loading readings from Firestore:', error)
         setIsLoading(false)
       })
-      
+
       return () => unsubscribe()
     } catch (error) {
       console.error('Error loading readings:', error)
