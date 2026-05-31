@@ -198,9 +198,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const loginWithNIK = async (userId: string, password: string) => {
-    // If userId doesn't contain @, append @interpulse.id
-    const email = userId.includes('@') ? userId : `${userId}@interpulse.id`
-    await signInWithEmailAndPassword(auth, email, password)
+    // If userId already contains @, use it directly
+    if (userId.includes('@')) {
+      await signInWithEmailAndPassword(auth, userId, password)
+      return
+    }
+
+    // Try new format first: nik@interpulse.id
+    try {
+      const email = `${userId}@interpulse.id`
+      await signInWithEmailAndPassword(auth, email, password)
+    } catch (error: any) {
+      // If new format fails, try old format: nik directly
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-email') {
+        try {
+          await signInWithEmailAndPassword(auth, userId, password)
+        } catch (retryError: any) {
+          // If both formats fail, throw the original error
+          throw error
+        }
+      } else {
+        throw error
+      }
+    }
   }
 
   const createUserByAdmin = async (
