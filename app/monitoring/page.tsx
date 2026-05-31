@@ -348,7 +348,11 @@ export default function MonitoringPage() {
     const data: any[] = []
     const uniqueResidents = new Set<string>()
 
-    Object.entries(residentsData).forEach(([nik, resident]: [string, any]) => {
+    Object.entries(residentsData).forEach(([key, resident]: [string, any]) => {
+      // Only process entries where the key matches the document ID (to avoid duplicates)
+      // residentsData has multiple keys per resident (id, nik, uid, name), but we only want to process once
+      if (key !== resident.id) return
+
       // Filter by RW
       if (tableFilterRW !== 'all' && resident.rw !== tableFilterRW) return
 
@@ -363,16 +367,16 @@ export default function MonitoringPage() {
         if (!matchesName && !matchesNIK) return
       }
 
-      // Skip duplicates
-      if (uniqueResidents.has(nik)) return
-      uniqueResidents.add(nik)
+      // Skip duplicates by document ID
+      if (uniqueResidents.has(resident.id)) return
+      uniqueResidents.add(resident.id)
 
       // Get TB/BB data for this resident
-      const tbbb = tbbbData[nik]
+      const tbbb = tbbbData[resident.nik]
 
       // Get health readings for this resident
       const rwReadings = healthReadingsDetails[resident.rw] || []
-      const residentReadings = rwReadings.filter((r: any) => r.nik === nik)
+      const residentReadings = rwReadings.filter((r: any) => r.nik === resident.nik)
 
       // Find readings for selected month
       const monthReadings = residentReadings.filter((r: any) => {
