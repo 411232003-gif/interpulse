@@ -71,6 +71,21 @@ export async function POST(request: NextRequest) {
     const deletePromises = residentsSnapshot.docs.map(doc => doc.ref.delete())
     await Promise.all(deletePromises)
 
+    // Cascade delete: Delete from healthReadings collection
+    const healthReadingsSnapshot = await db.collection('healthReadings').where('nik', '==', nik).get()
+    const healthReadingsDeletePromises = healthReadingsSnapshot.docs.map(doc => doc.ref.delete())
+    await Promise.all(healthReadingsDeletePromises)
+
+    // Cascade delete: Delete from attendance collection
+    const attendanceSnapshot = await db.collection('attendance').where('nik', '==', nik).get()
+    const attendanceDeletePromises = attendanceSnapshot.docs.map(doc => doc.ref.delete())
+    await Promise.all(attendanceDeletePromises)
+
+    // Cascade delete: Delete from tb-bb collection
+    const tbbbSnapshot = await db.collection('tb-bb').where('nik', '==', nik).get()
+    const tbbbDeletePromises = tbbbSnapshot.docs.map(doc => doc.ref.delete())
+    await Promise.all(tbbbDeletePromises)
+
     return NextResponse.json({
       success: true,
       message: 'User deleted successfully'
