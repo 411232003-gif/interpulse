@@ -346,50 +346,73 @@ export default function MonitoringPage() {
   // Get filtered table data
   const getTableData = () => {
     const data: any[] = []
-    
-    Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
+    const uniqueResidents = new Set<string>()
+
+    Object.entries(residentsData).forEach(([nik, resident]: [string, any]) => {
       // Filter by RW
-      if (tableFilterRW !== 'all' && rw !== tableFilterRW) return
-      
-      readings.forEach(reading => {
-        const resident = residentsData[reading.userId] || residentsData[reading.nik] || {}
-        
-        // Filter by month
-        const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-        if (month !== selectedMonth) return
-        
-        // Filter by RT
-        if (tableFilterRT !== 'all' && resident.rt !== tableFilterRT) return
-        
-        // Filter by search term
-        if (tableSearchTerm) {
-          const searchLower = tableSearchTerm.toLowerCase()
-          const matchesName = resident.nama?.toLowerCase().includes(searchLower)
-          const matchesNIK = resident.nik?.includes(searchLower)
-          if (!matchesName && !matchesNIK) return
-        }
-        
-        data.push({
-          nik: resident.nik || reading.nik || '-',
-          nama: resident.nama || reading.nama || '-',
-          tglLahir: resident.birthDate || '-',
-          umur: resident.umur || '-',
-          alamat: resident.alamat || '-',
-          jenisKelamin: resident.jenisKelamin || '-',
-          rw: resident.rw || rw,
-          tb: tbbbData[resident.nik]?.tb || '-',
-          bb: tbbbData[resident.nik]?.bb || '-',
-          lp: tbbbData[resident.nik]?.lp || '-',
-          td: reading.type === 'tensi' ? reading.value : '-',
-          gds: reading.type === 'guladarah' ? reading.value : '-',
-          imt: tbbbData[resident.nik] ? (tbbbData[resident.nik].bb / ((tbbbData[resident.nik].tb / 100) ** 2)).toFixed(1) : '-',
-          ua: reading.type === 'asamurat' ? reading.value : '-',
-          col: reading.type === 'kolesterol' ? reading.value : '-',
-          nadi: reading.nadi || '-',
-        })
+      if (tableFilterRW !== 'all' && resident.rw !== tableFilterRW) return
+
+      // Filter by RT
+      if (tableFilterRT !== 'all' && resident.rt !== tableFilterRT) return
+
+      // Filter by search term
+      if (tableSearchTerm) {
+        const searchLower = tableSearchTerm.toLowerCase()
+        const matchesName = resident.nama?.toLowerCase().includes(searchLower)
+        const matchesNIK = resident.nik?.includes(searchLower)
+        if (!matchesName && !matchesNIK) return
+      }
+
+      // Skip duplicates
+      if (uniqueResidents.has(nik)) return
+      uniqueResidents.add(nik)
+
+      // Get TB/BB data for this resident
+      const tbbb = tbbbData[nik]
+
+      // Get health readings for this resident
+      const rwReadings = healthReadingsDetails[resident.rw] || []
+      const residentReadings = rwReadings.filter((r: any) => r.nik === nik)
+
+      // Find readings for selected month
+      const monthReadings = residentReadings.filter((r: any) => {
+        const month = new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+        return month === selectedMonth
+      })
+
+      // Get values from readings
+      const tensiReading = monthReadings.find((r: any) => r.type === 'tensi')
+      const gdsReading = monthReadings.find((r: any) => r.type === 'guladarah')
+      const uaReading = monthReadings.find((r: any) => r.type === 'asamurat')
+      const colReading = monthReadings.find((r: any) => r.type === 'kolesterol')
+
+      // Calculate IMT if TB and BB are available
+      let imt = '-'
+      if (tbbb && tbbb.tinggiBadan && tbbb.beratBadan) {
+        const tbInMeters = tbbb.tinggiBadan / 100
+        imt = (tbbb.beratBadan / (tbInMeters * tbInMeters)).toFixed(1)
+      }
+
+      data.push({
+        nik: resident.nik || '-',
+        nama: resident.nama || '-',
+        tglLahir: resident.birthDate || '-',
+        umur: resident.umur || '-',
+        alamat: resident.alamat || '-',
+        jenisKelamin: resident.jenisKelamin || '-',
+        rw: resident.rw,
+        tb: tbbb?.tinggiBadan || '-',
+        bb: tbbb?.beratBadan || '-',
+        lp: tbbb?.lingkarPinggang || '-',
+        td: tensiReading ? `${tensiReading.sistolik}/${tensiReading.diastolik}` : '-',
+        gds: gdsReading?.nilai || '-',
+        imt: imt,
+        ua: uaReading?.nilai || '-',
+        col: colReading?.total || '-',
+        nadi: '-',
       })
     })
-    
+
     return data
   }
 
