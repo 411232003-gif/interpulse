@@ -247,15 +247,18 @@ export default function MonitoringPage() {
   }, [])
 
   // Fetch TB/BB data
-  const [tbbbData, setTbbbData] = useState<Record<string, any>>({})
+  const [tbbbData, setTbbbData] = useState<Record<string, any[]>>({})
   useEffect(() => {
     const tbbbRef = collection(db, 'tb-bb')
     const unsubscribe = onSnapshot(tbbbRef, (snapshot) => {
-      const data: Record<string, any> = {}
+      const data: Record<string, any[]> = {}
       snapshot.docs.forEach(doc => {
         const d = doc.data()
         if (d.nik) {
-          data[d.nik] = { ...d, id: doc.id }
+          if (!data[d.nik]) {
+            data[d.nik] = []
+          }
+          data[d.nik].push({ ...d, id: doc.id })
         }
       })
       setTbbbData(data)
@@ -356,8 +359,12 @@ export default function MonitoringPage() {
       if (uniqueResidents.has(resident.id)) return
       uniqueResidents.add(resident.id)
 
-      // Get TB/BB data for this resident
-      const tbbb = tbbbData[resident.nik]
+      // Get TB/BB data for this resident in selected month
+      const tbbbList = tbbbData[resident.nik] || []
+      const tbbb = tbbbList.find((t: any) => {
+        const month = new Date(t.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+        return month === selectedMonth
+      })
 
       // Get health readings for this resident
       const rwReadings = healthReadingsDetails[resident.rw] || []
@@ -368,6 +375,9 @@ export default function MonitoringPage() {
         const month = new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
         return month === selectedMonth
       })
+
+      // Only include resident if they have data in the selected month (health readings OR TB/BB)
+      if (monthReadings.length === 0 && !tbbb) return
 
       // Get values from readings
       const tensiReading = monthReadings.find((r: any) => r.type === 'tensi')
