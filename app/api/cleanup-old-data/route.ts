@@ -70,9 +70,11 @@ async function deleteOldDocuments(collectionName: string, db: admin.firestore.Fi
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify API key for security
+    // Verify API key for security (or allow Vercel cron jobs)
     const apiKey = request.headers.get('x-api-key')
-    if (apiKey !== process.env.CLEANUP_API_KEY) {
+    const cronSecret = request.headers.get('x-vercel-cron-secret')
+    
+    if (apiKey !== process.env.CLEANUP_API_KEY && cronSecret !== process.env.CRON_SECRET) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
