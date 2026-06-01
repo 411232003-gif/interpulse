@@ -1432,22 +1432,11 @@ export default function PosbinduMonitoring() {
                       placeholder="Alamat lengkap"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">PIN (6 digit)</label>
-                    <input
-                      type="text"
-                      required
-                      value={residentForm.password}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 6)
-                        setResidentForm({ ...residentForm, password: value })
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Masukkan 6 digit PIN"
-                      maxLength={6}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Masukkan 6 digit PIN untuk user.</p>
-                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 font-medium mb-2">ℹ️ Informasi Akun</p>
+                  <p className="text-xs text-blue-700">Username akan dibuat otomatis menggunakan NIK. PIN akan dibuat otomatis (6 digit unik) dan ditampilkan setelah data berhasil disimpan.</p>
                 </div>
 
                 <div className="flex gap-3 pt-4 mt-4">
