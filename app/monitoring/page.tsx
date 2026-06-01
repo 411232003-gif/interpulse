@@ -1550,6 +1550,8 @@ export default function MonitoringPage() {
                           {editingTarget === rw ? (
                             <input
                               type="number"
+                              title="Edit total target warga"
+                              placeholder="Target"
                               value={editTargetValue}
                               onChange={e => setEditTargetValue(e.target.value)}
                               onBlur={() => {

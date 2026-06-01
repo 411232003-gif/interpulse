@@ -505,8 +505,8 @@ export default function Home() {
             onTouchEnd={handleTouchEnd}
           >
             <div
-              className="flex transition-transform duration-500 ease-in-out carousel-slide"
-              style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
+              className="flex transition-transform duration-500 ease-in-out"
+              style={{ transform: `translateX(-${currentSlide * 100}%)` }}
               role="group"
               aria-label="Banner carousel"
             >
@@ -563,8 +563,8 @@ export default function Home() {
             onTouchEnd={handleTouchEnd}
           >
             <div
-              className="flex transition-transform duration-500 ease-in-out carousel-slide"
-              style={{ '--slide-offset': `-${currentSlide * 100}%` } as React.CSSProperties}
+              className="flex transition-transform duration-500 ease-in-out"
+              style={{ transform: `translateX(-${currentSlide * 100}%)` }}
               role="group"
               aria-label="Banner carousel"
             >
