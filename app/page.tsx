@@ -437,14 +437,6 @@ export default function Home() {
       icon: TrendingUp,
       gradient: 'from-teal-500 to-cyan-500',
       bgColor: 'bg-teal-50'
-    }] : []),
-    ...(user ? [{
-      title: 'Riwayat Kesehatan',
-      description: 'Lihat riwayat data kesehatan',
-      href: '/riwayat-tensi',
-      icon: History,
-      gradient: 'from-green-500 to-emerald-500',
-      bgColor: 'bg-green-50'
     }] : [])
   ]
 
