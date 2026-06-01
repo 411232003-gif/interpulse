@@ -1413,118 +1413,120 @@ export default function MonitoringPage() {
   const exportTableToPDF = () => {
     const doc = new jsPDF()
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    
-    // Header
+    const pemLabels: Record<string, string> = { td: 'TD (Tensi)', gds: 'GDS (Gula Darah)', imt: 'IMT', ua: 'UA (Asam Urat)', col: 'COL (Kolesterol)', nadi: 'Nadi' }
+    const katLabels: Record<string, string> = { rendah: 'Rendah', normal: 'Normal', batas: 'Batas Tinggi', tinggi: 'Tinggi' }
+    const katColors: Record<string, [number,number,number]> = { rendah: [59,130,246], normal: [34,197,94], batas: [234,179,8], tinggi: [239,68,68] }
+    const fieldToCol: Record<string, number> = { td: 11, gds: 12, imt: 13, ua: 14, col: 15, nadi: 16 }
+    const hasFilter = tableFilterPemeriksaan !== 'all'
+    const headerH = hasFilter ? 58 : 50
+
     doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, 50, 'F')
+    doc.rect(0, 0, 210, headerH, 'F')
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
+    doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
-    doc.text('Data Kesehatan Warga', 105, 20, { align: 'center' })
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
-    
-    doc.setTextColor(0, 0, 0)
+    doc.text('Data Kesehatan Warga', 105, 16, { align: 'center' })
     doc.setFontSize(10)
-    doc.text(`Total Data: ${displayTableData.length}`, 14, 60)
-    
-    // Table data
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 25, { align: 'center' })
+
+    if (hasFilter) {
+      const katColor = tableFilterKategori !== 'all' ? katColors[tableFilterKategori] : [255,255,255]
+      doc.setFillColor(255, 255, 255, 0.2)
+      doc.setDrawColor(255, 255, 255)
+      doc.roundedRect(14, 31, 182, 18, 3, 3, 'S')
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Filter Pemeriksaan: ${pemLabels[tableFilterPemeriksaan]}`, 20, 40)
+      if (tableFilterKategori !== 'all') {
+        doc.setTextColor(katColor[0], katColor[1], katColor[2])
+        doc.text(`  |  Kategori: ${katLabels[tableFilterKategori]}`, 100, 40)
+        doc.setTextColor(255, 255, 255)
+      }
+    }
+
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(9)
+    doc.text(`Total Data: ${displayTableData.length} warga`, 14, headerH + 10)
+
+    const colStyles: Record<number, object> = {}
+    if (hasFilter) {
+      const ci = fieldToCol[tableFilterPemeriksaan]
+      const bg = tableFilterKategori !== 'all' ? katColors[tableFilterKategori] : [79, 70, 229]
+      colStyles[ci] = { fillColor: bg, textColor: [255, 255, 255], fontStyle: 'bold' }
+    }
+
     const pdfData = displayTableData.map(row => [
-      row.nama,
-      row.nik,
-      row.rw,
-      row.rt,
-      row.tglLahir,
-      row.umur,
-      row.alamat,
-      row.jenisKelamin,
-      row.tb,
-      row.bb,
-      row.lp,
-      row.td,
-      row.gds,
-      row.imt,
-      row.ua,
-      row.col,
-      row.nadi
+      row.nama, row.nik, row.rw, row.rt, row.tglLahir, row.umur, row.alamat,
+      row.jenisKelamin, row.tb, row.bb, row.lp, row.td, row.gds, row.imt, row.ua, row.col, row.nadi
     ])
 
     autoTable(doc, {
-      startY: 65,
+      startY: headerH + 14,
       head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
       body: pdfData,
-      styles: {
-        fontSize: 7,
-        cellPadding: 2,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
-      },
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+      columnStyles: colStyles,
     })
-    
-    doc.save(`data-kesehatan-warga-${selectedMonth}.pdf`)
+
+    const suffix = hasFilter ? `-${tableFilterPemeriksaan}${tableFilterKategori !== 'all' ? '-' + tableFilterKategori : ''}` : ''
+    doc.save(`data-kesehatan-warga-${selectedMonth}${suffix}.pdf`)
     setTableExportDropdown(false)
   }
 
   const exportTableToExcel = () => {
-    const data = displayTableData.map(row => ({
-      'Nama': row.nama,
-      'NIK': row.nik,
-      'Tgl Lahir': row.tglLahir,
-      'Umur': row.umur,
-      'Alamat': row.alamat,
-      'L/P': row.jenisKelamin,
-      'TB': row.tb,
-      'BB': row.bb,
-      'LP': row.lp,
-      'TD': row.td,
-      'GDS': row.gds,
-      'IMT': row.imt,
-      'UA': row.ua,
-      'COL': row.col,
-      'NADI': row.nadi
-    }))
-    
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Data Kesehatan Warga')
-    
-    ws['!cols'] = [
-      { wch: 20 },
-      { wch: 18 },
-      { wch: 12 },
-      { wch: 6 },
-      { wch: 30 },
-      { wch: 6 },
-      { wch: 6 },
-      { wch: 6 },
-      { wch: 6 },
-      { wch: 8 },
-      { wch: 8 },
-      { wch: 8 },
-      { wch: 8 },
-      { wch: 8 },
-      { wch: 8 }
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const pemLabels: Record<string, string> = { td: 'TD (Tensi)', gds: 'GDS (Gula Darah)', imt: 'IMT', ua: 'UA (Asam Urat)', col: 'COL (Kolesterol)', nadi: 'Nadi' }
+    const katLabels: Record<string, string> = { rendah: 'Rendah', normal: 'Normal', batas: 'Batas Tinggi', tinggi: 'Tinggi' }
+    const hasFilter = tableFilterPemeriksaan !== 'all'
+
+    const metaRows: (string | number)[][] = [
+      ['DATA KESEHATAN WARGA'],
+      [`Kelurahan: ${kelurahan}`, '', `Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`],
     ]
-    
-    XLSX.writeFile(wb, `data-kesehatan-warga-${selectedMonth}.xlsx`)
+    if (hasFilter) {
+      metaRows.push([`Filter Pemeriksaan: ${pemLabels[tableFilterPemeriksaan]}`, '', `Kategori: ${tableFilterKategori !== 'all' ? katLabels[tableFilterKategori] : 'Semua'}`])
+    }
+    metaRows.push([`Total Data: ${displayTableData.length} warga`])
+    metaRows.push([])
+
+    const header = ['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']
+    const dataRows = displayTableData.map(row => [
+      row.nama, row.nik, row.tglLahir, row.umur, row.alamat,
+      row.jenisKelamin, row.tb, row.bb, row.lp,
+      row.td, row.gds, row.imt, row.ua, row.col, row.nadi
+    ])
+
+    const ws = XLSX.utils.aoa_to_sheet([...metaRows, header, ...dataRows])
+    ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 6 }, { wch: 30 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }]
+
+    const wb = XLSX.utils.book_new()
+    const sheetName = hasFilter ? `${pemLabels[tableFilterPemeriksaan].split(' ')[0]}${tableFilterKategori !== 'all' ? '-' + katLabels[tableFilterKategori] : ''}` : 'Data Kesehatan Warga'
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31))
+
+    const suffix = hasFilter ? `-${tableFilterPemeriksaan}${tableFilterKategori !== 'all' ? '-' + tableFilterKategori : ''}` : ''
+    XLSX.writeFile(wb, `data-kesehatan-warga-${selectedMonth}${suffix}.xlsx`)
     setTableExportDropdown(false)
   }
 
   const exportTableToWhatsApp = () => {
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     const filteredTableData = displayTableData
-    
+    const pemLabels: Record<string, string> = { td: 'TD (Tensi)', gds: 'GDS (Gula Darah)', imt: 'IMT', ua: 'UA (Asam Urat)', col: 'COL (Kolesterol)', nadi: 'Nadi' }
+    const katEmoji: Record<string, string> = { rendah: '🔵 Rendah', normal: '🟢 Normal', batas: '🟡 Batas Tinggi', tinggi: '🔴 Tinggi' }
+    const hasFilter = tableFilterPemeriksaan !== 'all'
+
     let message = `📊 *DATA KESEHATAN WARGA*\n`
     message += `🏥 Kelurahan ${kelurahan}\n`
-    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n`
+    if (hasFilter) {
+      message += `🔍 Filter: *${pemLabels[tableFilterPemeriksaan]}*`
+      if (tableFilterKategori !== 'all') message += ` → ${katEmoji[tableFilterKategori]}`
+      message += `\n`
+    }
+    message += `\n━━━━━━━━━━━━━━━━━━━━\n\n`
     message += `📈 *RINGKASAN DATA*\n`
     message += `• Total Warga: ${filteredTableData.length}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
@@ -2043,11 +2045,6 @@ export default function MonitoringPage() {
                       </div>
                     )}
                   </div>
-                  {/* Search Nama/NIK – desktop only, below export */}
-                  <div className="hidden sm:flex items-center gap-1">
-                    <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Nama/NIK</label>
-                    <input type="text" value={tableSearchTerm} onChange={(e) => setTableSearchTerm(e.target.value)} placeholder="Cari..." title="Cari nama atau NIK" className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-28" />
-                  </div>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -2070,11 +2067,6 @@ export default function MonitoringPage() {
                       <option key={rt} value={String(rt)}>{rt}</option>
                     ))}
                   </select>
-                </div>
-                {/* Nama/NIK – mobile only, next to Pemeriksaan */}
-                <div className="flex sm:hidden items-center gap-1">
-                  <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Nama/NIK</label>
-                  <input type="text" value={tableSearchTerm} onChange={(e) => setTableSearchTerm(e.target.value)} placeholder="Cari..." title="Cari nama atau NIK" className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-24" />
                 </div>
                 {/* Pemeriksaan */}
                 <div className="flex items-center gap-1">
@@ -2120,6 +2112,11 @@ export default function MonitoringPage() {
                     )}
                   </div>
                 )}
+                {/* Nama/NIK – always visible, right-aligned */}
+                <div className="flex items-center gap-1 ml-auto">
+                  <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Nama/NIK</label>
+                  <input type="text" value={tableSearchTerm} onChange={(e) => setTableSearchTerm(e.target.value)} placeholder="Cari..." title="Cari nama atau NIK" className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-28" />
+                </div>
               </div>
             </div>
             {/* Table */}
