@@ -50,6 +50,9 @@ export default function MonitoringPage() {
   const [tableFilterRW, setTableFilterRW] = useState<string>('all')
   const [tableFilterRT, setTableFilterRT] = useState<string>('all')
   const [tableSearchTerm, setTableSearchTerm] = useState<string>('')
+  const [tableFilterPemeriksaan, setTableFilterPemeriksaan] = useState<string>('all')
+  const [tableFilterKategori, setTableFilterKategori] = useState<string>('all')
+  const [tableKategoriDropdownOpen, setTableKategoriDropdownOpen] = useState(false)
 
   // Selection mode for Data Warga
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -304,6 +307,18 @@ export default function MonitoringPage() {
       if (value < 9) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
       return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
     }
+    if (type === 'imt') {
+      if (value < 18.5) return { status: 'Rendah', color: 'bg-blue-500', textColor: 'text-blue-700' }
+      if (value < 25) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
+      if (value < 30) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
+      return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
+    }
+    if (type === 'nadi') {
+      if (value < 60) return { status: 'Rendah', color: 'bg-blue-500', textColor: 'text-blue-700' }
+      if (value <= 100) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
+      if (value <= 110) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
+      return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
+    }
     return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
   }
 
@@ -311,7 +326,47 @@ export default function MonitoringPage() {
   const getDistributionForType = (healthType: string) => {
     const distribution = { rendah: 0, normal: 0, batas: 0, tinggi: 0 }
 
-    Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
+    if (healthType === 'nadi') {
+      Object.entries(healthReadingsDetails).forEach(([, readings]) => {
+        readings.forEach(reading => {
+          if (reading.type !== 'tensi' || !reading.nadi) return
+          const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+          if (month !== selectedMonth) return
+          const residentExists = Object.values(residentsData).some((r: any) =>
+            r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
+          )
+          if (!residentExists) return
+          const status = getHealthStatus('nadi', reading.nadi)
+          if (status.status === 'Normal') distribution.normal++
+          else if (status.status === 'Batas') distribution.batas++
+          else if (status.status === 'Tinggi') distribution.tinggi++
+          else distribution.rendah++
+        })
+      })
+      return distribution
+    }
+
+    if (healthType === 'imt') {
+      Object.entries(tbbbData).forEach(([nik, records]) => {
+        const monthRecord = (records as any[]).find(t => {
+          const month = new Date(t.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+          return month === selectedMonth
+        })
+        if (!monthRecord?.tinggiBadan || !monthRecord?.beratBadan) return
+        const residentExists = Object.values(residentsData).some((r: any) => r.nik === nik)
+        if (!residentExists) return
+        const tbM = monthRecord.tinggiBadan / 100
+        const imtVal = monthRecord.beratBadan / (tbM * tbM)
+        const status = getHealthStatus('imt', imtVal)
+        if (status.status === 'Normal') distribution.normal++
+        else if (status.status === 'Batas') distribution.batas++
+        else if (status.status === 'Tinggi') distribution.tinggi++
+        else distribution.rendah++
+      })
+      return distribution
+    }
+
+    Object.entries(healthReadingsDetails).forEach(([, readings]) => {
       readings.forEach(reading => {
         if (reading.type !== healthType) return
 
@@ -339,6 +394,47 @@ export default function MonitoringPage() {
   // Calculate health status distribution for filtered data (uses current filterRW & filterHealthType)
   const getHealthStatusDistribution = () => {
     const distribution = { rendah: 0, normal: 0, batas: 0, tinggi: 0 }
+
+    if (filterHealthType === 'nadi') {
+      Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
+        if (filterRW !== 'all' && rw !== filterRW) return
+        readings.forEach(reading => {
+          if (reading.type !== 'tensi' || !reading.nadi) return
+          const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+          if (month !== selectedMonth) return
+          const residentExists = Object.values(residentsData).some((r: any) =>
+            r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
+          )
+          if (!residentExists) return
+          const status = getHealthStatus('nadi', reading.nadi)
+          if (status.status === 'Normal') distribution.normal++
+          else if (status.status === 'Batas') distribution.batas++
+          else if (status.status === 'Tinggi') distribution.tinggi++
+          else distribution.rendah++
+        })
+      })
+      return distribution
+    }
+
+    if (filterHealthType === 'imt') {
+      Object.entries(tbbbData).forEach(([nik, records]) => {
+        const monthRecord = (records as any[]).find(t => {
+          const month = new Date(t.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+          return month === selectedMonth
+        })
+        if (!monthRecord?.tinggiBadan || !monthRecord?.beratBadan) return
+        const residentExists = Object.values(residentsData).some((r: any) => r.nik === nik)
+        if (!residentExists) return
+        const tbM = monthRecord.tinggiBadan / 100
+        const imtVal = monthRecord.beratBadan / (tbM * tbM)
+        const status = getHealthStatus('imt', imtVal)
+        if (status.status === 'Normal') distribution.normal++
+        else if (status.status === 'Batas') distribution.batas++
+        else if (status.status === 'Tinggi') distribution.tinggi++
+        else distribution.rendah++
+      })
+      return distribution
+    }
 
     Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
       if (filterRW !== 'all' && rw !== filterRW) return
@@ -465,6 +561,35 @@ export default function MonitoringPage() {
 
     return data
   }, [selectedMonth, residentsData, tbbbData, healthReadingsDetails, tableFilterRW, tableFilterRT, tableSearchTerm])
+
+  // Map pemeriksaan field to getHealthStatus type
+  const fieldToHealthType: Record<string, string> = {
+    td: 'tensi', gds: 'guladarah', imt: 'imt', ua: 'asamurat', col: 'kolesterol', nadi: 'nadi',
+  }
+  const kategoriToStatus: Record<string, string> = {
+    rendah: 'Rendah', normal: 'Normal', batas: 'Batas', tinggi: 'Tinggi',
+  }
+
+  // Filtered display data (applies Pemeriksaan + Kategori filters on top of tableData)
+  const displayTableData = useMemo(() => {
+    if (tableFilterPemeriksaan === 'all') return tableData
+    return tableData.filter(row => {
+      let numVal: number | null = null
+      if (tableFilterPemeriksaan === 'td') {
+        const v = String(row.td || '')
+        if (v !== '-') { const s = parseInt(v.split('/')[0]); numVal = isNaN(s) ? null : s }
+      } else {
+        const v = parseFloat(row[tableFilterPemeriksaan])
+        numVal = isNaN(v) ? null : v
+      }
+      if (numVal === null) return false
+      if (tableFilterKategori === 'all') return true
+      const type = fieldToHealthType[tableFilterPemeriksaan]
+      const status = getHealthStatus(type, numVal)
+      return status.status === kategoriToStatus[tableFilterKategori]
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableData, tableFilterPemeriksaan, tableFilterKategori])
 
   // Select all residents
   const selectAllResidents = () => {
@@ -1282,7 +1407,6 @@ export default function MonitoringPage() {
   const exportTableToPDF = () => {
     const doc = new jsPDF()
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const filteredTableData = tableData
     
     // Header
     doc.setFillColor(79, 70, 229)
@@ -1297,10 +1421,10 @@ export default function MonitoringPage() {
     
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(10)
-    doc.text(`Total Data: ${tableData.length}`, 14, 60)
+    doc.text(`Total Data: ${displayTableData.length}`, 14, 60)
     
     // Table data
-    const pdfData = tableData.map(row => [
+    const pdfData = displayTableData.map(row => [
       row.nama,
       row.nik,
       row.rw,
@@ -1343,9 +1467,7 @@ export default function MonitoringPage() {
   }
 
   const exportTableToExcel = () => {
-    const filteredTableData = tableData
-    
-    const data = filteredTableData.map(row => ({
+    const data = displayTableData.map(row => ({
       'Nama': row.nama,
       'NIK': row.nik,
       'Tgl Lahir': row.tglLahir,
@@ -1391,7 +1513,7 @@ export default function MonitoringPage() {
 
   const exportTableToWhatsApp = () => {
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const filteredTableData = tableData
+    const filteredTableData = displayTableData
     
     let message = `📊 *DATA KESEHATAN WARGA*\n`
     message += `🏥 Kelurahan ${kelurahan}\n`
@@ -1613,6 +1735,8 @@ export default function MonitoringPage() {
                   <option value="tensi">Tensi</option>
                   <option value="guladarah">Gula Darah</option>
                   <option value="asamurat">Asam Urat</option>
+                  <option value="nadi">Nadi</option>
+                  <option value="imt">IMT</option>
                 </select>
               </div>
             </div>
@@ -1912,45 +2036,76 @@ export default function MonitoringPage() {
                   )}
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-gray-600">RW</label>
-                  <select
-                    value={tableFilterRW}
-                    onChange={(e) => setTableFilterRW(e.target.value)}
-                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    title="Filter RW Tabel"
-                  >
-                    <option value="all">Semua RW</option>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                {/* RW */}
+                <div className="flex items-center gap-1">
+                  <label className="text-xs font-medium text-gray-500 whitespace-nowrap">RW</label>
+                  <select value={tableFilterRW} onChange={(e) => setTableFilterRW(e.target.value)} title="Filter RW" className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+                    <option value="all">Semua</option>
                     {Object.keys(rwTargets).sort((a, b) => parseInt(a) - parseInt(b)).map(rw => (
-                      <option key={rw} value={rw}>RW {rw}</option>
+                      <option key={rw} value={rw}>{rw}</option>
                     ))}
                   </select>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-gray-600">RT</label>
-                  <select
-                    value={tableFilterRT}
-                    onChange={(e) => setTableFilterRT(e.target.value)}
-                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    title="Filter RT Tabel"
-                  >
-                    <option value="all">Semua RT</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rt => (
-                      <option key={rt} value={String(rt)}>RT {rt}</option>
+                {/* RT */}
+                <div className="flex items-center gap-1">
+                  <label className="text-xs font-medium text-gray-500 whitespace-nowrap">RT</label>
+                  <select value={tableFilterRT} onChange={(e) => setTableFilterRT(e.target.value)} title="Filter RT" className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+                    <option value="all">Semua</option>
+                    {[1,2,3,4,5,6,7,8,9,10].map(rt => (
+                      <option key={rt} value={String(rt)}>{rt}</option>
                     ))}
                   </select>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-gray-600">Nama / NIK</label>
-                  <input
-                    type="text"
-                    value={tableSearchTerm}
-                    onChange={(e) => setTableSearchTerm(e.target.value)}
-                    placeholder="Cari data warga..."
-                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-32"
-                  />
+                {/* Nama/NIK */}
+                <div className="flex items-center gap-1">
+                  <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Nama/NIK</label>
+                  <input type="text" value={tableSearchTerm} onChange={(e) => setTableSearchTerm(e.target.value)} placeholder="Cari..." title="Cari nama atau NIK" className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-24" />
                 </div>
+                {/* Pemeriksaan */}
+                <div className="flex items-center gap-1">
+                  <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Pemeriksaan</label>
+                  <select value={tableFilterPemeriksaan} onChange={(e) => { setTableFilterPemeriksaan(e.target.value); setTableFilterKategori('all') }} title="Filter Pemeriksaan" className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+                    <option value="all">Semua</option>
+                    <option value="td">TD</option>
+                    <option value="gds">GDS</option>
+                    <option value="imt">IMT</option>
+                    <option value="ua">UA</option>
+                    <option value="col">COL</option>
+                    <option value="nadi">NADI</option>
+                  </select>
+                </div>
+                {/* Kategori Hasil – custom colored dropdown */}
+                {tableFilterPemeriksaan !== 'all' && (
+                  <div className="flex items-center gap-1 relative">
+                    <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Kategori</label>
+                    <button
+                      onClick={() => setTableKategoriDropdownOpen(!tableKategoriDropdownOpen)}
+                      className={`text-xs border rounded px-1.5 py-1 flex items-center gap-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                        tableFilterKategori === 'rendah' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                        tableFilterKategori === 'normal' ? 'bg-green-100 text-green-800 border-green-200' :
+                        tableFilterKategori === 'batas' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                        tableFilterKategori === 'tinggi' ? 'bg-red-100 text-red-800 border-red-200' :
+                        'bg-white text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      {tableFilterKategori === 'all' ? 'Semua' :
+                       tableFilterKategori === 'rendah' ? 'Rendah' :
+                       tableFilterKategori === 'normal' ? 'Normal' :
+                       tableFilterKategori === 'batas' ? 'Batas Tinggi' : 'Tinggi'}
+                      <svg className="w-2.5 h-2.5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {tableKategoriDropdownOpen && (
+                      <div className="absolute left-0 top-full mt-1 w-32 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden">
+                        <button onClick={() => { setTableFilterKategori('all'); setTableKategoriDropdownOpen(false) }} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">Semua</button>
+                        <button onClick={() => { setTableFilterKategori('rendah'); setTableKategoriDropdownOpen(false) }} className="w-full text-left px-3 py-2 text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors">Rendah</button>
+                        <button onClick={() => { setTableFilterKategori('normal'); setTableKategoriDropdownOpen(false) }} className="w-full text-left px-3 py-2 text-xs bg-green-100 text-green-800 hover:bg-green-200 transition-colors">Normal</button>
+                        <button onClick={() => { setTableFilterKategori('batas'); setTableKategoriDropdownOpen(false) }} className="w-full text-left px-3 py-2 text-xs bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors">Batas Tinggi</button>
+                        <button onClick={() => { setTableFilterKategori('tinggi'); setTableKategoriDropdownOpen(false) }} className="w-full text-left px-3 py-2 text-xs bg-red-100 text-red-800 hover:bg-red-200 transition-colors">Tinggi</button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             {/* Table */}
@@ -1978,7 +2133,7 @@ export default function MonitoringPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tableData.slice(0, 10).map((row, i) => (
+                  {displayTableData.slice(0, 10).map((row, i) => (
                     <tr key={i} className="border-b hover:bg-gray-50">
                       <td className="px-2 py-2 font-medium">{row.nama}</td>
                       <td className="px-2 py-2">{row.nik}</td>
