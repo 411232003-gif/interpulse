@@ -34,8 +34,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat } = body
 
-    // Generate 6-digit PIN
-    const password = Math.floor(100000 + Math.random() * 900000).toString()
+    // Generate unique 6-digit PIN
+    let password = ''
+    let isUnique = false
+    let attempts = 0
+    const maxAttempts = 100
+
+    while (!isUnique && attempts < maxAttempts) {
+      password = Math.floor(100000 + Math.random() * 900000).toString()
+
+      // Check if PIN already exists in users collection
+      const usersSnapshot = await db.collection('users').where('password', '==', password).get()
+
+      if (usersSnapshot.empty) {
+        isUnique = true
+      }
+
+      attempts++
+    }
+
+    if (!isUnique) {
+      throw new Error('Gagal generate PIN unik setelah beberapa percobaan')
+    }
 
     // Create user in Firebase Authentication
     const userRecord = await auth.createUser({
