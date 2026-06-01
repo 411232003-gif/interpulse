@@ -12,7 +12,7 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 
 const rwTargets: Record<string, number> = {
-  '01': 32, '02': 65, '03': 60, '04': 60, '05': 70, '06': 33, '07': 40, '08': 35, '09': 45, '10': 38
+  '01': 32, '02': 65, '03': 60, '04': 60, '05': 70, '06': 33, '07': 0, '08': 0, '09': 0, '10': 0
 }
 
 const months = ['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember']
