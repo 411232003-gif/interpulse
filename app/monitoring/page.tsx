@@ -411,11 +411,12 @@ export default function MonitoringPage() {
       data.push({
         nik: resident.nik || '-',
         nama: resident.nama || '-',
+        rw: resident.rw || '-',
+        rt: resident.rt || '-',
         tglLahir: resident.birthDate || '-',
         umur: resident.umur || '-',
         alamat: resident.alamat || '-',
         jenisKelamin: resident.jenisKelamin || '-',
-        rw: resident.rw,
         tb: tbbb?.tinggiBadan || '-',
         bb: tbbb?.beratBadan || '-',
         lp: tbbb?.lingkarPinggang || '-',
@@ -823,6 +824,8 @@ export default function MonitoringPage() {
     const pdfData = tableData.map(row => [
       row.nama,
       row.nik,
+      row.rw,
+      row.rt,
       row.tglLahir,
       row.umur,
       row.alamat,
@@ -840,7 +843,7 @@ export default function MonitoringPage() {
 
     autoTable(doc, {
       startY: 65,
-      head: [['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
+      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
       body: pdfData,
       styles: {
         fontSize: 7,
@@ -1097,6 +1100,8 @@ export default function MonitoringPage() {
     const pdfData = tableData.map(row => [
       row.nama,
       row.nik,
+      row.rw,
+      row.rt,
       row.tglLahir,
       row.umur,
       row.alamat,
@@ -1111,10 +1116,10 @@ export default function MonitoringPage() {
       row.col,
       row.nadi
     ])
-    
+
     autoTable(doc, {
       startY: 65,
-      head: [['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
+      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
       body: pdfData,
       styles: {
         fontSize: 7,
@@ -1698,6 +1703,8 @@ export default function MonitoringPage() {
                   <tr className="bg-gray-50">
                     <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">Nama</th>
                     <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">NIK</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">RW</th>
+                    <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">RT</th>
                     <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">Tgl Lahir</th>
                     <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">Umur</th>
                     <th className="px-2 py-2 text-left font-semibold text-gray-700 border-b">Alamat</th>
@@ -1718,6 +1725,8 @@ export default function MonitoringPage() {
                     <tr key={i} className="border-b hover:bg-gray-50">
                       <td className="px-2 py-2 font-medium">{row.nama}</td>
                       <td className="px-2 py-2">{row.nik}</td>
+                      <td className="px-2 py-2">{row.rw}</td>
+                      <td className="px-2 py-2">{row.rt}</td>
                       <td className="px-2 py-2">{row.tglLahir}</td>
                       <td className="px-2 py-2">{row.umur}</td>
                       <td className="px-2 py-2">{row.alamat}</td>
