@@ -314,10 +314,9 @@ export default function CatatKesehatan() {
     return todayTBBB
   }
 
-  // Build resident list from attendance + TB/BB data
+  // Build resident list from attendance only (no longer require TB/BB)
   // Use residents collection data if available, otherwise use attendance record data
   const allEligibleResidents: Resident[] = Array.from(attendanceToday)
-    .filter(nik => getTodayTBBB(nik) !== undefined)
     .map(nik => {
       const fromCollection = residents.find(r => r.nik === nik)
       if (fromCollection) return fromCollection
@@ -351,17 +350,17 @@ export default function CatatKesehatan() {
   console.log('[Fasca] Total residents:', residents.length, 'Filtered residents:', filteredResidents.length)
 
   const sortedResidents = filteredResidents.sort((a, b) => {
-    // Get latest TB/BB timestamp for each resident
-    const getLatestTBBBTimestamp = (nik: string) => {
-      const residentTBBB = tbbbData.filter(tb => tb.nik === nik)
-      if (residentTBBB.length === 0) return 0
-      return Math.max(...residentTBBB.map(tb => new Date(tb.timestamp).getTime()))
+    // Get latest health reading timestamp for each resident
+    const getLatestHealthTimestamp = (residentId: string) => {
+      const residentReadings = healthReadings.filter(r => r.userId === residentId)
+      if (residentReadings.length === 0) return 0
+      return Math.max(...residentReadings.map(r => new Date(r.timestamp).getTime()))
     }
 
-    const aTimestamp = getLatestTBBBTimestamp(a.nik)
-    const bTimestamp = getLatestTBBBTimestamp(b.nik)
+    const aTimestamp = getLatestHealthTimestamp(a.id)
+    const bTimestamp = getLatestHealthTimestamp(b.id)
 
-    // Sort by latest TB/BB input (newest first)
+    // Sort by latest health input (newest first)
     return bTimestamp - aTimestamp
   })
 
@@ -840,22 +839,28 @@ export default function CatatKesehatan() {
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">RW/RT</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Jenis Kelamin</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Usia</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">TB (cm)</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">BB (kg)</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">LP (cm)</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Nadi (bpm)</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">TD (mmHg)</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">GDS (mg/dL)</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">UA (mg/dL)</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">COL (mg/dL)</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedResidents.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi dan input TB/BB hari ini</td>
+                        <td colSpan={10} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi hari ini</td>
                       </tr>
                     ) : sortedResidents.map(r => {
-                      const todayTBBB = getTodayTBBB(r.nik)
                       const todayData = getTodayReadings(r.id)
-                      const todayNadi = todayData.readings.find(reading => reading.type === 'tensi')?.nadi || '-'
+                      const todayTD = todayData.readings.find(reading => reading.type === 'tensi')
+                      const todayGDS = todayData.readings.find(reading => reading.type === 'guladarah')
+                      const todayUA = todayData.readings.find(reading => reading.type === 'asamurat')
+                      const todayCOL = todayData.readings.find(reading => reading.type === 'kolesterol')
+                      const tdValue = todayTD ? `${todayTD.sistolik}/${todayTD.diastolik}` : '-'
+                      const gdsValue = todayGDS?.nilai || '-'
+                      const uaValue = todayUA?.nilai || '-'
+                      const colValue = todayCOL?.total || '-'
                       return (
                         <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
@@ -863,10 +868,10 @@ export default function CatatKesehatan() {
                           <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
                           <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                           <td className="px-4 py-3 text-gray-600">{r.umur} tahun</td>
-                          <td className="px-4 py-3 text-gray-600">{todayTBBB?.tinggiBadan || '-'}</td>
-                          <td className="px-4 py-3 text-gray-600">{todayTBBB?.beratBadan || '-'}</td>
-                          <td className="px-4 py-3 text-gray-600">{todayTBBB?.lingkarPinggang || '-'}</td>
-                          <td className="px-4 py-3 text-gray-600">{todayNadi}</td>
+                          <td className="px-4 py-3 text-gray-600">{tdValue}</td>
+                          <td className="px-4 py-3 text-gray-600">{gdsValue}</td>
+                          <td className="px-4 py-3 text-gray-600">{uaValue}</td>
+                          <td className="px-4 py-3 text-gray-600">{colValue}</td>
                           <td className="px-4 py-3 text-center">
                             <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
                               <Stethoscope className="w-3.5 h-3.5" />
