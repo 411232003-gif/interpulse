@@ -52,14 +52,6 @@ export default function MonevPosbindu() {
       bgColor: 'bg-blue-50'
     },
     {
-      title: 'Riwayat Kesehatan',
-      description: 'Lihat riwayat data kesehatan warga',
-      href: '/riwayat-tensi',
-      icon: History,
-      gradient: 'from-green-500 to-emerald-500',
-      bgColor: 'bg-green-50'
-    },
-    {
       title: 'Trafik',
       description: 'Export Laporan',
       href: '/monitoring',
