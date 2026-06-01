@@ -33,6 +33,7 @@ export default function MonitoringPage() {
   const [rwExportDropdown, setRwExportDropdown] = useState<string | null>(null)
   const [attendanceExportDropdown, setAttendanceExportDropdown] = useState<string | null>(null)
   const [tableExportDropdown, setTableExportDropdown] = useState(false)
+  const [healthDistExportDropdown, setHealthDistExportDropdown] = useState(false)
   
   // Editable targets per RW
   const [customTargets, setCustomTargets] = useState<Record<string, number>>({...rwTargets})
@@ -611,17 +612,19 @@ export default function MonitoringPage() {
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
 
-    const tableData = Object.entries(customTargets).map(([rw, target]) => {
-      const readings = healthReadings[rw] || {}
-      const count = readings[selectedMonth] || 0
-      const percentage = target > 0 ? ((count / target) * 100).toFixed(1) : '0'
-      return [
-        `RW ${rw}`,
-        count,
-        target,
-        `${percentage}%`,
-      ]
-    })
+    const tableData = Object.entries(customTargets)
+      .sort(([a], [b]) => parseInt(a) - parseInt(b))
+      .map(([rw, target]) => {
+        const readings = healthReadings[rw] || {}
+        const count = readings[selectedMonth] || 0
+        const percentage = target > 0 ? ((count / target) * 100).toFixed(1) : '0'
+        return [
+          `RW ${rw}`,
+          count,
+          target,
+          `${percentage}%`,
+        ]
+      })
 
     autoTable(doc, {
       startY: finalY + 5,
@@ -670,6 +673,34 @@ export default function MonitoringPage() {
       alternateRowStyles: {
         fillColor: [238, 242, 255],
       },
+    })
+
+    // Table 4: Rekapitulasi Hasil Pemeriksaan
+    const finalY3 = (doc as any).lastAutoTable.finalY + 10
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Rekapitulasi Hasil Pemeriksaan', 14, finalY3)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`(${filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'})`, 14, finalY3 + 6)
+
+    const dist = getHealthStatusDistribution()
+    const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
+    const distBody = [
+      ['Rendah', dist.rendah, distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(2) + '%' : '0%'],
+      ['Normal', dist.normal, distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(2) + '%' : '0%'],
+      ['Batas Tinggi', dist.batas, distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(2) + '%' : '0%'],
+      ['Tinggi', dist.tinggi, distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(2) + '%' : '0%'],
+      ['Total Warga', distTotal, '100%'],
+    ]
+
+    autoTable(doc, {
+      startY: finalY3 + 12,
+      head: [['Kategori Hasil', 'Jumlah Warga', 'Persentase']],
+      body: distBody,
+      styles: { fontSize: 10, cellPadding: 4 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
     })
 
     doc.save(`monitoring-kesehatan-${selectedMonth}.pdf`)
@@ -752,6 +783,19 @@ export default function MonitoringPage() {
     ]
     XLSX.utils.book_append_sheet(wb, ws3, 'Jenis Pemeriksaan')
 
+    // Sheet 4: Health Status Distribution
+    const distExcel = getHealthStatusDistribution()
+    const distExcelTotal = distExcel.rendah + distExcel.normal + distExcel.batas + distExcel.tinggi
+    const healthDistData = [
+      { 'Kategori': 'Rendah', 'Jumlah Warga': distExcel.rendah, 'Persentase (%)': distExcelTotal > 0 ? parseFloat(((distExcel.rendah / distExcelTotal) * 100).toFixed(2)) : 0 },
+      { 'Kategori': 'Normal', 'Jumlah Warga': distExcel.normal, 'Persentase (%)': distExcelTotal > 0 ? parseFloat(((distExcel.normal / distExcelTotal) * 100).toFixed(2)) : 0 },
+      { 'Kategori': 'Batas Tinggi', 'Jumlah Warga': distExcel.batas, 'Persentase (%)': distExcelTotal > 0 ? parseFloat(((distExcel.batas / distExcelTotal) * 100).toFixed(2)) : 0 },
+      { 'Kategori': 'Tinggi', 'Jumlah Warga': distExcel.tinggi, 'Persentase (%)': distExcelTotal > 0 ? parseFloat(((distExcel.tinggi / distExcelTotal) * 100).toFixed(2)) : 0 },
+    ]
+    const ws4 = XLSX.utils.json_to_sheet(healthDistData)
+    ws4['!cols'] = [{ wch: 15 }, { wch: 14 }, { wch: 14 }]
+    XLSX.utils.book_append_sheet(wb, ws4, 'Hasil Pemeriksaan')
+
     XLSX.writeFile(wb, `monitoring-kesehatan-${selectedMonth}.xlsx`)
   }
 
@@ -780,7 +824,7 @@ export default function MonitoringPage() {
     
     // Per-RW Data with Targets
     message += `📋 *DATA PER RW*\n\n`
-    Object.entries(rwTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).forEach(([rw, target]) => {
+    Object.entries(customTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).forEach(([rw, target]) => {
       const readings = healthReadings[rw] || {}
       const count = readings[selectedMonth] || 0
       const percentage = target > 0 ? ((count / target) * 100).toFixed(1) : '0'
@@ -797,11 +841,99 @@ export default function MonitoringPage() {
       message += `${icon} ${monthLabels[m]}: ${total} pemeriksaan\n`
     })
     
+    // Health Status Distribution
+    const distWA = getHealthStatusDistribution()
+    const distWATotal = distWA.rendah + distWA.normal + distWA.batas + distWA.tinggi
+    const typeLabel = filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'
+    message += `📊 *HASIL PEMERIKSAAN (${typeLabel})*\n\n`
+    message += `• Rendah: ${distWA.rendah} (${distWATotal > 0 ? ((distWA.rendah / distWATotal) * 100).toFixed(1) : 0}%)\n`
+    message += `• Normal: ${distWA.normal} (${distWATotal > 0 ? ((distWA.normal / distWATotal) * 100).toFixed(1) : 0}%)\n`
+    message += `• Batas Tinggi: ${distWA.batas} (${distWATotal > 0 ? ((distWA.batas / distWATotal) * 100).toFixed(1) : 0}%)\n`
+    message += `• Tinggi: ${distWA.tinggi} (${distWATotal > 0 ? ((distWA.tinggi / distWATotal) * 100).toFixed(1) : 0}%)\n`
+    message += `• Total Warga: ${distWATotal}\n`
+
     message += `\n━━━━━━━━━━━━━━━━━━━━\n`
     message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
 
     const encodedMessage = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
+  }
+
+  // Standalone export functions for Rekapitulasi Hasil Pemeriksaan
+  const exportHealthDistToPDF = () => {
+    const doc = new jsPDF()
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const typeName = filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'
+
+    doc.setFillColor(79, 70, 229)
+    doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(18)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Rekapitulasi Hasil Pemeriksaan', 105, 18, { align: 'center' })
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`${kelurahan} - ${typeName} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+
+    const dist = getHealthStatusDistribution()
+    const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
+
+    autoTable(doc, {
+      startY: 48,
+      head: [['Kategori Hasil', 'Jumlah Warga', 'Persentase']],
+      body: [
+        ['Rendah', dist.rendah, distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(2) + '%' : '0%'],
+        ['Normal', dist.normal, distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(2) + '%' : '0%'],
+        ['Batas Tinggi', dist.batas, distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(2) + '%' : '0%'],
+        ['Tinggi', dist.tinggi, distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(2) + '%' : '0%'],
+        ['Total Warga', distTotal, '100%'],
+      ],
+      styles: { fontSize: 11, cellPadding: 4 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+    })
+
+    doc.save(`rekapitulasi-hasil-pemeriksaan-${filterHealthType}-${selectedMonth}.pdf`)
+  }
+
+  const exportHealthDistToExcel = () => {
+    const typeName = filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'
+    const dist = getHealthStatusDistribution()
+    const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
+
+    const data = [
+      { 'Kategori': 'Rendah', 'Jumlah Warga': dist.rendah, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.rendah / distTotal) * 100).toFixed(2)) : 0 },
+      { 'Kategori': 'Normal', 'Jumlah Warga': dist.normal, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.normal / distTotal) * 100).toFixed(2)) : 0 },
+      { 'Kategori': 'Batas Tinggi', 'Jumlah Warga': dist.batas, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.batas / distTotal) * 100).toFixed(2)) : 0 },
+      { 'Kategori': 'Tinggi', 'Jumlah Warga': dist.tinggi, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.tinggi / distTotal) * 100).toFixed(2)) : 0 },
+    ]
+
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 15 }, { wch: 14 }, { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, typeName)
+    XLSX.writeFile(wb, `rekapitulasi-hasil-pemeriksaan-${filterHealthType}-${selectedMonth}.xlsx`)
+  }
+
+  const exportHealthDistToWhatsApp = () => {
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const typeName = filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'
+    const dist = getHealthStatusDistribution()
+    const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
+
+    let message = `📊 *REKAPITULASI HASIL PEMERIKSAAN*\n`
+    message += `🏥 Kelurahan ${kelurahan}\n`
+    message += `💊 ${typeName} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
+    message += `• Rendah: ${dist.rendah} (${distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(1) : 0}%)\n`
+    message += `• Normal: ${dist.normal} (${distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(1) : 0}%)\n`
+    message += `• Batas Tinggi: ${dist.batas} (${distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(1) : 0}%)\n`
+    message += `• Tinggi: ${dist.tinggi} (${distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(1) : 0}%)\n`
+    message += `• Total Warga: ${distTotal}\n\n`
+    message += `━━━━━━━━━━━━━━━━━━━━\n`
+    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank')
   }
 
   // Per-RW export functions for attendance
@@ -823,10 +955,10 @@ export default function MonitoringPage() {
 
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(10)
-    doc.text(`Total Data: ${tableData.length}`, 14, 60)
+    doc.text(`Total Data: ${filteredTableData.length}`, 14, 60)
 
     // Table data
-    const pdfData = tableData.map(row => [
+    const pdfData = filteredTableData.map(row => [
       row.nama,
       row.nik,
       row.rw,
@@ -1346,9 +1478,34 @@ export default function MonitoringPage() {
                 <Activity className="w-4 h-4 text-indigo-600" />
                 <span className="font-semibold text-gray-800 text-sm">Rekapitulasi Hasil Pemeriksaan</span>
               </div>
-              <button className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                Export
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setHealthDistExportDropdown(!healthDistExportDropdown)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export
+                </button>
+                {healthDistExportDropdown && (
+                  <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                    <div className="px-3 py-1.5 bg-indigo-50 border-b border-gray-100">
+                      <p className="text-xs font-semibold text-indigo-700">Pilih Format</p>
+                    </div>
+                    <button onClick={() => { exportHealthDistToPDF(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-red-50 transition-colors text-xs">
+                      <div className="w-6 h-6 bg-red-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg></div>
+                      <span className="text-gray-700">PDF</span>
+                    </button>
+                    <button onClick={() => { exportHealthDistToExcel(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-green-50 transition-colors text-xs">
+                      <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/></svg></div>
+                      <span className="text-gray-700">Excel</span>
+                    </button>
+                    <button onClick={() => { exportHealthDistToWhatsApp(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-emerald-50 transition-colors text-xs">
+                      <div className="w-6 h-6 bg-emerald-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
+                      <span className="text-gray-700">WhatsApp</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             {/* Filters */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
@@ -1656,66 +1813,36 @@ export default function MonitoringPage() {
 
           {/* Table 3: Data Kesehatan Warga */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Data Kesehatan Warga</span>
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-indigo-600" />
+                  <span className="font-semibold text-gray-800 text-sm">Data Kesehatan Warga</span>
+                </div>
                 <div className="relative">
                   <button
                     onClick={() => setTableExportDropdown(!tableExportDropdown)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl text-sm font-semibold shadow-md hover:shadow-lg hover:from-indigo-600 hover:to-purple-700 active:scale-95 transition-all duration-200"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
                   >
-                    <Download className="w-4 h-4" />
-                    <span>Export Data</span>
+                    <Download className="w-3.5 h-3.5" />
+                    Export
                   </button>
                   {tableExportDropdown && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
-                      <div className="px-4 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-100">
-                        <p className="text-xs font-semibold text-indigo-700">Pilih Format Export</p>
+                    <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                      <div className="px-3 py-1.5 bg-indigo-50 border-b border-gray-100">
+                        <p className="text-xs font-semibold text-indigo-700">Pilih Format</p>
                       </div>
-                      <button
-                        onClick={() => { exportTableToPDF(); setTableExportDropdown(false); }}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-red-50 transition-colors group"
-                      >
-                        <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
-                          <svg className="w-4 h-4 text-red-600" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">PDF</p>
-                          <p className="text-xs text-gray-500">Dokumen cetak</p>
-                        </div>
+                      <button onClick={() => { exportTableToPDF(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-red-50 transition-colors text-xs">
+                        <div className="w-6 h-6 bg-red-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg></div>
+                        <span className="text-gray-700">PDF</span>
                       </button>
-                      <button
-                        onClick={() => { exportTableToExcel(); setTableExportDropdown(false); }}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-green-50 transition-colors group"
-                      >
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                          <svg className="w-4 h-4 text-green-700" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">Excel</p>
-                          <p className="text-xs text-gray-500">Spreadsheet</p>
-                        </div>
+                      <button onClick={() => { exportTableToExcel(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-green-50 transition-colors text-xs">
+                        <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/></svg></div>
+                        <span className="text-gray-700">Excel</span>
                       </button>
-                      <button
-                        onClick={() => { exportTableToWhatsApp(); setTableExportDropdown(false); }}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-emerald-50 transition-colors group"
-                      >
-                        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                          <svg className="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">WhatsApp</p>
-                          <p className="text-xs text-gray-500">Kirim pesan</p>
-                        </div>
+                      <button onClick={() => { exportTableToWhatsApp(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-emerald-50 transition-colors text-xs">
+                        <div className="w-6 h-6 bg-emerald-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
+                        <span className="text-gray-700">WhatsApp</span>
                       </button>
                     </div>
                   )}
