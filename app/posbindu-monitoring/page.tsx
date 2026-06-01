@@ -656,7 +656,12 @@ export default function PosbinduMonitoring() {
         if (filterUmur === '51-60' && (age < 51 || age > 60)) return false
         if (filterUmur === '60+' && age < 60) return false
       }
-      if (searchNama && resident.nama && !resident.nama.toLowerCase().includes(searchNama.toLowerCase())) return false
+      if (searchNama) {
+        const searchLower = searchNama.toLowerCase()
+        const matchesName = resident.nama?.toLowerCase().includes(searchLower)
+        const matchesNIK = resident.nik?.includes(searchLower)
+        if (!matchesName && !matchesNIK) return false
+      }
       return true
     })
     .map(resident => ({
@@ -1026,18 +1031,9 @@ export default function PosbinduMonitoring() {
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-2xl font-bold">{isAdmin ? 'Monitoring dan Evaluasi' : 'Absensi Posbindu'}</h1>
-          {isAdmin && (
-            <button
-              onClick={() => router.push('/Fasca')}
-              className="ml-auto px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm font-medium"
-              title="Input Kesehatan Warga"
-            >
-              Input Kesehatan
-            </button>
-          )}
+          <h1 className="text-2xl font-bold">{isAdmin ? 'Data Warga' : 'Absensi Posbindu'}</h1>
         </div>
-        <p className="text-blue-100 text-sm ml-10">{isAdmin ? 'Pantau kesehatan warga dan partisipasi lansia' : 'Silakan isi form absensi saat datang ke Posbindu'}</p>
+        <p className="text-blue-100 text-sm ml-10">{isAdmin ? 'Daftar warga kelurahan Duri Selatan' : 'Silakan isi form absensi saat datang ke Posbindu'}</p>
       </div>
 
 
@@ -1149,24 +1145,9 @@ export default function PosbinduMonitoring() {
                   <option value="51-60">51-60 Tahun</option>
                   <option value="60+">60+ Tahun</option>
                 </select>
-                <div className="relative">
-                  <select
-                    value={healthTypeFilter}
-                    onChange={e => setHealthTypeFilter(e.target.value)}
-                    aria-label="Filter jenis data kesehatan"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
-                  >
-                    <option value="all">Semua Data Kesehatan</option>
-                    <option value="tensi">Tekanan Darah</option>
-                    <option value="kolesterol">Kolesterol</option>
-                    <option value="asamurat">Asam Urat</option>
-                    <option value="guladarah">Gula Darah</option>
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
                 <div className="relative col-span-2">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="text" placeholder="Cari nama..." value={searchNama} onChange={e => setSearchNama(e.target.value)} className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="text" placeholder="Cari nama atau NIK..." value={searchNama} onChange={e => setSearchNama(e.target.value)} className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
             </div>
