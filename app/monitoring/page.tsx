@@ -307,7 +307,36 @@ export default function MonitoringPage() {
     return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
   }
 
-  // Calculate health status distribution for filtered data
+  // Calculate health status distribution for a specific type (used by export)
+  const getDistributionForType = (healthType: string) => {
+    const distribution = { rendah: 0, normal: 0, batas: 0, tinggi: 0 }
+
+    Object.entries(healthReadingsDetails).forEach(([rw, readings]) => {
+      readings.forEach(reading => {
+        if (reading.type !== healthType) return
+
+        const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+        if (month !== selectedMonth) return
+
+        const residentExists = Object.values(residentsData).some((r: any) =>
+          r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
+        )
+        if (!residentExists) return
+
+        const value = reading.value || 0
+        const status = getHealthStatus(healthType, value)
+
+        if (status.status === 'Normal') distribution.normal++
+        else if (status.status === 'Batas') distribution.batas++
+        else if (status.status === 'Tinggi') distribution.tinggi++
+        else distribution.rendah++
+      })
+    })
+
+    return distribution
+  }
+
+  // Calculate health status distribution for filtered data (uses current filterRW & filterHealthType)
   const getHealthStatusDistribution = () => {
     const distribution = { rendah: 0, normal: 0, batas: 0, tinggi: 0 }
 
@@ -320,7 +349,6 @@ export default function MonitoringPage() {
         const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
         if (month !== selectedMonth) return
 
-        // Only count if resident still exists
         const residentExists = Object.values(residentsData).some((r: any) =>
           r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
         )
@@ -863,7 +891,12 @@ export default function MonitoringPage() {
   const exportHealthDistToPDF = () => {
     const doc = new jsPDF()
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const typeName = filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'
+    const allTypes = [
+      { key: 'tensi', label: 'Tekanan Darah (Tensi)' },
+      { key: 'kolesterol', label: 'Kolesterol' },
+      { key: 'guladarah', label: 'Gula Darah' },
+      { key: 'asamurat', label: 'Asam Urat' },
+    ]
 
     doc.setFillColor(79, 70, 229)
     doc.rect(0, 0, 210, 40, 'F')
@@ -873,63 +906,94 @@ export default function MonitoringPage() {
     doc.text('Rekapitulasi Hasil Pemeriksaan', 105, 18, { align: 'center' })
     doc.setFontSize(11)
     doc.setFont('helvetica', 'normal')
-    doc.text(`${kelurahan} - ${typeName} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+    doc.text(`${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
 
-    const dist = getHealthStatusDistribution()
-    const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
+    let startY = 48
+    allTypes.forEach(({ key, label }, index) => {
+      const dist = getDistributionForType(key)
+      const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
 
-    autoTable(doc, {
-      startY: 48,
-      head: [['Kategori Hasil', 'Jumlah Warga', 'Persentase']],
-      body: [
-        ['Rendah', dist.rendah, distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(2) + '%' : '0%'],
-        ['Normal', dist.normal, distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(2) + '%' : '0%'],
-        ['Batas Tinggi', dist.batas, distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(2) + '%' : '0%'],
-        ['Tinggi', dist.tinggi, distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(2) + '%' : '0%'],
-        ['Total Warga', distTotal, '100%'],
-      ],
-      styles: { fontSize: 11, cellPadding: 4 },
-      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [238, 242, 255] },
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text(label, 14, startY)
+
+      autoTable(doc, {
+        startY: startY + 5,
+        head: [['Kategori Hasil', 'Jumlah Warga', 'Persentase']],
+        body: [
+          ['Rendah', dist.rendah, distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(2) + '%' : '0%'],
+          ['Normal', dist.normal, distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(2) + '%' : '0%'],
+          ['Batas Tinggi', dist.batas, distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(2) + '%' : '0%'],
+          ['Tinggi', dist.tinggi, distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(2) + '%' : '0%'],
+          ['Total Warga', distTotal, '100%'],
+        ],
+        styles: { fontSize: 10, cellPadding: 3 },
+        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [238, 242, 255] },
+      })
+
+      startY = (doc as any).lastAutoTable.finalY + 12
+      if (index < allTypes.length - 1 && startY > 220) {
+        doc.addPage()
+        startY = 15
+      }
     })
 
-    doc.save(`rekapitulasi-hasil-pemeriksaan-${filterHealthType}-${selectedMonth}.pdf`)
+    doc.save(`rekapitulasi-hasil-pemeriksaan-${selectedMonth}.pdf`)
   }
 
   const exportHealthDistToExcel = () => {
-    const typeName = filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'
-    const dist = getHealthStatusDistribution()
-    const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
-
-    const data = [
-      { 'Kategori': 'Rendah', 'Jumlah Warga': dist.rendah, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.rendah / distTotal) * 100).toFixed(2)) : 0 },
-      { 'Kategori': 'Normal', 'Jumlah Warga': dist.normal, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.normal / distTotal) * 100).toFixed(2)) : 0 },
-      { 'Kategori': 'Batas Tinggi', 'Jumlah Warga': dist.batas, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.batas / distTotal) * 100).toFixed(2)) : 0 },
-      { 'Kategori': 'Tinggi', 'Jumlah Warga': dist.tinggi, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.tinggi / distTotal) * 100).toFixed(2)) : 0 },
+    const allTypes = [
+      { key: 'tensi', label: 'Tekanan Darah' },
+      { key: 'kolesterol', label: 'Kolesterol' },
+      { key: 'guladarah', label: 'Gula Darah' },
+      { key: 'asamurat', label: 'Asam Urat' },
     ]
-
-    const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 15 }, { wch: 14 }, { wch: 14 }]
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, typeName)
-    XLSX.writeFile(wb, `rekapitulasi-hasil-pemeriksaan-${filterHealthType}-${selectedMonth}.xlsx`)
+
+    allTypes.forEach(({ key, label }) => {
+      const dist = getDistributionForType(key)
+      const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
+      const data = [
+        { 'Kategori': 'Rendah', 'Jumlah Warga': dist.rendah, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.rendah / distTotal) * 100).toFixed(2)) : 0 },
+        { 'Kategori': 'Normal', 'Jumlah Warga': dist.normal, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.normal / distTotal) * 100).toFixed(2)) : 0 },
+        { 'Kategori': 'Batas Tinggi', 'Jumlah Warga': dist.batas, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.batas / distTotal) * 100).toFixed(2)) : 0 },
+        { 'Kategori': 'Tinggi', 'Jumlah Warga': dist.tinggi, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.tinggi / distTotal) * 100).toFixed(2)) : 0 },
+      ]
+      const ws = XLSX.utils.json_to_sheet(data)
+      ws['!cols'] = [{ wch: 15 }, { wch: 14 }, { wch: 14 }]
+      XLSX.utils.book_append_sheet(wb, ws, label)
+    })
+
+    XLSX.writeFile(wb, `rekapitulasi-hasil-pemeriksaan-${selectedMonth}.xlsx`)
   }
 
   const exportHealthDistToWhatsApp = () => {
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const typeName = filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'
-    const dist = getHealthStatusDistribution()
-    const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
+    const allTypes = [
+      { key: 'tensi', label: 'Tekanan Darah' },
+      { key: 'kolesterol', label: 'Kolesterol' },
+      { key: 'guladarah', label: 'Gula Darah' },
+      { key: 'asamurat', label: 'Asam Urat' },
+    ]
 
     let message = `📊 *REKAPITULASI HASIL PEMERIKSAAN*\n`
     message += `🏥 Kelurahan ${kelurahan}\n`
-    message += `💊 ${typeName} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
+    message += `� ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `• Rendah: ${dist.rendah} (${distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(1) : 0}%)\n`
-    message += `• Normal: ${dist.normal} (${distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(1) : 0}%)\n`
-    message += `• Batas Tinggi: ${dist.batas} (${distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(1) : 0}%)\n`
-    message += `• Tinggi: ${dist.tinggi} (${distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(1) : 0}%)\n`
-    message += `• Total Warga: ${distTotal}\n\n`
+
+    allTypes.forEach(({ key, label }) => {
+      const dist = getDistributionForType(key)
+      const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
+      message += `💊 *${label}*\n`
+      message += `• Rendah: ${dist.rendah} (${distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(1) : 0}%)\n`
+      message += `• Normal: ${dist.normal} (${distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(1) : 0}%)\n`
+      message += `• Batas Tinggi: ${dist.batas} (${distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(1) : 0}%)\n`
+      message += `• Tinggi: ${dist.tinggi} (${distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(1) : 0}%)\n`
+      message += `• Total Warga: ${distTotal}\n\n`
+    })
+
     message += `━━━━━━━━━━━━━━━━━━━━\n`
     message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
 
