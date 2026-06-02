@@ -34,6 +34,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat } = body
 
+    // Check if NIK already exists in users collection
+    const existingUserSnapshot = await db.collection('users').where('nik', '==', nik).get()
+    if (!existingUserSnapshot.empty) {
+      return NextResponse.json(
+        { success: false, error: 'NIK sudah terdaftar di sistem' },
+        { status: 400 }
+      )
+    }
+
+    // Check if NIK already exists in residents collection
+    const existingResidentSnapshot = await db.collection('residents').where('nik', '==', nik).get()
+    if (!existingResidentSnapshot.empty) {
+      return NextResponse.json(
+        { success: false, error: 'NIK sudah terdaftar di sistem' },
+        { status: 400 }
+      )
+    }
+
     // Generate unique 6-digit PIN
     let password = ''
     let isUnique = false
