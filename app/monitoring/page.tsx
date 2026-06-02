@@ -10,6 +10,8 @@ import Link from 'next/link'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const XLSXStyle = require('xlsx-js-style')
 
 const rwTargets: Record<string, number> = {
   '01': 32, '02': 65, '03': 60, '04': 60, '05': 70, '06': 33, '07': 0, '08': 0, '09': 0, '10': 0
@@ -574,6 +576,23 @@ export default function MonitoringPage() {
   }
   const kategoriToStatus: Record<string, string> = {
     rendah: 'Rendah', normal: 'Normal', batas: 'Batas', tinggi: 'Tinggi',
+  }
+
+  const getHealthCellClass = (field: string, value: string | number): string => {
+    const v = String(value ?? '')
+    if (!v || v === '-') return 'px-2 py-2'
+    const numVal = field === 'td' ? parseInt(v.split('/')[0]) : parseFloat(v)
+    if (isNaN(numVal)) return 'px-2 py-2'
+    const type = fieldToHealthType[field]
+    if (!type) return 'px-2 py-2'
+    const { status } = getHealthStatus(type, numVal)
+    const map: Record<string, string> = {
+      Rendah: 'bg-blue-100 text-blue-800 font-semibold',
+      Normal: 'bg-green-100 text-green-800 font-semibold',
+      Batas: 'bg-yellow-100 text-yellow-800 font-semibold',
+      Tinggi: 'bg-red-100 text-red-800 font-semibold',
+    }
+    return `px-2 py-2 ${map[status] || ''}`
   }
 
   // Filtered display data (applies Pemeriksaan + Kategori filters on top of tableData)
@@ -1449,17 +1468,14 @@ export default function MonitoringPage() {
     doc.setFontSize(9)
     doc.text(`Total Data: ${displayTableData.length} warga`, 14, headerH + 10)
 
-    const colStyles: Record<number, object> = {}
-    if (hasFilter) {
-      const ci = fieldToCol[tableFilterPemeriksaan]
-      const bg = tableFilterKategori !== 'all' ? katColors[tableFilterKategori] : [79, 70, 229]
-      colStyles[ci] = { fillColor: bg, textColor: [255, 255, 255], fontStyle: 'bold' }
-    }
-
     const pdfData = displayTableData.map(row => [
       row.nama, row.nik, row.rw, row.rt, row.tglLahir, row.umur, row.alamat,
       row.jenisKelamin, row.tb, row.bb, row.lp, row.td, row.gds, row.imt, row.ua, row.col, row.nadi
     ])
+
+    const colTypePDF: Record<number, string> = { 11: 'tensi', 12: 'guladarah', 13: 'imt', 14: 'asamurat', 15: 'kolesterol', 16: 'nadi' }
+    const statusBgPDF: Record<string, [number,number,number]> = { Rendah: [219,234,254], Normal: [220,252,231], Batas: [254,249,195], Tinggi: [254,226,226] }
+    const statusTxtPDF: Record<string, [number,number,number]> = { Rendah: [29,78,216], Normal: [21,128,61], Batas: [161,98,7], Tinggi: [185,28,28] }
 
     autoTable(doc, {
       startY: headerH + 14,
@@ -1468,7 +1484,26 @@ export default function MonitoringPage() {
       styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [238, 242, 255] },
-      columnStyles: colStyles,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      didParseCell: (data: any) => {
+        if (hasFilter && data.section === 'head' && data.column.index === fieldToCol[tableFilterPemeriksaan]) {
+          const bg = tableFilterKategori !== 'all' ? katColors[tableFilterKategori] : [79, 70, 229]
+          data.cell.styles.fillColor = bg
+        }
+        if (data.section !== 'body') return
+        const type = colTypePDF[data.column.index]
+        if (!type) return
+        const val = String(data.cell.raw ?? '')
+        if (!val || val === '-') return
+        const numVal = data.column.index === 11 ? parseInt(val.split('/')[0]) : parseFloat(val)
+        if (isNaN(numVal)) return
+        const { status } = getHealthStatus(type, numVal)
+        if (statusBgPDF[status]) {
+          data.cell.styles.fillColor = statusBgPDF[status]
+          data.cell.styles.textColor = statusTxtPDF[status]
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
     })
 
     const suffix = hasFilter ? `-${tableFilterPemeriksaan}${tableFilterKategori !== 'all' ? '-' + tableFilterKategori : ''}` : ''
@@ -1499,15 +1534,42 @@ export default function MonitoringPage() {
       row.td, row.gds, row.imt, row.ua, row.col, row.nadi
     ])
 
-    const ws = XLSX.utils.aoa_to_sheet([...metaRows, header, ...dataRows])
+    const ws = XLSXStyle.utils.aoa_to_sheet([...metaRows, header, ...dataRows])
     ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 6 }, { wch: 30 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }]
 
-    const wb = XLSX.utils.book_new()
+    const xlsxHealthCols = [
+      { colIdx: 9, field: 'td', type: 'tensi' },
+      { colIdx: 10, field: 'gds', type: 'guladarah' },
+      { colIdx: 11, field: 'imt', type: 'imt' },
+      { colIdx: 12, field: 'ua', type: 'asamurat' },
+      { colIdx: 13, field: 'col', type: 'kolesterol' },
+      { colIdx: 14, field: 'nadi', type: 'nadi' },
+    ]
+    const xlsxFill: Record<string, string> = { Rendah: 'DBEAFE', Normal: 'DCFCE7', Batas: 'FEF9C3', Tinggi: 'FEE2E2' }
+    const xlsxFont: Record<string, string> = { Rendah: '1D4ED8', Normal: '15803D', Batas: 'A16207', Tinggi: 'B91C1C' }
+    const dataStartRow = metaRows.length + 2
+    displayTableData.forEach((row: any, i: number) => {
+      const excelRow = dataStartRow + i
+      xlsxHealthCols.forEach(({ colIdx, field, type }) => {
+        const cellAddr = `${String.fromCharCode(65 + colIdx)}${excelRow}`
+        if (!ws[cellAddr]) return
+        const valStr = String((row as any)[field] ?? '')
+        if (!valStr || valStr === '-') return
+        const numVal = field === 'td' ? parseInt(valStr.split('/')[0]) : parseFloat(valStr)
+        if (isNaN(numVal)) return
+        const { status } = getHealthStatus(type, numVal)
+        if (xlsxFill[status]) {
+          ws[cellAddr].s = { fill: { fgColor: { rgb: xlsxFill[status] } }, font: { color: { rgb: xlsxFont[status] }, bold: true } }
+        }
+      })
+    })
+
+    const wb = XLSXStyle.utils.book_new()
     const sheetName = hasFilter ? `${pemLabels[tableFilterPemeriksaan].split(' ')[0]}${tableFilterKategori !== 'all' ? '-' + katLabels[tableFilterKategori] : ''}` : 'Data Kesehatan Warga'
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31))
+    XLSXStyle.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31))
 
     const suffix = hasFilter ? `-${tableFilterPemeriksaan}${tableFilterKategori !== 'all' ? '-' + tableFilterKategori : ''}` : ''
-    XLSX.writeFile(wb, `data-kesehatan-warga-${selectedMonth}${suffix}.xlsx`)
+    XLSXStyle.writeFile(wb, `data-kesehatan-warga-${selectedMonth}${suffix}.xlsx`)
     setTableExportDropdown(false)
   }
 
@@ -2157,12 +2219,12 @@ export default function MonitoringPage() {
                       <td className="px-2 py-2">{row.tb}</td>
                       <td className="px-2 py-2">{row.bb}</td>
                       <td className="px-2 py-2">{row.lp}</td>
-                      <td className="px-2 py-2">{row.td}</td>
-                      <td className="px-2 py-2">{row.gds}</td>
-                      <td className="px-2 py-2">{row.imt}</td>
-                      <td className="px-2 py-2">{row.ua}</td>
-                      <td className="px-2 py-2">{row.col}</td>
-                      <td className="px-2 py-2">{row.nadi}</td>
+                      <td className={getHealthCellClass('td', row.td)}>{row.td}</td>
+                      <td className={getHealthCellClass('gds', row.gds)}>{row.gds}</td>
+                      <td className={getHealthCellClass('imt', row.imt)}>{row.imt}</td>
+                      <td className={getHealthCellClass('ua', row.ua)}>{row.ua}</td>
+                      <td className={getHealthCellClass('col', row.col)}>{row.col}</td>
+                      <td className={getHealthCellClass('nadi', row.nadi)}>{row.nadi}</td>
                     </tr>
                   ))}
                 </tbody>
