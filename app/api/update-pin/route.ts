@@ -4,7 +4,10 @@ import admin from 'firebase-admin'
 // Helper function to initialize Firebase Admin
 function getFirebaseAdmin() {
   if (!admin.apps.length) {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+    const rawKey = process.env.FIREBASE_PRIVATE_KEY || ''
+    const privateKey = rawKey
+      .replace(/^["']|["']$/g, '')
+      .replace(/\\n/g, '\n')
 
     if (!privateKey || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PROJECT_ID) {
       throw new Error('Missing Firebase environment variables')
