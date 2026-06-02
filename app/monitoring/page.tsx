@@ -1298,98 +1298,111 @@ export default function MonitoringPage() {
   const exportRWToPDF = (rw: string) => {
     const doc = new jsPDF()
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    
-    // Header
+    const headerH = 50
+
     doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, 40, 'F')
+    doc.rect(0, 0, 210, headerH, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
     doc.text(`Pemeriksaan Kesehatan RW ${rw}`, 105, 20, { align: 'center' })
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
-    
-    // Filter data for selected RW and month
-    const rwData = healthReadingsDetails[rw] || []
-    const monthData = rwData.filter(d => {
-      const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-      return month === selectedMonth
-    })
-    
+    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 32, { align: 'center' })
+
+    const rwTableData = tableData.filter((row: any) => row.rw === rw)
     doc.setTextColor(0, 0, 0)
-    doc.setFontSize(10)
-    const uniqueWargaRW = new Set(monthData.map((d: any) => d.nik)).size
-    doc.text(`Total Warga Diperiksa: ${uniqueWargaRW}`, 14, 50)
-    
-    // Table data - merge with residents data (no grouping, each reading as separate row)
-    const tableData = monthData.map(d => {
-      const resident = residentsData[d.userId] || residentsData[d.nik] || residentsData[d.residentId] || 
-                      (d.nama ? residentsData[d.nama.toLowerCase()] : {}) || 
-                      (d.userName ? residentsData[d.userName.toLowerCase()] : {}) || {}
-      return [
-        resident.nama || d.nama || d.userName || '-',
-        resident.nik || d.nik || '-',
-        d.type || '-',
-        d.timestamp ? new Date(d.timestamp).toLocaleDateString('id-ID') : '-'
-      ]
-    })
-    
+    doc.setFontSize(9)
+    doc.text(`Total Data: ${rwTableData.length} warga`, 14, headerH + 10)
+
+    const pdfData = rwTableData.map((row: any) => [
+      row.nama, row.nik, row.rw, row.rt, row.tglLahir, row.umur, row.alamat,
+      row.jenisKelamin, row.tb, row.bb, row.lp, row.td, row.gds, row.imt, row.ua, row.col, row.nadi
+    ])
+
+    const colTypePDF: Record<number, string> = { 11: 'tensi', 12: 'guladarah', 13: 'imt', 14: 'asamurat', 15: 'kolesterol', 16: 'nadi' }
+    const statusBgPDF: Record<string, [number,number,number]> = { Rendah: [219,234,254], Normal: [220,252,231], Batas: [254,249,195], Tinggi: [254,226,226] }
+    const statusTxtPDF: Record<string, [number,number,number]> = { Rendah: [29,78,216], Normal: [21,128,61], Batas: [161,98,7], Tinggi: [185,28,28] }
+
     autoTable(doc, {
-      startY: 55,
-      head: [['Nama', 'NIK', 'Jenis Pemeriksaan', 'Tanggal']],
-      body: tableData,
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
+      startY: headerH + 14,
+      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
+      body: pdfData,
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+      didParseCell: (data: any) => {
+        if (data.section !== 'body') return
+        const type = colTypePDF[data.column.index]
+        if (!type) return
+        const val = String(data.cell.raw ?? '')
+        if (!val || val === '-') return
+        const numVal = data.column.index === 11 ? parseInt(val.split('/')[0]) : parseFloat(val)
+        if (isNaN(numVal)) return
+        const rowGender = rwTableData[data.row.index]?.jenisKelamin
+        const { status } = getHealthStatus(type, numVal, rowGender)
+        if (statusBgPDF[status]) {
+          data.cell.styles.fillColor = statusBgPDF[status]
+          data.cell.styles.textColor = statusTxtPDF[status]
+          data.cell.styles.fontStyle = 'bold'
+        }
       },
     })
-    
+
     doc.save(`pemeriksaan-rw-${rw}-${selectedMonth}.pdf`)
   }
 
   const exportRWToExcel = (rw: string) => {
-    const rwData = healthReadingsDetails[rw] || []
-    const monthData = rwData.filter(d => {
-      const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-      return month === selectedMonth
-    })
-    
-    // No grouping, each reading as separate row
-    const data = monthData.map(d => {
-      const resident = residentsData[d.userId] || residentsData[d.nik] || residentsData[d.residentId] || 
-                      (d.nama ? residentsData[d.nama.toLowerCase()] : {}) || 
-                      (d.userName ? residentsData[d.userName.toLowerCase()] : {}) || {}
-      return {
-        'Nama': resident.nama || d.nama || d.userName || '-',
-        'NIK': resident.nik || d.nik || '-',
-        'Jenis Pemeriksaan': d.type || '-',
-        'Tanggal': d.timestamp ? new Date(d.timestamp).toLocaleDateString('id-ID') : '-',
-        'RW': d.rw || '-'
-      }
-    })
-    
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, `RW ${rw}`)
-    
-    ws['!cols'] = [
-      { wch: 25 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 15 },
-      { wch: 10 },
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const rwTableData = tableData.filter((row: any) => row.rw === rw)
+
+    const metaRows: (string | number)[][] = [
+      [`DATA KESEHATAN WARGA - RW ${rw}`],
+      [`Kelurahan: ${kelurahan}`, '', `Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`],
+      [`Total Data: ${rwTableData.length} warga`],
+      []
     ]
-    
-    XLSX.writeFile(wb, `pemeriksaan-rw-${rw}-${selectedMonth}.xlsx`)
+
+    const header = ['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']
+    const dataRows = rwTableData.map((row: any) => [
+      row.nama, row.nik, row.tglLahir, row.umur, row.alamat,
+      row.jenisKelamin, row.tb, row.bb, row.lp,
+      row.td, row.gds, row.imt, row.ua, row.col, row.nadi
+    ])
+
+    const ws = XLSXStyle.utils.aoa_to_sheet([...metaRows, header, ...dataRows])
+    ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 6 }, { wch: 30 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }]
+
+    const xlsxHealthCols = [
+      { colIdx: 9, field: 'td', type: 'tensi' },
+      { colIdx: 10, field: 'gds', type: 'guladarah' },
+      { colIdx: 11, field: 'imt', type: 'imt' },
+      { colIdx: 12, field: 'ua', type: 'asamurat' },
+      { colIdx: 13, field: 'col', type: 'kolesterol' },
+      { colIdx: 14, field: 'nadi', type: 'nadi' },
+    ]
+    const xlsxFill: Record<string, string> = { Rendah: 'DBEAFE', Normal: 'DCFCE7', Batas: 'FEF9C3', Tinggi: 'FEE2E2' }
+    const xlsxFont: Record<string, string> = { Rendah: '1D4ED8', Normal: '15803D', Batas: 'A16207', Tinggi: 'B91C1C' }
+    const dataStartRow = metaRows.length + 2
+    rwTableData.forEach((row: any, i: number) => {
+      const excelRow = dataStartRow + i
+      xlsxHealthCols.forEach(({ colIdx, field, type }) => {
+        const cellAddr = `${String.fromCharCode(65 + colIdx)}${excelRow}`
+        if (!ws[cellAddr]) return
+        const valStr = String(row[field] ?? '')
+        if (!valStr || valStr === '-') return
+        const numVal = field === 'td' ? parseInt(valStr.split('/')[0]) : parseFloat(valStr)
+        if (isNaN(numVal)) return
+        const { status } = getHealthStatus(type, numVal, row.jenisKelamin)
+        if (xlsxFill[status]) {
+          ws[cellAddr].s = { fill: { fgColor: { rgb: xlsxFill[status] } }, font: { color: { rgb: xlsxFont[status] }, bold: true } }
+        }
+      })
+    })
+
+    const wb = XLSXStyle.utils.book_new()
+    XLSXStyle.utils.book_append_sheet(wb, ws, `RW ${rw}`.slice(0, 31))
+    XLSXStyle.writeFile(wb, `pemeriksaan-rw-${rw}-${selectedMonth}.xlsx`)
   }
 
   const exportRWToWhatsApp = (rw: string) => {
