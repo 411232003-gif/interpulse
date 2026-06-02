@@ -190,7 +190,7 @@ export default function AbsensiPage() {
     const bPresent = attendanceThisMonth.has(b.nik)
     if (aPresent && !bPresent) return 1
     if (!aPresent && bPresent) return -1
-    if (aPresent && bPresent) return (attendanceTimestamp.get(a.nik) || 0) - (attendanceTimestamp.get(b.nik) || 0)
+    if (aPresent && bPresent) return (attendanceTimestamp.get(b.nik) || 0) - (attendanceTimestamp.get(a.nik) || 0)
     return 0
   })
 
