@@ -1000,10 +1000,12 @@ export default function MonitoringPage() {
     const doc = new jsPDF()
     const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     const allTypes = [
-      { key: 'tensi', label: 'Tekanan Darah (Tensi)' },
-      { key: 'kolesterol', label: 'Kolesterol' },
-      { key: 'guladarah', label: 'Gula Darah' },
-      { key: 'asamurat', label: 'Asam Urat' },
+      { key: 'tensi', label: 'Tekanan Darah (TD)' },
+      { key: 'guladarah', label: 'Gula Darah (GDS)' },
+      { key: 'imt', label: 'IMT' },
+      { key: 'asamurat', label: 'Asam Urat (UA)' },
+      { key: 'kolesterol', label: 'Kolesterol (COL)' },
+      { key: 'nadi', label: 'Nadi' },
     ]
 
     doc.setFillColor(79, 70, 229)
@@ -1048,55 +1050,17 @@ export default function MonitoringPage() {
       }
     })
 
-    // Data lengkap warga dengan warna status kesehatan
-    if (tableData && tableData.length > 0) {
-      doc.addPage()
-      doc.setFillColor(79, 70, 229)
-      doc.rect(0, 0, 210, 20, 'F')
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Data Lengkap Kesehatan Warga', 105, 13, { align: 'center' })
-      const detailData = tableData.map((row: any) => [
-        row.nama, row.nik, row.jenisKelamin, row.umur, row.td, row.gds, row.imt, row.ua, row.col, row.nadi
-      ])
-      const colTypeFull: Record<number, string> = { 4: 'tensi', 5: 'guladarah', 6: 'imt', 7: 'asamurat', 8: 'kolesterol', 9: 'nadi' }
-      const statusBgFull: Record<string, [number,number,number]> = { Rendah: [219,234,254], Normal: [220,252,231], Batas: [254,249,195], Tinggi: [254,226,226] }
-      const statusTxtFull: Record<string, [number,number,number]> = { Rendah: [29,78,216], Normal: [21,128,61], Batas: [161,98,7], Tinggi: [185,28,28] }
-      autoTable(doc, {
-        startY: 24,
-        head: [['Nama', 'NIK', 'L/P', 'Umur', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
-        body: detailData,
-        styles: { fontSize: 7, cellPadding: 2 },
-        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [238, 242, 255] },
-        didParseCell: (data: any) => {
-          if (data.section !== 'body') return
-          const type = colTypeFull[data.column.index]
-          if (!type) return
-          const val = String(data.cell.raw ?? '')
-          if (!val || val === '-') return
-          const numVal = data.column.index === 4 ? parseInt(val.split('/')[0]) : parseFloat(val)
-          if (isNaN(numVal)) return
-          const rowGender = tableData[data.row.index]?.jenisKelamin
-          const { status } = getHealthStatus(type, numVal, rowGender)
-          if (statusBgFull[status]) {
-            data.cell.styles.fillColor = statusBgFull[status]
-            data.cell.styles.textColor = statusTxtFull[status]
-            data.cell.styles.fontStyle = 'bold'
-          }
-        },
-      })
-    }
     doc.save(`rekapitulasi-hasil-pemeriksaan-${selectedMonth}.pdf`)
   }
 
   const exportHealthDistToExcel = () => {
     const allTypes = [
-      { key: 'tensi', label: 'Tekanan Darah' },
-      { key: 'kolesterol', label: 'Kolesterol' },
-      { key: 'guladarah', label: 'Gula Darah' },
-      { key: 'asamurat', label: 'Asam Urat' },
+      { key: 'tensi', label: 'Tekanan Darah (TD)' },
+      { key: 'guladarah', label: 'Gula Darah (GDS)' },
+      { key: 'imt', label: 'IMT' },
+      { key: 'asamurat', label: 'Asam Urat (UA)' },
+      { key: 'kolesterol', label: 'Kolesterol (COL)' },
+      { key: 'nadi', label: 'Nadi' },
     ]
     const wb = XLSXStyle.utils.book_new()
 
@@ -1113,41 +1077,6 @@ export default function MonitoringPage() {
       ws['!cols'] = [{ wch: 15 }, { wch: 14 }, { wch: 14 }]
       XLSXStyle.utils.book_append_sheet(wb, ws, label)
     })
-
-    // Sheet Data Warga: data lengkap dengan warna status kesehatan
-    const headerDetail = ['Nama', 'NIK', 'L/P', 'Tgl Lahir', 'Umur', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']
-    const dataRowsDetail = tableData.map((row: any) => [
-      row.nama, row.nik, row.jenisKelamin, row.tglLahir, row.umur,
-      row.td, row.gds, row.imt, row.ua, row.col, row.nadi
-    ])
-    const wsDetail = XLSXStyle.utils.aoa_to_sheet([headerDetail, ...dataRowsDetail])
-    wsDetail['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 5 }, { wch: 12 }, { wch: 6 }, { wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }]
-    const xlsxHealthColsD = [
-      { colIdx: 5, field: 'td', type: 'tensi' },
-      { colIdx: 6, field: 'gds', type: 'guladarah' },
-      { colIdx: 7, field: 'imt', type: 'imt' },
-      { colIdx: 8, field: 'ua', type: 'asamurat' },
-      { colIdx: 9, field: 'col', type: 'kolesterol' },
-      { colIdx: 10, field: 'nadi', type: 'nadi' },
-    ]
-    const xlsxFillD: Record<string, string> = { Rendah: 'DBEAFE', Normal: 'DCFCE7', Batas: 'FEF9C3', Tinggi: 'FEE2E2' }
-    const xlsxFontD: Record<string, string> = { Rendah: '1D4ED8', Normal: '15803D', Batas: 'A16207', Tinggi: 'B91C1C' }
-    tableData.forEach((row: any, i: number) => {
-      const excelRow = 2 + i
-      xlsxHealthColsD.forEach(({ colIdx, field, type }) => {
-        const cellAddr = `${String.fromCharCode(65 + colIdx)}${excelRow}`
-        if (!wsDetail[cellAddr]) return
-        const valStr = String((row as any)[field] ?? '')
-        if (!valStr || valStr === '-') return
-        const numVal = field === 'td' ? parseInt(valStr.split('/')[0]) : parseFloat(valStr)
-        if (isNaN(numVal)) return
-        const { status } = getHealthStatus(type, numVal, row.jenisKelamin)
-        if (xlsxFillD[status]) {
-          wsDetail[cellAddr].s = { fill: { fgColor: { rgb: xlsxFillD[status] } }, font: { color: { rgb: xlsxFontD[status] }, bold: true } }
-        }
-      })
-    })
-    XLSXStyle.utils.book_append_sheet(wb, wsDetail, 'Data Warga')
 
     XLSXStyle.writeFile(wb, `rekapitulasi-hasil-pemeriksaan-${selectedMonth}.xlsx`)
   }
