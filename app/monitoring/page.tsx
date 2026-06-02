@@ -10,7 +10,6 @@ import Link from 'next/link'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSXStyle = require('xlsx-js-style')
 
 const rwTargets: Record<string, number> = {
@@ -1484,7 +1483,6 @@ export default function MonitoringPage() {
       styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [238, 242, 255] },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       didParseCell: (data: any) => {
         if (hasFilter && data.section === 'head' && data.column.index === fieldToCol[tableFilterPemeriksaan]) {
           const bg = tableFilterKategori !== 'all' ? katColors[tableFilterKategori] : [79, 70, 229]
