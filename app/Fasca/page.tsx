@@ -352,7 +352,6 @@ export default function CatatKesehatan() {
   console.log('[Fasca] Total residents:', residents.length, 'Filtered residents:', filteredResidents.length)
 
   const sortedResidents = filteredResidents.sort((a, b) => {
-    // Get latest health reading timestamp for each resident
     const getLatestHealthTimestamp = (residentId: string) => {
       const residentReadings = healthReadings.filter(r => r.userId === residentId)
       if (residentReadings.length === 0) return 0
@@ -361,9 +360,14 @@ export default function CatatKesehatan() {
 
     const aTimestamp = getLatestHealthTimestamp(a.id)
     const bTimestamp = getLatestHealthTimestamp(b.id)
+    const aHasData = aTimestamp > 0
+    const bHasData = bTimestamp > 0
 
-    // Sort by latest health input (newest first)
-    return bTimestamp - aTimestamp
+    // Belum input → atas, sudah input → bawah (terbaru di atas grup bawah)
+    if (aHasData && !bHasData) return 1
+    if (!aHasData && bHasData) return -1
+    if (aHasData && bHasData) return bTimestamp - aTimestamp
+    return 0
   })
 
   console.log('[Fasca] Sorted residents:', sortedResidents.length, sortedResidents.map(r => ({ nama: r.nama, nik: r.nik })))

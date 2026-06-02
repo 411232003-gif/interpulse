@@ -166,7 +166,17 @@ export default function InputTBBBPage() {
       att.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
       att.nik.includes(searchQuery)
     return rwMatch && rtMatch && searchMatch
-  }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  }).sort((a, b) => {
+    const aTbbb = getTodayTBBB(a.nik)
+    const bTbbb = getTodayTBBB(b.nik)
+    const aHas = !!aTbbb
+    const bHas = !!bTbbb
+    // Belum input TB/BB/LP → atas, sudah input → bawah (terbaru di atas grup bawah)
+    if (aHas && !bHas) return 1
+    if (!aHas && bHas) return -1
+    if (aHas && bHas) return new Date(bTbbb!.timestamp).getTime() - new Date(aTbbb!.timestamp).getTime()
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  })
 
   // Open modal for input
   const openModal = (resident: AttendanceRecord) => {
