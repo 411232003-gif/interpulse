@@ -797,6 +797,45 @@ export default function CatatKesehatan() {
   if (!showFascaModal) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pb-24">
+        {/* TB/BB/LP Warning Popup Overlay */}
+        {showTbbbWarning && warningResident && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+              style={{ animation: 'slideDown 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}>
+              <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 pt-8 pb-6 text-center">
+                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-10 h-10 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">TB/BB/LP Belum Diinput</h2>
+              </div>
+              <div className="px-6 py-6 text-center">
+                <div className="bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 mb-4">
+                  <p className="text-orange-700 font-semibold text-lg">{warningResident.nama}</p>
+                  <p className="text-orange-500 text-sm">NIK: {warningResident.nik}</p>
+                </div>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Warga ini <span className="font-semibold text-red-500">belum dilakukan pengukuran TB/BB/LP</span> hari ini.
+                  Harap selesaikan pengukuran fisik terlebih dahulu sebelum menginput data kesehatan.
+                </p>
+              </div>
+              <div className="px-6 pb-6 flex flex-col gap-3">
+                <button
+                  onClick={() => { setShowTbbbWarning(false); router.push('/input-tb-bb') }}
+                  className="w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+                >
+                  Ke Halaman Input TB/BB/LP
+                </button>
+                <button
+                  onClick={() => setShowTbbbWarning(false)}
+                  className="w-full py-3 bg-gray-100 text-gray-600 font-medium rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+            <style>{`@keyframes slideDown { from { opacity: 0; transform: translateY(-40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
+          </div>
+        )}
         <div className="max-w-6xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <div className="flex items-center justify-between mb-6">
@@ -902,51 +941,6 @@ export default function CatatKesehatan() {
 
           </div>
         </div>
-      </div>
-    )
-  }
-
-  // TB/BB/LP Warning Popup
-  if (showTbbbWarning && warningResident) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-bounce-in"
-          style={{ animation: 'slideDown 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}>
-          {/* Header strip */}
-          <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 pt-8 pb-6 text-center">
-            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-10 h-10 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-white">TB/BB/LP Belum Diinput</h2>
-          </div>
-          {/* Body */}
-          <div className="px-6 py-6 text-center">
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 mb-4">
-              <p className="text-orange-700 font-semibold text-lg">{warningResident.nama}</p>
-              <p className="text-orange-500 text-sm">NIK: {warningResident.nik}</p>
-            </div>
-            <p className="text-gray-600 text-sm leading-relaxed">
-              Warga ini <span className="font-semibold text-red-500">belum dilakukan pengukuran TB/BB/LP</span> hari ini.
-              Harap selesaikan pengukuran fisik terlebih dahulu sebelum menginput data kesehatan.
-            </p>
-          </div>
-          {/* Footer buttons */}
-          <div className="px-6 pb-6 flex flex-col gap-3">
-            <button
-              onClick={() => { setShowTbbbWarning(false); router.push('/input-tb-bb') }}
-              className="w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-            >
-              Ke Halaman Input TB/BB/LP
-            </button>
-            <button
-              onClick={() => setShowTbbbWarning(false)}
-              className="w-full py-3 bg-gray-100 text-gray-600 font-medium rounded-xl hover:bg-gray-200 transition-colors"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
-        <style>{`@keyframes slideDown { from { opacity: 0; transform: translateY(-40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
       </div>
     )
   }
