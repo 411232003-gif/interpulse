@@ -352,22 +352,52 @@ export default function CatatKesehatan() {
   console.log('[Fasca] Total residents:', residents.length, 'Filtered residents:', filteredResidents.length)
 
   const sortedResidents = filteredResidents.sort((a, b) => {
-    const getLatestHealthTimestamp = (residentId: string) => {
-      const residentReadings = healthReadings.filter(r => r.userId === residentId)
-      if (residentReadings.length === 0) return 0
-      return Math.max(...residentReadings.map(r => new Date(r.timestamp).getTime()))
+    const todayStr = new Date().toISOString().split('T')[0]
+
+    const aTbbb = getTodayTBBB(a.nik)
+    const bTbbb = getTodayTBBB(b.nik)
+    const aHasTbbb = !!aTbbb
+    const bHasTbbb = !!bTbbb
+
+    const getTodayHealthTs = (residentId: string) => {
+      const readings = healthReadings.filter(r =>
+        r.userId === residentId && r.timestamp.startsWith(todayStr) && r.source === 'posbindu'
+      )
+      if (readings.length === 0) return 0
+      return Math.max(...readings.map(r => new Date(r.timestamp).getTime()))
     }
 
-    const aTimestamp = getLatestHealthTimestamp(a.id)
-    const bTimestamp = getLatestHealthTimestamp(b.id)
-    const aHasData = aTimestamp > 0
-    const bHasData = bTimestamp > 0
+    const aHealthTs = getTodayHealthTs(a.id)
+    const bHealthTs = getTodayHealthTs(b.id)
+    const aHasHealth = aHealthTs > 0
+    const bHasHealth = bHealthTs > 0
 
-    // Belum input → atas, sudah input → bawah (terbaru di atas grup bawah)
-    if (aHasData && !bHasData) return 1
-    if (!aHasData && bHasData) return -1
-    if (aHasData && bHasData) return bTimestamp - aTimestamp
-    return 0
+    // Grup 1=sudah TB/BB tapi belum health (atas), 2=belum TB/BB (tengah), 3=sudah health (bawah)
+    const getGroup = (hasTbbb: boolean, hasHealth: boolean) => {
+      if (hasHealth) return 3
+      if (hasTbbb) return 1
+      return 2
+    }
+
+    const aGroup = getGroup(aHasTbbb, aHasHealth)
+    const bGroup = getGroup(bHasTbbb, bHasHealth)
+
+    if (aGroup !== bGroup) return aGroup - bGroup
+
+    if (aGroup === 1) {
+      // Antrian: pertama selesai TB/BB = posisi 1 (ASC)
+      return new Date(aTbbb!.timestamp).getTime() - new Date(bTbbb!.timestamp).getTime()
+    }
+    if (aGroup === 2) {
+      // Urutan sama seperti halaman TB/BB/LP (attendance timestamp DESC)
+      const aAtt = todayAttendanceFull.find(att => att.nik === a.nik)
+      const bAtt = todayAttendanceFull.find(att => att.nik === b.nik)
+      const aTs = aAtt ? new Date(aAtt.timestamp).getTime() : 0
+      const bTs = bAtt ? new Date(bAtt.timestamp).getTime() : 0
+      return bTs - aTs
+    }
+    // Grup 3: paling baru input kesehatan = teratas grup bawah, paling lama = paling bawah (DESC)
+    return bHealthTs - aHealthTs
   })
 
   console.log('[Fasca] Sorted residents:', sortedResidents.length, sortedResidents.map(r => ({ nama: r.nama, nik: r.nik })))
