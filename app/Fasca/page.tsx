@@ -306,14 +306,15 @@ export default function CatatKesehatan() {
     }
   }
 
-  const getHealthCellClass = (type: string, value: string | number): string => {
+  const getHealthCellClass = (type: string, value: string | number, gender?: string): string => {
     const v = String(value ?? '')
     if (!v || v === '-') return 'px-4 py-3 text-gray-600'
     const numVal = type === 'tensi' ? parseInt(v.split('/')[0]) : parseFloat(v)
     if (isNaN(numVal)) return 'px-4 py-3 text-gray-600'
     let status = ''
     if (type === 'tensi') {
-      if (numVal < 120) status = 'Normal'
+      if (numVal < 120) status = 'Rendah'
+      else if (numVal < 130) status = 'Normal'
       else if (numVal < 140) status = 'Batas'
       else status = 'Tinggi'
     } else if (type === 'guladarah') {
@@ -321,15 +322,15 @@ export default function CatatKesehatan() {
       else if (numVal < 126) status = 'Batas'
       else status = 'Tinggi'
     } else if (type === 'asamurat') {
-      if (numVal < 7) status = 'Normal'
-      else if (numVal < 9) status = 'Batas'
+      const threshold = gender === 'P' ? 6 : 7
+      if (numVal <= threshold) status = 'Normal'
       else status = 'Tinggi'
     } else if (type === 'kolesterol') {
       if (numVal < 200) status = 'Normal'
-      else if (numVal < 240) status = 'Batas'
       else status = 'Tinggi'
     }
     const map: Record<string, string> = {
+      Rendah: 'bg-blue-100 text-blue-800 font-semibold',
       Normal: 'bg-green-100 text-green-800 font-semibold',
       Batas: 'bg-yellow-100 text-yellow-800 font-semibold',
       Tinggi: 'bg-red-100 text-red-800 font-semibold',
@@ -976,7 +977,7 @@ export default function CatatKesehatan() {
                           <td className="px-4 py-3 text-gray-600">{r.umur} tahun</td>
                           <td className={getHealthCellClass('tensi', tdValue)}>{tdValue}</td>
                           <td className={getHealthCellClass('guladarah', gdsValue)}>{gdsValue}</td>
-                          <td className={getHealthCellClass('asamurat', uaValue)}>{uaValue}</td>
+                          <td className={getHealthCellClass('asamurat', uaValue, r.jenisKelamin)}>{uaValue}</td>
                           <td className={getHealthCellClass('kolesterol', colValue)}>{colValue}</td>
                           <td className="px-4 py-3 text-center">
                             {(() => {

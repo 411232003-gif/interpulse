@@ -287,14 +287,14 @@ export default function MonitoringPage() {
   }, [])
 
   // Health status calculation functions
-  const getHealthStatus = (type: string, value: number) => {
+  const getHealthStatus = (type: string, value: number, gender?: string) => {
     if (type === 'kolesterol') {
       if (value < 200) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
-      if (value < 240) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
       return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
     }
     if (type === 'tensi') {
-      if (value < 120) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
+      if (value < 120) return { status: 'Rendah', color: 'bg-blue-500', textColor: 'text-blue-700' }
+      if (value < 130) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
       if (value < 140) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
       return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
     }
@@ -304,8 +304,8 @@ export default function MonitoringPage() {
       return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
     }
     if (type === 'asamurat') {
-      if (value < 7) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
-      if (value < 9) return { status: 'Batas', color: 'bg-yellow-500', textColor: 'text-yellow-700' }
+      const threshold = gender === 'P' ? 6 : 7
+      if (value <= threshold) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
       return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
     }
     if (type === 'imt') {
@@ -577,14 +577,14 @@ export default function MonitoringPage() {
     rendah: 'Rendah', normal: 'Normal', batas: 'Batas', tinggi: 'Tinggi',
   }
 
-  const getHealthCellClass = (field: string, value: string | number): string => {
+  const getHealthCellClass = (field: string, value: string | number, gender?: string): string => {
     const v = String(value ?? '')
     if (!v || v === '-') return 'px-2 py-2'
     const numVal = field === 'td' ? parseInt(v.split('/')[0]) : parseFloat(v)
     if (isNaN(numVal)) return 'px-2 py-2'
     const type = fieldToHealthType[field]
     if (!type) return 'px-2 py-2'
-    const { status } = getHealthStatus(type, numVal)
+    const { status } = getHealthStatus(type, numVal, gender)
     const map: Record<string, string> = {
       Rendah: 'bg-blue-100 text-blue-800 font-semibold',
       Normal: 'bg-green-100 text-green-800 font-semibold',
@@ -2220,7 +2220,7 @@ export default function MonitoringPage() {
                       <td className={getHealthCellClass('td', row.td)}>{row.td}</td>
                       <td className={getHealthCellClass('gds', row.gds)}>{row.gds}</td>
                       <td className={getHealthCellClass('imt', row.imt)}>{row.imt}</td>
-                      <td className={getHealthCellClass('ua', row.ua)}>{row.ua}</td>
+                      <td className={getHealthCellClass('ua', row.ua, row.jenisKelamin)}>{row.ua}</td>
                       <td className={getHealthCellClass('col', row.col)}>{row.col}</td>
                       <td className={getHealthCellClass('nadi', row.nadi)}>{row.nadi}</td>
                     </tr>
