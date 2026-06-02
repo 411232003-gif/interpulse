@@ -306,6 +306,37 @@ export default function CatatKesehatan() {
     }
   }
 
+  const getHealthCellClass = (type: string, value: string | number): string => {
+    const v = String(value ?? '')
+    if (!v || v === '-') return 'px-4 py-3 text-gray-600'
+    const numVal = type === 'tensi' ? parseInt(v.split('/')[0]) : parseFloat(v)
+    if (isNaN(numVal)) return 'px-4 py-3 text-gray-600'
+    let status = ''
+    if (type === 'tensi') {
+      if (numVal < 120) status = 'Normal'
+      else if (numVal < 140) status = 'Batas'
+      else status = 'Tinggi'
+    } else if (type === 'guladarah') {
+      if (numVal < 100) status = 'Normal'
+      else if (numVal < 126) status = 'Batas'
+      else status = 'Tinggi'
+    } else if (type === 'asamurat') {
+      if (numVal < 7) status = 'Normal'
+      else if (numVal < 9) status = 'Batas'
+      else status = 'Tinggi'
+    } else if (type === 'kolesterol') {
+      if (numVal < 200) status = 'Normal'
+      else if (numVal < 240) status = 'Batas'
+      else status = 'Tinggi'
+    }
+    const map: Record<string, string> = {
+      Normal: 'bg-green-100 text-green-800 font-semibold',
+      Batas: 'bg-yellow-100 text-yellow-800 font-semibold',
+      Tinggi: 'bg-red-100 text-red-800 font-semibold',
+    }
+    return `px-4 py-3 ${map[status] || 'text-gray-600'}`
+  }
+
   // Check if resident has TB/BB data for today
   const getTodayTBBB = (nik: string) => {
     const today = new Date()
@@ -943,10 +974,10 @@ export default function CatatKesehatan() {
                           <td className="px-4 py-3 text-gray-600">RW {r.rw} / RT {r.rt}</td>
                           <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                           <td className="px-4 py-3 text-gray-600">{r.umur} tahun</td>
-                          <td className="px-4 py-3 text-gray-600">{tdValue}</td>
-                          <td className="px-4 py-3 text-gray-600">{gdsValue}</td>
-                          <td className="px-4 py-3 text-gray-600">{uaValue}</td>
-                          <td className="px-4 py-3 text-gray-600">{colValue}</td>
+                          <td className={getHealthCellClass('tensi', tdValue)}>{tdValue}</td>
+                          <td className={getHealthCellClass('guladarah', gdsValue)}>{gdsValue}</td>
+                          <td className={getHealthCellClass('asamurat', uaValue)}>{uaValue}</td>
+                          <td className={getHealthCellClass('kolesterol', colValue)}>{colValue}</td>
                           <td className="px-4 py-3 text-center">
                             {(() => {
                               const hasTbbb = !!getTodayTBBB(r.nik)
