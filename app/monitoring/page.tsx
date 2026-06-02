@@ -1191,21 +1191,32 @@ export default function MonitoringPage() {
       row.nadi
     ])
 
+    const colTypePDF: Record<number, string> = { 11: 'tensi', 12: 'guladarah', 13: 'imt', 14: 'asamurat', 15: 'kolesterol', 16: 'nadi' }
+    const statusBgPDF: Record<string, [number,number,number]> = { Rendah: [219,234,254], Normal: [220,252,231], Batas: [254,249,195], Tinggi: [254,226,226] }
+    const statusTxtPDF: Record<string, [number,number,number]> = { Rendah: [29,78,216], Normal: [21,128,61], Batas: [161,98,7], Tinggi: [185,28,28] }
+
     autoTable(doc, {
       startY: 65,
       head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
       body: pdfData,
-      styles: {
-        fontSize: 7,
-        cellPadding: 2,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+      didParseCell: (data: any) => {
+        if (data.section !== 'body') return
+        const type = colTypePDF[data.column.index]
+        if (!type) return
+        const val = String(data.cell.raw ?? '')
+        if (!val || val === '-') return
+        const numVal = data.column.index === 11 ? parseInt(val.split('/')[0]) : parseFloat(val)
+        if (isNaN(numVal)) return
+        const rowGender = filteredTableData[data.row.index]?.jenisKelamin
+        const { status } = getHealthStatus(type, numVal, rowGender)
+        if (statusBgPDF[status]) {
+          data.cell.styles.fillColor = statusBgPDF[status]
+          data.cell.styles.textColor = statusTxtPDF[status]
+          data.cell.styles.fontStyle = 'bold'
+        }
       },
     })
 
@@ -1213,49 +1224,56 @@ export default function MonitoringPage() {
   }
 
   const exportAttendanceToExcel = (rw: string) => {
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
     const filteredTableData = tableData.filter(row => row.rw === rw)
 
-    const data = filteredTableData.map(row => ({
-      'Nama': row.nama,
-      'NIK': row.nik,
-      'Tgl Lahir': row.tglLahir,
-      'Umur': row.umur,
-      'Alamat': row.alamat,
-      'L/P': row.jenisKelamin,
-      'TB': row.tb,
-      'BB': row.bb,
-      'LP': row.lp,
-      'TD': row.td,
-      'GDS': row.gds,
-      'IMT': row.imt,
-      'UA': row.ua,
-      'COL': row.col,
-      'NADI': row.nadi
-    }))
-
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, `Data Kesehatan Warga RW ${rw}`)
-
-    ws['!cols'] = [
-      { wch: 20 },
-      { wch: 18 },
-      { wch: 12 },
-      { wch: 6 },
-      { wch: 30 },
-      { wch: 6 },
-      { wch: 6 },
-      { wch: 6 },
-      { wch: 6 },
-      { wch: 8 },
-      { wch: 8 },
-      { wch: 6 },
-      { wch: 6 },
-      { wch: 6 },
-      { wch: 6 },
+    const metaRows: (string | number)[][] = [
+      [`DATA KESEHATAN WARGA - RW ${rw}`],
+      [`Kelurahan: ${kelurahan}`, '', `Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`],
+      [`Total Data: ${filteredTableData.length} warga`],
+      []
     ]
 
-    XLSX.writeFile(wb, `data-kesehatan-warga-rw-${rw}-${selectedMonth}.xlsx`)
+    const header = ['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']
+    const dataRows = filteredTableData.map((row: any) => [
+      row.nama, row.nik, row.tglLahir, row.umur, row.alamat,
+      row.jenisKelamin, row.tb, row.bb, row.lp,
+      row.td, row.gds, row.imt, row.ua, row.col, row.nadi
+    ])
+
+    const ws = XLSXStyle.utils.aoa_to_sheet([...metaRows, header, ...dataRows])
+    ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 6 }, { wch: 30 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }]
+
+    const xlsxHealthCols = [
+      { colIdx: 9, field: 'td', type: 'tensi' },
+      { colIdx: 10, field: 'gds', type: 'guladarah' },
+      { colIdx: 11, field: 'imt', type: 'imt' },
+      { colIdx: 12, field: 'ua', type: 'asamurat' },
+      { colIdx: 13, field: 'col', type: 'kolesterol' },
+      { colIdx: 14, field: 'nadi', type: 'nadi' },
+    ]
+    const xlsxFill: Record<string, string> = { Rendah: 'DBEAFE', Normal: 'DCFCE7', Batas: 'FEF9C3', Tinggi: 'FEE2E2' }
+    const xlsxFont: Record<string, string> = { Rendah: '1D4ED8', Normal: '15803D', Batas: 'A16207', Tinggi: 'B91C1C' }
+    const dataStartRow = metaRows.length + 2
+    filteredTableData.forEach((row: any, i: number) => {
+      const excelRow = dataStartRow + i
+      xlsxHealthCols.forEach(({ colIdx, field, type }) => {
+        const cellAddr = `${String.fromCharCode(65 + colIdx)}${excelRow}`
+        if (!ws[cellAddr]) return
+        const valStr = String(row[field] ?? '')
+        if (!valStr || valStr === '-') return
+        const numVal = field === 'td' ? parseInt(valStr.split('/')[0]) : parseFloat(valStr)
+        if (isNaN(numVal)) return
+        const { status } = getHealthStatus(type, numVal, row.jenisKelamin)
+        if (xlsxFill[status]) {
+          ws[cellAddr].s = { fill: { fgColor: { rgb: xlsxFill[status] } }, font: { color: { rgb: xlsxFont[status] }, bold: true } }
+        }
+      })
+    })
+
+    const wb = XLSXStyle.utils.book_new()
+    XLSXStyle.utils.book_append_sheet(wb, ws, `Data Kesehatan Warga RW ${rw}`.slice(0, 31))
+    XLSXStyle.writeFile(wb, `data-kesehatan-warga-rw-${rw}-${selectedMonth}.xlsx`)
   }
 
   const exportAttendanceToWhatsApp = (rw: string) => {
