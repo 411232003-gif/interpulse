@@ -28,7 +28,7 @@ export default function AbsensiPage() {
   const [filterRW, setFilterRW] = useState('')
   const [filterRT, setFilterRT] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [attendanceToday, setAttendanceToday] = useState<Set<string>>(new Set())
+  const [attendanceThisMonth, setAttendanceThisMonth] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -121,21 +121,25 @@ export default function AbsensiPage() {
     return () => unsubscribeResidents()
   }, [])
 
-  // Load today's attendance
+  // Load this month's attendance (once per month per NIK)
   useEffect(() => {
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
+    const now = new Date()
+    const currentMonth = now.getMonth()
+    const currentYear = now.getFullYear()
 
     const attendanceRef = collection(db, 'attendance')
     const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
-      const todayAttendance = new Set<string>()
+      const monthAttendance = new Set<string>()
       snapshot.docs.forEach(doc => {
         const data = doc.data()
-        if (data.timestamp && data.timestamp.startsWith(todayStr)) {
-          todayAttendance.add(data.nik)
+        if (data.timestamp) {
+          const d = new Date(data.timestamp)
+          if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+            monthAttendance.add(data.nik)
+          }
         }
       })
-      setAttendanceToday(todayAttendance)
+      setAttendanceThisMonth(monthAttendance)
     })
 
     return () => unsubscribe()
@@ -181,6 +185,12 @@ export default function AbsensiPage() {
 
   // Handle attendance
   const handleAttendance = async (resident: Resident) => {
+    // Guard: prevent re-click if already present this month
+    if (attendanceThisMonth.has(resident.nik)) {
+      showNotification('info', `${resident.nama} sudah diabsen di bulan ini`)
+      return
+    }
+
     try {
       const today = new Date()
       const todayStr = today.toISOString().split('T')[0]
@@ -415,7 +425,7 @@ export default function AbsensiPage() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">RW/RT</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Jenis Kelamin</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Usia</th>
-                  <th className="px-4 py-3 text-center font-semibold text-gray-700">Status Hari Ini</th>
+                  <th className="px-4 py-3 text-center font-semibold text-gray-700">Status Bulan Ini</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                 </tr>
               </thead>
@@ -425,7 +435,7 @@ export default function AbsensiPage() {
                     <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Tidak ada data warga</td>
                   </tr>
                 ) : filteredResidents.map(r => {
-                  const isPresentToday = attendanceToday.has(r.nik)
+                  const isPresentThisMonth = attendanceThisMonth.has(r.nik)
                   return (
                     <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-800">{r.nama}</td>
@@ -434,7 +444,7 @@ export default function AbsensiPage() {
                       <td className="px-4 py-3 text-gray-600">{r.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                       <td className="px-4 py-3 text-gray-600">{r.umur} tahun</td>
                       <td className="px-4 py-3 text-center">
-                        {isPresentToday ? (
+                        {isPresentThisMonth ? (
                           <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -443,15 +453,15 @@ export default function AbsensiPage() {
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => handleAttendance(r)}
-                          disabled={isPresentToday}
+                          disabled={isPresentThisMonth}
                           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
-                            isPresentToday
+                            isPresentThisMonth
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-blue-600 text-white hover:bg-blue-700'
                           }`}
                         >
                           <Calendar className="w-3.5 h-3.5" />
-                          {isPresentToday ? 'Sudah Hadir' : 'Hadir'}
+                          {isPresentThisMonth ? 'Sudah Hadir' : 'Hadir'}
                         </button>
                       </td>
                     </tr>
