@@ -29,6 +29,7 @@ export default function AbsensiPage() {
   const [filterRT, setFilterRT] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [attendanceThisMonth, setAttendanceThisMonth] = useState<Set<string>>(new Set())
+  const [attendanceTimestamp, setAttendanceTimestamp] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -130,16 +131,19 @@ export default function AbsensiPage() {
     const attendanceRef = collection(db, 'attendance')
     const unsubscribe = onSnapshot(attendanceRef, (snapshot) => {
       const monthAttendance = new Set<string>()
+      const timestampMap = new Map<string, number>()
       snapshot.docs.forEach(doc => {
         const data = doc.data()
         if (data.timestamp) {
           const d = new Date(data.timestamp)
           if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
             monthAttendance.add(data.nik)
+            timestampMap.set(data.nik, d.getTime())
           }
         }
       })
       setAttendanceThisMonth(monthAttendance)
+      setAttendanceTimestamp(timestampMap)
     })
 
     return () => unsubscribe()
@@ -181,6 +185,13 @@ export default function AbsensiPage() {
       r.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
       r.nik.includes(searchQuery)
     return rwMatch && rtMatch && searchMatch
+  }).sort((a, b) => {
+    const aPresent = attendanceThisMonth.has(a.nik)
+    const bPresent = attendanceThisMonth.has(b.nik)
+    if (aPresent && !bPresent) return 1
+    if (!aPresent && bPresent) return -1
+    if (aPresent && bPresent) return (attendanceTimestamp.get(a.nik) || 0) - (attendanceTimestamp.get(b.nik) || 0)
+    return 0
   })
 
   // Handle attendance
