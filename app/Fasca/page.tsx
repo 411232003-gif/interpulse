@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import BigNumpad from '@/components/BigNumpad'
-import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope, Download, MoreVertical, FileText, Table, MessageCircle, PlusCircle, Edit2, Trash2, Info } from 'lucide-react'
+import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope, Download, MoreVertical, FileText, Table, MessageCircle, PlusCircle, Edit2, Trash2, Info, Lock } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -50,6 +50,8 @@ export default function CatatKesehatan() {
   const [tbbbData, setTbbbData] = useState<TBBBData[]>([])
   const [attendanceToday, setAttendanceToday] = useState<Set<string>>(new Set())
   const [todayAttendanceFull, setTodayAttendanceFull] = useState<any[]>([])
+  const [showTbbbWarning, setShowTbbbWarning] = useState(false)
+  const [warningResident, setWarningResident] = useState<Resident | null>(null)
 
   // Fasca form state
   const [healthType, setHealthType] = useState<HealthType | null>(null)
@@ -873,10 +875,23 @@ export default function CatatKesehatan() {
                           <td className="px-4 py-3 text-gray-600">{uaValue}</td>
                           <td className="px-4 py-3 text-gray-600">{colValue}</td>
                           <td className="px-4 py-3 text-center">
-                            <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
-                              <Stethoscope className="w-3.5 h-3.5" />
-                              Input Kesehatan
-                            </button>
+                            {(() => {
+                              const hasTbbb = !!getTodayTBBB(r.nik)
+                              return hasTbbb ? (
+                                <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
+                                  <Stethoscope className="w-3.5 h-3.5" />
+                                  Input Kesehatan
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => { setWarningResident(r); setShowTbbbWarning(true) }}
+                                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-200 text-gray-400 rounded-lg cursor-not-allowed text-xs font-medium"
+                                >
+                                  <Lock className="w-3.5 h-3.5" />
+                                  Input Kesehatan
+                                </button>
+                              )
+                            })()}
                           </td>
                         </tr>
                       )
@@ -887,6 +902,51 @@ export default function CatatKesehatan() {
 
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // TB/BB/LP Warning Popup
+  if (showTbbbWarning && warningResident) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-bounce-in"
+          style={{ animation: 'slideDown 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}>
+          {/* Header strip */}
+          <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 pt-8 pb-6 text-center">
+            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-white">TB/BB/LP Belum Diinput</h2>
+          </div>
+          {/* Body */}
+          <div className="px-6 py-6 text-center">
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 mb-4">
+              <p className="text-orange-700 font-semibold text-lg">{warningResident.nama}</p>
+              <p className="text-orange-500 text-sm">NIK: {warningResident.nik}</p>
+            </div>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              Warga ini <span className="font-semibold text-red-500">belum dilakukan pengukuran TB/BB/LP</span> hari ini.
+              Harap selesaikan pengukuran fisik terlebih dahulu sebelum menginput data kesehatan.
+            </p>
+          </div>
+          {/* Footer buttons */}
+          <div className="px-6 pb-6 flex flex-col gap-3">
+            <button
+              onClick={() => { setShowTbbbWarning(false); router.push('/input-tb-bb') }}
+              className="w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            >
+              Ke Halaman Input TB/BB/LP
+            </button>
+            <button
+              onClick={() => setShowTbbbWarning(false)}
+              className="w-full py-3 bg-gray-100 text-gray-600 font-medium rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+        <style>{`@keyframes slideDown { from { opacity: 0; transform: translateY(-40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
       </div>
     )
   }
