@@ -10,6 +10,7 @@ import Link from 'next/link'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 const XLSXStyle = require('xlsx-js-style')
 
 const rwTargets: Record<string, number> = {
@@ -22,6 +23,239 @@ const monthLabels: Record<string, string> = {
   juli:'Jul', agustus:'Agu', september:'Sep', oktober:'Okt', november:'Nov', desember:'Des'
 }
 
+const fullMonthLabels: Record<string, string> = {
+  januari: 'Januari', februari: 'Februari', maret: 'Maret', april: 'April', mei: 'Mei', juni: 'Juni',
+  juli: 'Juli', agustus: 'Agustus', september: 'September', oktober: 'Oktober', november: 'November', desember: 'Desember'
+}
+
+const exportHealthTypes = [
+  { key: 'kolesterol', label: 'Kolesterol' },
+  { key: 'tensi', label: 'Tensi' },
+  { key: 'guladarah', label: 'Gula Darah' },
+  { key: 'asamurat', label: 'Asam Urat' },
+  { key: 'nadi', label: 'Nadi' },
+  { key: 'imt', label: 'IMT' },
+]
+
+const exportCategories = ['Rendah', 'Normal', 'Batas Tinggi', 'Tinggi']
+
+const excelCategoryStyles: Record<string, { fill: string; font: string }> = {
+  Rendah: { fill: 'DBEAFE', font: '1D4ED8' },
+  Normal: { fill: 'DCFCE7', font: '15803D' },
+  'Batas Tinggi': { fill: 'FEF9C3', font: 'A16207' },
+  Tinggi: { fill: 'FEE2E2', font: 'B91C1C' },
+}
+
+const pdfCategoryStyles: Record<string, { fill: [number, number, number]; text: [number, number, number] }> = {
+  Rendah: { fill: [219, 234, 254], text: [29, 78, 216] },
+  Normal: { fill: [220, 252, 231], text: [21, 128, 61] },
+  'Batas Tinggi': { fill: [254, 249, 195], text: [161, 98, 7] },
+  Tinggi: { fill: [254, 226, 226], text: [185, 28, 28] },
+}
+
+type ChartType = 'bar' | 'line'
+
+interface ChartSeries {
+  name: string
+  categories: string
+  values: string
+}
+
+interface ExcelChartSpec {
+  sheetIndex: number
+  type: ChartType
+  title: string
+  fromCol: number
+  fromRow: number
+  toCol: number
+  toRow: number
+  series: ChartSeries[]
+}
+
+const escapeXml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+
+const quoteSheetName = (sheetName: string) => `'${sheetName.replace(/'/g, "''")}'`
+
+const buildSheetRange = (sheetName: string, startCol: string, startRow: number, endCol: string, endRow: number) =>
+  `${quoteSheetName(sheetName)}!$${startCol}$${startRow}:$${endCol}$${endRow}`
+
+const appendRelationship = (zip: Record<string, Uint8Array>, relPath: string, type: string, target: string) => {
+  const relationshipTag = 'http://schemas.openxmlformats.org/package/2006/relationships'
+  const initialXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${relationshipTag}"></Relationships>`
+  const existingXml = zip[relPath] ? strFromU8(zip[relPath]) : initialXml
+  const ids = Array.from(existingXml.matchAll(/Id="rId(\d+)"/g)).map(match => Number(match[1]))
+  const relId = `rId${ids.length > 0 ? Math.max(...ids) + 1 : 1}`
+  const relXml = `<Relationship Id="${relId}" Type="${type}" Target="${target}"/>`
+  zip[relPath] = strToU8(existingXml.replace('</Relationships>', `${relXml}</Relationships>`))
+  return relId
+}
+
+const ensureContentTypeOverride = (zip: Record<string, Uint8Array>, partName: string, contentType: string) => {
+  const path = '[Content_Types].xml'
+  const xml = strFromU8(zip[path])
+  if (xml.includes(`PartName="${partName}"`)) return
+  const override = `<Override PartName="${partName}" ContentType="${contentType}"/>`
+  zip[path] = strToU8(xml.replace('</Types>', `${override}</Types>`))
+}
+
+const generateChartXml = (chart: ExcelChartSpec, chartId: number) => {
+  const categoryAxisId = chartId * 1000 + 1
+  const valueAxisId = chartId * 1000 + 2
+  const seriesXml = chart.series.map((series, index) => `
+        <c:ser>
+          <c:idx val="${index}"/>
+          <c:order val="${index}"/>
+          <c:tx><c:v>${escapeXml(series.name)}</c:v></c:tx>
+          ${chart.type === 'line' ? '<c:marker><c:symbol val="circle"/></c:marker>' : ''}
+          <c:cat><c:strRef><c:f>${escapeXml(series.categories)}</c:f></c:strRef></c:cat>
+          <c:val><c:numRef><c:f>${escapeXml(series.values)}</c:f></c:numRef></c:val>
+        </c:ser>`).join('')
+  const chartBody = chart.type === 'bar'
+    ? `<c:barChart>
+        <c:barDir val="col"/>
+        <c:grouping val="clustered"/>
+        ${seriesXml}
+        <c:axId val="${categoryAxisId}"/>
+        <c:axId val="${valueAxisId}"/>
+      </c:barChart>`
+    : `<c:lineChart>
+        <c:grouping val="standard"/>
+        <c:varyColors val="0"/>
+        ${seriesXml}
+        <c:axId val="${categoryAxisId}"/>
+        <c:axId val="${valueAxisId}"/>
+      </c:lineChart>`
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <c:chart>
+    <c:title>
+      <c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="id-ID" sz="1200" b="1"/><a:t>${escapeXml(chart.title)}</a:t></a:r></a:p></c:rich></c:tx>
+      <c:layout/>
+    </c:title>
+    <c:plotArea>
+      <c:layout/>
+      ${chartBody}
+      <c:catAx>
+        <c:axId val="${categoryAxisId}"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="b"/>
+        <c:tickLblPos val="nextTo"/>
+        <c:crossAx val="${valueAxisId}"/>
+        <c:crosses val="autoZero"/>
+      </c:catAx>
+      <c:valAx>
+        <c:axId val="${valueAxisId}"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="l"/>
+        <c:majorGridlines/>
+        <c:numFmt formatCode="General" sourceLinked="1"/>
+        <c:tickLblPos val="nextTo"/>
+        <c:crossAx val="${categoryAxisId}"/>
+        <c:crosses val="autoZero"/>
+      </c:valAx>
+    </c:plotArea>
+    <c:legend><c:legendPos val="r"/><c:layout/></c:legend>
+    <c:plotVisOnly val="1"/>
+  </c:chart>
+  <c:printSettings><c:headerFooter/><c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/></c:printSettings>
+</c:chartSpace>`
+}
+
+const generateDrawingXml = (chartRelationships: { relId: string; chart: ExcelChartSpec; index: number }[]) => {
+  const anchors = chartRelationships.map(({ relId, chart, index }) => `
+  <xdr:twoCellAnchor>
+    <xdr:from><xdr:col>${chart.fromCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${chart.fromRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to><xdr:col>${chart.toCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${chart.toRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:graphicFrame macro="">
+      <xdr:nvGraphicFramePr><xdr:cNvPr id="${index + 2}" name="Chart ${index + 1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>
+      <xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>
+      <a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="${relId}"/></a:graphicData></a:graphic>
+    </xdr:graphicFrame>
+    <xdr:clientData/>
+  </xdr:twoCellAnchor>`).join('')
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+${anchors}
+</xdr:wsDr>`
+}
+
+const addExcelCharts = (workbookBytes: ArrayBuffer, charts: ExcelChartSpec[]) => {
+  if (charts.length === 0) return new Uint8Array(workbookBytes)
+
+  const zip = unzipSync(new Uint8Array(workbookBytes))
+  const drawingRelType = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing'
+  const chartRelType = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart'
+  const drawingContentType = 'application/vnd.openxmlformats-officedocument.drawing+xml'
+  const chartContentType = 'application/vnd.openxmlformats-officedocument.drawingml.chart+xml'
+  const chartsBySheet = charts.reduce((map, chart) => {
+    const sheetCharts = map.get(chart.sheetIndex) || []
+    sheetCharts.push(chart)
+    map.set(chart.sheetIndex, sheetCharts)
+    return map
+  }, new Map<number, ExcelChartSpec[]>())
+
+  let drawingId = 1
+  let chartId = 1
+  chartsBySheet.forEach((sheetCharts, sheetIndex) => {
+    const sheetPath = `xl/worksheets/sheet${sheetIndex}.xml`
+    if (!zip[sheetPath]) return
+
+    const drawingPath = `xl/drawings/drawing${drawingId}.xml`
+    const drawingRelPath = `xl/drawings/_rels/drawing${drawingId}.xml.rels`
+    const sheetRelPath = `xl/worksheets/_rels/sheet${sheetIndex}.xml.rels`
+    const sheetDrawingRelId = appendRelationship(zip, sheetRelPath, drawingRelType, `../drawings/drawing${drawingId}.xml`)
+    const chartRelationships = sheetCharts.map((chart, index) => {
+      const currentChartId = chartId
+      const chartPath = `xl/charts/chart${currentChartId}.xml`
+      const relId = appendRelationship(zip, drawingRelPath, chartRelType, `../charts/chart${currentChartId}.xml`)
+      zip[chartPath] = strToU8(generateChartXml(chart, currentChartId))
+      ensureContentTypeOverride(zip, `/xl/charts/chart${currentChartId}.xml`, chartContentType)
+      chartId++
+      return { relId, chart, index }
+    })
+
+    zip[drawingPath] = strToU8(generateDrawingXml(chartRelationships))
+    ensureContentTypeOverride(zip, `/xl/drawings/drawing${drawingId}.xml`, drawingContentType)
+
+    let sheetXml = strFromU8(zip[sheetPath])
+    if (!sheetXml.includes('xmlns:r=')) {
+      sheetXml = sheetXml.replace('<worksheet ', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ')
+    }
+    const drawingXml = `<drawing r:id="${sheetDrawingRelId}"/>`
+    sheetXml = sheetXml.includes('<drawing ')
+      ? sheetXml.replace(/<drawing r:id="[^"]+"\/>/, drawingXml)
+      : sheetXml.replace('</worksheet>', `${drawingXml}</worksheet>`)
+    zip[sheetPath] = strToU8(sheetXml)
+    drawingId++
+  })
+
+  return zipSync(zip, { level: 0 })
+}
+
+const saveExcelWorkbook = (workbook: XLSX.WorkBook, filename: string, charts: ExcelChartSpec[]) => {
+  const workbookBytes = XLSXStyle.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
+  const output = addExcelCharts(workbookBytes, charts)
+  const blob = new Blob([output], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 export default function MonitoringPage() {
   const router = useRouter()
   const { isAdmin, userProfile } = useAuth()
@@ -31,10 +265,6 @@ export default function MonitoringPage() {
   const [residentsData, setResidentsData] = useState<Record<string, any>>({})
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('id-ID', { month: 'long' }).toLowerCase())
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
-  const [rwExportDropdown, setRwExportDropdown] = useState<string | null>(null)
-  const [attendanceExportDropdown, setAttendanceExportDropdown] = useState<string | null>(null)
-  const [tableExportDropdown, setTableExportDropdown] = useState(false)
-  const [healthDistExportDropdown, setHealthDistExportDropdown] = useState(false)
   
   // Editable targets per RW
   const [customTargets, setCustomTargets] = useState<Record<string, number>>({...rwTargets})
@@ -727,212 +957,483 @@ export default function MonitoringPage() {
   const attendancePercentage = totalTarget > 0 ? ((totalAttendance / totalTarget) * 100).toFixed(1) : '0'
   const healthPercentage = totalTarget > 0 ? ((totalReadings / totalTarget) * 100).toFixed(1) : '0'
 
-  const exportToPDF = () => {
-    const doc = new jsPDF()
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+  const normalizeRW = (rw: string | number | undefined | null) => {
+    if (rw === undefined || rw === null || rw === '') return '-'
+    return String(rw).padStart(2, '0')
+  }
 
-    // Header
-    doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, 40, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Monitoring Kesehatan', 105, 20, { align: 'center' })
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
+  const sortByRW = <T extends { rw?: string | number }>(rows: T[]) =>
+    [...rows].sort((a, b) => {
+      const rwA = parseInt(normalizeRW(a.rw), 10)
+      const rwB = parseInt(normalizeRW(b.rw), 10)
+      if (Number.isNaN(rwA) && Number.isNaN(rwB)) return 0
+      if (Number.isNaN(rwA)) return 1
+      if (Number.isNaN(rwB)) return -1
+      return rwA - rwB
+    })
 
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(10)
-    doc.text(`Total Warga Diperiksa: ${totalReadings}`, 14, 50)
+  const calculateAge = (dateValue?: string) => {
+    if (!dateValue) return '-'
+    const birthDate = new Date(dateValue)
+    if (Number.isNaN(birthDate.getTime())) return '-'
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--
+    return age
+  }
 
-    // Health Type Distribution
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Distribusi Jenis Pemeriksaan', 14, 60)
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    
-    const typeDistData = Object.entries(healthTypeDistribution).map(([type, count]) => {
-      const labels: Record<string, string> = {
-        tensi: 'Tekanan Darah',
-        kolesterol: 'Kolesterol',
-        asamurat: 'Asam Urat',
-        guladarah: 'Gula Darah'
+  const formatDate = (dateValue?: string) => {
+    if (!dateValue) return '-'
+    const date = new Date(dateValue)
+    if (Number.isNaN(date.getTime())) return dateValue
+    return date.toLocaleDateString('id-ID')
+  }
+
+  const getUniqueResidents = () => sortByRW(Object.entries(residentsData)
+    .filter(([key, resident]: [string, any]) => key === resident.id)
+    .map(([, resident]: [string, any]) => ({
+      ...resident,
+      rw: normalizeRW(resident.rw),
+      rt: resident.rt || '-',
+      tglLahir: resident.birthDate || resident.tglLahir || '-',
+      umur: resident.umur || calculateAge(resident.birthDate || resident.tglLahir),
+      alamat: resident.alamat || '-',
+      jenisKelamin: resident.jenisKelamin || '-',
+      nama: resident.nama || '-',
+      nik: resident.nik || '-',
+    })))
+
+  const getRegisteredResidentsByRW = () => getUniqueResidents().reduce((acc, resident) => {
+    const rw = normalizeRW(resident.rw)
+    acc[rw] = (acc[rw] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const getStatusLabel = (status: string) => status === 'Batas' ? 'Batas Tinggi' : status
+
+  const getHealthValue = (row: Record<string, string | number>, field: string) => {
+    const value = row[field]
+    if (value === undefined || value === null || value === '-') return null
+    const parsedValue = field === 'td' ? parseInt(String(value).split('/')[0], 10) : parseFloat(String(value))
+    return Number.isNaN(parsedValue) ? null : parsedValue
+  }
+
+  const getSortedHealthRows = () => sortByRW(tableData.map(row => ({
+    ...row,
+    rw: normalizeRW(row.rw),
+    umur: row.umur || calculateAge(row.tglLahir),
+  })))
+
+  const getExamRecapRows = () => {
+    const rows: { rw: string; kategori: string; [key: string]: string | number }[] = []
+    const recap: Record<string, Record<string, Record<string, number>>> = {}
+    const sortedRWs = Object.keys(customTargets).sort((a, b) => parseInt(a) - parseInt(b))
+
+    sortedRWs.forEach(rw => {
+      recap[rw] = {}
+      exportCategories.forEach(category => {
+        recap[rw][category] = {}
+        exportHealthTypes.forEach(type => { recap[rw][category][type.key] = 0 })
+      })
+    })
+
+    getSortedHealthRows().forEach(row => {
+      const rw = normalizeRW(row.rw)
+      if (!recap[rw]) return
+      const healthFields = [
+        { key: 'kolesterol', field: 'col' },
+        { key: 'tensi', field: 'td' },
+        { key: 'guladarah', field: 'gds' },
+        { key: 'asamurat', field: 'ua' },
+        { key: 'nadi', field: 'nadi' },
+        { key: 'imt', field: 'imt' },
+      ]
+      healthFields.forEach(({ key, field }) => {
+        const value = getHealthValue(row, field)
+        if (value === null) return
+        const category = getStatusLabel(getHealthStatus(key, value, String(row.jenisKelamin || '')).status)
+        if (recap[rw][category]) recap[rw][category][key]++
+      })
+    })
+
+    sortedRWs.forEach(rw => {
+      exportCategories.forEach(category => {
+        const row: { rw: string; kategori: string; [key: string]: string | number } = { rw, kategori: category }
+        exportHealthTypes.forEach(type => { row[type.key] = recap[rw][category][type.key] })
+        rows.push(row)
+      })
+    })
+
+    return rows
+  }
+
+  const applyWorksheetStyles = (ws: XLSX.WorkSheet, headerRow: number, lastRow: number, lastCol: number, titleCols: number) => {
+    const border = {
+      top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+      bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+      left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+      right: { style: 'thin', color: { rgb: 'CBD5E1' } },
+    }
+
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: titleCols - 1 } }]
+    ws['!autofilter'] = { ref: `A${headerRow}:${XLSX.utils.encode_col(lastCol - 1)}${lastRow}` }
+    ws['!rows'] = [{ hpt: 24 }, { hpt: 18 }, { hpt: 18 }, { hpt: 8 }]
+
+    for (let row = 1; row <= lastRow; row++) {
+      for (let col = 0; col < lastCol; col++) {
+        const address = XLSX.utils.encode_cell({ r: row - 1, c: col })
+        if (!ws[address]) continue
+        const cell = ws[address] as XLSX.CellObject & { s?: Record<string, unknown> }
+        if (row === 1) {
+          cell.s = {
+            fill: { fgColor: { rgb: '312E81' } },
+            font: { color: { rgb: 'FFFFFF' }, bold: true, sz: 14 },
+            alignment: { horizontal: 'center', vertical: 'center' },
+          }
+        } else if (row === headerRow) {
+          cell.s = {
+            fill: { fgColor: { rgb: '4F46E5' } },
+            font: { color: { rgb: 'FFFFFF' }, bold: true },
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+            border,
+          }
+        } else if (row > headerRow) {
+          cell.s = {
+            fill: { fgColor: { rgb: row % 2 === 0 ? 'EEF2FF' : 'FFFFFF' } },
+            alignment: { vertical: 'center', wrapText: true },
+            border,
+          }
+        }
       }
-      return [labels[type] || type, count]
-    })
+    }
+  }
 
-    autoTable(doc, {
-      startY: 65,
-      head: [['Jenis Pemeriksaan', 'Jumlah']],
-      body: typeDistData,
-      styles: {
-        fontSize: 10,
-        cellPadding: 4,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
-      },
-    })
+  const setCellCategoryStyle = (ws: XLSX.WorkSheet, address: string, category: string) => {
+    const style = excelCategoryStyles[category]
+    if (!style || !ws[address]) return
+    const cell = ws[address] as XLSX.CellObject & { s?: Record<string, unknown> }
+    cell.s = {
+      ...(cell.s || {}),
+      fill: { fgColor: { rgb: style.fill } },
+      font: { color: { rgb: style.font }, bold: true },
+    }
+  }
 
-    // Per-RW Data
-    const finalY = (doc as any).lastAutoTable.finalY + 10
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Pemeriksaan per RW', 14, finalY)
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
+  const getExportFilename = (extension: 'xlsx' | 'pdf') =>
+    `monitoring-kesehatan-${selectedMonth}-${new Date().getFullYear()}.${extension}`
 
-    const tableData = Object.entries(customTargets)
+  const exportToPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const year = new Date().getFullYear()
+    const residents = getUniqueResidents()
+    const registeredByRW = getRegisteredResidentsByRW()
+    const healthRows = getSortedHealthRows()
+    const recapRows = getExamRecapRows()
+    const rwRows = Object.entries(customTargets)
       .sort(([a], [b]) => parseInt(a) - parseInt(b))
       .map(([rw, target]) => {
-        const readings = healthReadings[rw] || {}
-        const count = readings[selectedMonth] || 0
-        const percentage = target > 0 ? ((count / target) * 100).toFixed(1) : '0'
-        return [
-          `RW ${rw}`,
-          count,
-          target,
-          `${percentage}%`,
-        ]
+        const checked = healthReadings[rw]?.[selectedMonth] || 0
+        const percentage = target > 0 ? (checked / target) * 100 : 0
+        return [rw, checked, registeredByRW[rw] || 0, target, `${percentage.toFixed(2)}%`]
       })
+    const trendRows = Object.keys(customTargets)
+      .sort((a, b) => parseInt(a) - parseInt(b))
+      .map(rw => [rw, ...months.map(month => healthReadings[rw]?.[month] || 0)])
+    const trendFooter = ['Total per Bulan', ...months.map(month => Object.keys(customTargets).reduce((sum, rw) => sum + (healthReadings[rw]?.[month] || 0), 0))]
+    const recapFooter = ['Total', '', ...exportHealthTypes.map(type => recapRows.reduce((sum, row) => sum + Number(row[type.key] || 0), 0))]
 
-    autoTable(doc, {
-      startY: finalY + 5,
-      head: [['RW', 'Jumlah Warga Diperiksa', 'Target', 'Persentase']],
-      body: tableData,
-      styles: {
-        fontSize: 10,
-        cellPadding: 4,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
-      },
-    })
-
-    // Monthly Trend Data
-    const finalY2 = (doc as any).lastAutoTable.finalY + 10
-    doc.setFontSize(12)
+    doc.setFillColor(79, 70, 229)
+    doc.rect(0, 0, 297, 28, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
-    doc.text('Trafik Pemeriksaan Bulanan', 14, finalY2)
+    doc.text('Monitoring Kesehatan', 148.5, 12, { align: 'center' })
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan ${kelurahan} - ${fullMonthLabels[selectedMonth]} ${year}`, 148.5, 20, { align: 'center' })
 
-    const monthlyData = months.map(m => {
-      const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
-      return [monthLabels[m], total]
-    })
+    const addTitle = (title: string, y = 38) => {
+      doc.setTextColor(17, 24, 39)
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(title, 10, y)
+    }
 
+    addTitle('Daftar Warga')
     autoTable(doc, {
-      startY: finalY2 + 5,
-      head: [['Bulan', 'Total Warga Diperiksa']],
-      body: monthlyData,
-      styles: {
-        fontSize: 10,
-        cellPadding: 4,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
+      startY: 42,
+      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'Jenis Kelamin']],
+      body: residents.map(resident => [
+        resident.nama, resident.nik, resident.rw, resident.rt, formatDate(resident.tglLahir), resident.umur, resident.alamat, resident.jenisKelamin
+      ]),
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+    })
+
+    doc.addPage('landscape')
+    addTitle('Kehadiran per RW', 15)
+    autoTable(doc, {
+      startY: 19,
+      head: [['RW', 'Jumlah Warga Diperiksa', 'Jumlah Warga Terdaftar', 'Target', 'Persentase (dari target)']],
+      body: rwRows,
+      styles: { fontSize: 9, cellPadding: 2.5 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+    })
+
+    doc.addPage('landscape')
+    addTitle('Tren Bulanan', 15)
+    autoTable(doc, {
+      startY: 19,
+      head: [['RW', ...months.map(month => fullMonthLabels[month])]],
+      body: [...trendRows, trendFooter],
+      styles: { fontSize: 7, cellPadding: 1.6 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.row.index === trendRows.length) {
+          data.cell.styles.fillColor = [224, 231, 255]
+          data.cell.styles.fontStyle = 'bold'
+        }
       },
     })
 
-    doc.save(`monitoring-kesehatan-${selectedMonth}.pdf`)
+    doc.addPage('landscape')
+    addTitle('Rekapitulasi Hasil Pemeriksaan', 15)
+    autoTable(doc, {
+      startY: 19,
+      head: [['RW', 'Kategori Hasil', ...exportHealthTypes.map(type => type.label)]],
+      body: [...recapRows.map(row => [row.rw, row.kategori, ...exportHealthTypes.map(type => row[type.key])]), recapFooter],
+      styles: { fontSize: 7, cellPadding: 1.7 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.row.index === recapRows.length) {
+          data.cell.styles.fillColor = [224, 231, 255]
+          data.cell.styles.fontStyle = 'bold'
+          return
+        }
+        if (data.section !== 'body' || data.column.index !== 1) return
+        const category = String(data.cell.raw || '')
+        const style = pdfCategoryStyles[category]
+        if (!style) return
+        data.cell.styles.fillColor = style.fill
+        data.cell.styles.textColor = style.text
+        data.cell.styles.fontStyle = 'bold'
+      },
+    })
+
+    doc.addPage('landscape')
+    addTitle('Data Kesehatan Warga', 15)
+    autoTable(doc, {
+      startY: 19,
+      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'Jenis Kelamin', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'Nadi']],
+      body: healthRows.map(row => [
+        row.nama, row.nik, row.rw, row.rt, formatDate(row.tglLahir), row.umur, row.alamat, row.jenisKelamin,
+        row.tb, row.bb, row.lp, row.td, row.gds, row.imt, row.ua, row.col, row.nadi
+      ]),
+      styles: { fontSize: 5.8, cellPadding: 1.1 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [238, 242, 255] },
+      didParseCell: (data: any) => {
+        if (data.section !== 'body') return
+        const healthColumnMap: Record<number, { field: string; type: string }> = {
+          11: { field: 'td', type: 'tensi' },
+          12: { field: 'gds', type: 'guladarah' },
+          13: { field: 'imt', type: 'imt' },
+          14: { field: 'ua', type: 'asamurat' },
+          15: { field: 'col', type: 'kolesterol' },
+          16: { field: 'nadi', type: 'nadi' },
+        }
+        const healthColumn = healthColumnMap[data.column.index]
+        if (!healthColumn) return
+        const row = healthRows[data.row.index]
+        const value = getHealthValue(row, healthColumn.field)
+        if (value === null) return
+        const category = getStatusLabel(getHealthStatus(healthColumn.type, value, String(row.jenisKelamin || '')).status)
+        const style = pdfCategoryStyles[category]
+        if (!style) return
+        data.cell.styles.fillColor = style.fill
+        data.cell.styles.textColor = style.text
+        data.cell.styles.fontStyle = 'bold'
+      },
+    })
+
+    doc.save(getExportFilename('pdf'))
   }
 
   const exportToExcel = () => {
-    // Sheet 1: Per-RW Data for Selected Month
-    const rwData = Object.entries(customTargets).map(([rw, target]) => {
-      const readings = healthReadings[rw] || {}
-      const count = readings[selectedMonth] || 0
-      const percentage = target > 0 ? ((count / target) * 100).toFixed(2) : '0'
-      return {
-        'RW': rw,
-        'Jumlah Warga Diperiksa': count,
-        'Target': target,
-        'Persentase (%)': parseFloat(percentage),
-        'Status': count >= target ? 'Tercapai' : 'Belum Tercapai'
-      }
-    })
-
-    // Sheet 2: Monthly Trend Data
-    const monthlyData = months.map(m => {
-      const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
-      const totalCustom = Object.values(customTargets).reduce((s, t) => s + t, 0)
-      const percentage = totalCustom > 0 ? ((total / totalCustom) * 100).toFixed(2) : '0'
-      return {
-        'Bulan': monthLabels[m],
-        'Total Warga Diperiksa': total,
-        'Total Target': totalCustom,
-        'Persentase (%)': parseFloat(percentage)
-      }
-    })
-
-    // Sheet 3: Health Type Distribution
-    const typeDistData = Object.entries(healthTypeDistribution).map(([type, count]) => {
-      const labels: Record<string, string> = {
-        tensi: 'Tekanan Darah',
-        kolesterol: 'Kolesterol',
-        asamurat: 'Asam Urat',
-        guladarah: 'Gula Darah'
-      }
-      const percentage = totalReadings > 0 ? ((count / totalReadings) * 100).toFixed(2) : '0'
-      return {
-        'Jenis Pemeriksaan': labels[type] || type,
-        'Jumlah': count,
-        'Persentase (%)': parseFloat(percentage)
-      }
-    })
-
-    // Create workbook with multiple sheets
-    const wb = XLSX.utils.book_new()
-
-    // Sheet 1: Per-RW
-    const ws1 = XLSX.utils.json_to_sheet(rwData)
-    ws1['!cols'] = [
-      { wch: 10 },
-      { wch: 18 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 15 },
+    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
+    const year = new Date().getFullYear()
+    const wb = XLSXStyle.utils.book_new()
+    const charts: ExcelChartSpec[] = []
+    const residents = getUniqueResidents()
+    const registeredByRW = getRegisteredResidentsByRW()
+    const healthRows = getSortedHealthRows()
+    const sortedRWs = Object.keys(customTargets).sort((a, b) => parseInt(a) - parseInt(b))
+    const metaRows = (title: string, totalLabel: string): (string | number)[][] => [
+      [title],
+      [`Kelurahan: ${kelurahan}`, '', `Bulan: ${fullMonthLabels[selectedMonth]} ${year}`],
+      [totalLabel],
+      [],
     ]
-    XLSX.utils.book_append_sheet(wb, ws1, 'Per RW')
 
-    // Sheet 2: Monthly Trend
-    const ws2 = XLSX.utils.json_to_sheet(monthlyData)
-    ws2['!cols'] = [
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 15 },
-      { wch: 15 },
+    const daftarHeader = ['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'Jenis Kelamin']
+    const daftarRows = residents.map(resident => [
+      resident.nama, resident.nik, resident.rw, resident.rt, formatDate(resident.tglLahir), resident.umur, resident.alamat, resident.jenisKelamin
+    ])
+    const daftarWs = XLSXStyle.utils.aoa_to_sheet([...metaRows('Daftar Warga', `Total Warga: ${residents.length}`), daftarHeader, ...daftarRows])
+    daftarWs['!cols'] = [{ wch: 26 }, { wch: 20 }, { wch: 8 }, { wch: 8 }, { wch: 14 }, { wch: 8 }, { wch: 36 }, { wch: 16 }]
+    applyWorksheetStyles(daftarWs, 5, 5 + daftarRows.length, daftarHeader.length, daftarHeader.length)
+    XLSXStyle.utils.book_append_sheet(wb, daftarWs, 'Daftar Warga')
+
+    const rwHeader = ['RW', 'Jumlah Warga Diperiksa', 'Jumlah Warga Terdaftar', 'Target', 'Persentase (%)']
+    const rwRows = sortedRWs.map(rw => {
+      const checked = healthReadings[rw]?.[selectedMonth] || 0
+      const target = customTargets[rw] || 0
+      const percentage = target > 0 ? Number(((checked / target) * 100).toFixed(2)) : 0
+      return [rw, checked, registeredByRW[rw] || 0, target, percentage]
+    })
+    const rwWs = XLSXStyle.utils.aoa_to_sheet([...metaRows('Kehadiran per RW', `Total Warga Diperiksa: ${totalReadings}`), rwHeader, ...rwRows])
+    rwWs['!cols'] = [{ wch: 8 }, { wch: 24 }, { wch: 24 }, { wch: 12 }, { wch: 16 }]
+    applyWorksheetStyles(rwWs, 5, 5 + rwRows.length, rwHeader.length, rwHeader.length)
+    XLSXStyle.utils.book_append_sheet(wb, rwWs, 'kehadiran per RW')
+    if (rwRows.length > 0) {
+      charts.push({
+        sheetIndex: 2,
+        type: 'bar',
+        title: 'Jumlah Warga Diperiksa per RW',
+        fromCol: 6,
+        fromRow: 4,
+        toCol: 14,
+        toRow: 22,
+        series: [{
+          name: 'Jumlah Warga Diperiksa',
+          categories: buildSheetRange('kehadiran per RW', 'A', 6, 'A', 5 + rwRows.length),
+          values: buildSheetRange('kehadiran per RW', 'B', 6, 'B', 5 + rwRows.length),
+        }],
+      })
+    }
+
+    const trendHeader = ['RW', ...months.map(month => fullMonthLabels[month])]
+    const trendRows = sortedRWs.map(rw => [rw, ...months.map(month => healthReadings[rw]?.[month] || 0)])
+    const trendFooter = ['Total per Bulan', ...months.map(month => sortedRWs.reduce((sum, rw) => sum + (healthReadings[rw]?.[month] || 0), 0))]
+    const trendTotal = trendFooter.slice(1).reduce<number>((sum, value) => sum + Number(value), 0)
+    const trendWs = XLSXStyle.utils.aoa_to_sheet([...metaRows('Tren Bulanan', `Total Tahun Ini: ${trendTotal}`), trendHeader, ...trendRows, trendFooter])
+    trendWs['!cols'] = [{ wch: 10 }, ...months.map(() => ({ wch: 12 }))]
+    applyWorksheetStyles(trendWs, 5, 6 + trendRows.length, trendHeader.length, trendHeader.length)
+    const trendFooterRow = 6 + trendRows.length
+    for (let col = 0; col < trendHeader.length; col++) {
+      const address = XLSX.utils.encode_cell({ r: trendFooterRow - 1, c: col })
+      if (!trendWs[address]) continue
+      const cell = trendWs[address] as XLSX.CellObject & { s?: Record<string, unknown> }
+      cell.s = { ...(cell.s || {}), fill: { fgColor: { rgb: 'E0E7FF' } }, font: { bold: true, color: { rgb: '312E81' } } }
+    }
+    XLSXStyle.utils.book_append_sheet(wb, trendWs, 'Tren Bulanan')
+    if (trendRows.length > 0) {
+      charts.push({
+        sheetIndex: 3,
+        type: 'line',
+        title: 'Tren Bulanan per RW',
+        fromCol: 0,
+        fromRow: 8 + trendRows.length,
+        toCol: 13,
+        toRow: 26 + trendRows.length,
+        series: trendRows.map((row, index) => ({
+          name: `RW ${row[0]}`,
+          categories: buildSheetRange('Tren Bulanan', 'B', 5, 'M', 5),
+          values: buildSheetRange('Tren Bulanan', 'B', 6 + index, 'M', 6 + index),
+        })),
+      })
+    }
+
+    const recapHeader = ['RW', 'Kategori Hasil', ...exportHealthTypes.map(type => type.label)]
+    const recapRows = getExamRecapRows()
+    const recapFooter = ['Total', '', ...exportHealthTypes.map(type => recapRows.reduce((sum, row) => sum + Number(row[type.key] || 0), 0))]
+    const recapSheetRows: (string | number)[][] = [
+      ...metaRows('Rekapitulasi Hasil Pemeriksaan', `Total Klasifikasi: ${recapFooter.slice(2).reduce<number>((sum, value) => sum + Number(value), 0)}`),
+      recapHeader,
+      ...recapRows.map(row => [row.rw, row.kategori, ...exportHealthTypes.map(type => Number(row[type.key] || 0))]),
+      recapFooter,
+      [],
     ]
-    XLSX.utils.book_append_sheet(wb, ws2, 'Tren Bulanan')
+    const chartSourceRanges: { type: string; label: string; startRow: number; endRow: number }[] = []
+    exportHealthTypes.forEach(type => {
+      recapSheetRows.push([`Data Grafik ${type.label}`])
+      const sourceHeaderRow = recapSheetRows.length + 1
+      recapSheetRows.push(['RW', ...exportCategories])
+      sortedRWs.forEach(rw => {
+        recapSheetRows.push([
+          rw,
+          ...exportCategories.map(category => {
+            const found = recapRows.find(row => row.rw === rw && row.kategori === category)
+            return Number(found?.[type.key] || 0)
+          }),
+        ])
+      })
+      chartSourceRanges.push({ type: type.key, label: type.label, startRow: sourceHeaderRow + 1, endRow: sourceHeaderRow + sortedRWs.length })
+      recapSheetRows.push([])
+    })
+    const recapWs = XLSXStyle.utils.aoa_to_sheet(recapSheetRows)
+    recapWs['!cols'] = [{ wch: 8 }, { wch: 16 }, ...exportHealthTypes.map(() => ({ wch: 14 })) ]
+    applyWorksheetStyles(recapWs, 5, 6 + recapRows.length, recapHeader.length, recapHeader.length)
+    const recapFooterRow = 6 + recapRows.length
+    for (let col = 0; col < recapHeader.length; col++) {
+      const address = XLSX.utils.encode_cell({ r: recapFooterRow - 1, c: col })
+      if (!recapWs[address]) continue
+      const cell = recapWs[address] as XLSX.CellObject & { s?: Record<string, unknown> }
+      cell.s = { ...(cell.s || {}), fill: { fgColor: { rgb: 'E0E7FF' } }, font: { bold: true, color: { rgb: '312E81' } } }
+    }
+    recapRows.forEach((row, index) => setCellCategoryStyle(recapWs, `B${6 + index}`, row.kategori))
+    chartSourceRanges.forEach((range, index) => {
+      charts.push({
+        sheetIndex: 4,
+        type: 'line',
+        title: `Grafik ${range.label}`,
+        fromCol: 8,
+        fromRow: 4 + (index * 16),
+        toCol: 17,
+        toRow: 18 + (index * 16),
+        series: exportCategories.map((category, categoryIndex) => ({
+          name: category,
+          categories: buildSheetRange('Rekapitulasi Hasil Pemeriksaan', 'A', range.startRow, 'A', range.endRow),
+          values: buildSheetRange('Rekapitulasi Hasil Pemeriksaan', XLSX.utils.encode_col(categoryIndex + 1), range.startRow, XLSX.utils.encode_col(categoryIndex + 1), range.endRow),
+        })),
+      })
+    })
+    XLSXStyle.utils.book_append_sheet(wb, recapWs, 'Rekapitulasi Hasil Pemeriksaan')
 
-    // Sheet 3: Health Type Distribution
-    const ws3 = XLSX.utils.json_to_sheet(typeDistData)
-    ws3['!cols'] = [
-      { wch: 20 },
-      { wch: 10 },
-      { wch: 15 },
+    const healthHeader = ['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'Jenis Kelamin', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'Nadi']
+    const healthSheetRows = healthRows.map(row => [
+      row.nama, row.nik, row.rw, row.rt, formatDate(row.tglLahir), row.umur, row.alamat, row.jenisKelamin,
+      row.tb, row.bb, row.lp, row.td, row.gds, row.imt, row.ua, row.col, row.nadi
+    ])
+    const healthWs = XLSXStyle.utils.aoa_to_sheet([...metaRows('Data Kesehatan Warga', `Total Data: ${healthRows.length}`), healthHeader, ...healthSheetRows])
+    healthWs['!cols'] = [{ wch: 26 }, { wch: 20 }, { wch: 8 }, { wch: 8 }, { wch: 14 }, { wch: 8 }, { wch: 34 }, { wch: 16 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }]
+    applyWorksheetStyles(healthWs, 5, 5 + healthSheetRows.length, healthHeader.length, healthHeader.length)
+    const healthColumns = [
+      { column: 11, field: 'td', type: 'tensi' },
+      { column: 12, field: 'gds', type: 'guladarah' },
+      { column: 13, field: 'imt', type: 'imt' },
+      { column: 14, field: 'ua', type: 'asamurat' },
+      { column: 15, field: 'col', type: 'kolesterol' },
+      { column: 16, field: 'nadi', type: 'nadi' },
     ]
-    XLSX.utils.book_append_sheet(wb, ws3, 'Jenis Pemeriksaan')
+    healthRows.forEach((row, index) => {
+      healthColumns.forEach(({ column, field, type }) => {
+        const value = getHealthValue(row, field)
+        if (value === null) return
+        const category = getStatusLabel(getHealthStatus(type, value, String(row.jenisKelamin || '')).status)
+        setCellCategoryStyle(healthWs, `${XLSX.utils.encode_col(column)}${6 + index}`, category)
+      })
+    })
+    XLSXStyle.utils.book_append_sheet(wb, healthWs, 'Data Kesehatan Warga')
 
-    XLSX.writeFile(wb, `monitoring-kesehatan-${selectedMonth}.xlsx`)
+    saveExcelWorkbook(wb, getExportFilename('xlsx'), charts)
+    setExportDropdownOpen(false)
   }
 
   const exportToWhatsApp = () => {
@@ -1500,7 +2001,6 @@ export default function MonitoringPage() {
 
     const suffix = hasFilter ? `-${tableFilterPemeriksaan}${tableFilterKategori !== 'all' ? '-' + tableFilterKategori : ''}` : ''
     doc.save(`data-kesehatan-warga-${selectedMonth}${suffix}.pdf`)
-    setTableExportDropdown(false)
   }
 
   const exportTableToExcel = () => {
@@ -1562,7 +2062,6 @@ export default function MonitoringPage() {
 
     const suffix = hasFilter ? `-${tableFilterPemeriksaan}${tableFilterKategori !== 'all' ? '-' + tableFilterKategori : ''}` : ''
     XLSXStyle.writeFile(wb, `data-kesehatan-warga-${selectedMonth}${suffix}.xlsx`)
-    setTableExportDropdown(false)
   }
 
   const exportTableToWhatsApp = () => {
@@ -1604,7 +2103,6 @@ export default function MonitoringPage() {
     
     const encodedMessage = encodeURIComponent(message)
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
-    setTableExportDropdown(false)
   }
 
   return (
@@ -1725,34 +2223,6 @@ export default function MonitoringPage() {
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-indigo-600" />
                 <span className="font-semibold text-gray-800 text-sm">Rekapitulasi Hasil Pemeriksaan</span>
-              </div>
-              <div className="relative">
-                <button
-                  onClick={() => setHealthDistExportDropdown(!healthDistExportDropdown)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Export
-                </button>
-                {healthDistExportDropdown && (
-                  <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                    <div className="px-3 py-1.5 bg-indigo-50 border-b border-gray-100">
-                      <p className="text-xs font-semibold text-indigo-700">Pilih Format</p>
-                    </div>
-                    <button onClick={() => { exportHealthDistToPDF(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-red-50 transition-colors text-xs">
-                      <div className="w-6 h-6 bg-red-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg></div>
-                      <span className="text-gray-700">PDF</span>
-                    </button>
-                    <button onClick={() => { exportHealthDistToExcel(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-green-50 transition-colors text-xs">
-                      <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/></svg></div>
-                      <span className="text-gray-700">Excel</span>
-                    </button>
-                    <button onClick={() => { exportHealthDistToWhatsApp(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-emerald-50 transition-colors text-xs">
-                      <div className="w-6 h-6 bg-emerald-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
-                      <span className="text-gray-700">WhatsApp</span>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
             {/* Filters */}
@@ -1940,7 +2410,6 @@ export default function MonitoringPage() {
                       <span className="ml-1 text-xs font-normal text-indigo-400">(klik untuk edit)</span>
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Capaian</th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Export</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1993,48 +2462,6 @@ export default function MonitoringPage() {
                           )}
                         </td>
                         <td className={`px-3 py-2 text-center font-bold ${colorClass}`}>{percentage}%</td>
-                        <td className="px-3 py-2 text-center">
-                          <div className="relative inline-block">
-                            <button
-                              onClick={() => setAttendanceExportDropdown(attendanceExportDropdown === rw ? null : rw)}
-                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                              title="Export"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                            {attendanceExportDropdown === rw && (
-                              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-                                <button
-                                  onClick={() => { exportAttendanceToPDF(rw); setAttendanceExportDropdown(null); }}
-                                  className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl text-xs"
-                                >
-                                  <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
-                                  </svg>
-                                  <span className="text-gray-700">PDF</span>
-                                </button>
-                                <button
-                                  onClick={() => { exportAttendanceToExcel(rw); setAttendanceExportDropdown(null); }}
-                                  className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors text-xs"
-                                >
-                                  <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
-                                  </svg>
-                                  <span className="text-gray-700">Excel</span>
-                                </button>
-                                <button
-                                  onClick={() => { exportAttendanceToWhatsApp(rw); setAttendanceExportDropdown(null); }}
-                                  className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl text-xs"
-                                >
-                                  <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                                  </svg>
-                                  <span className="text-gray-700">WhatsApp</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
                       </tr>
                     )
                   })}
@@ -2068,37 +2495,6 @@ export default function MonitoringPage() {
                 <div className="flex items-center gap-2 mt-0.5">
                   <Activity className="w-4 h-4 text-indigo-600" />
                   <span className="font-semibold text-gray-800 text-sm">Data Kesehatan Warga</span>
-                </div>
-                {/* Right: export button + search (desktop only) */}
-                <div className="flex flex-col items-end gap-1.5">
-                  <div className="relative">
-                    <button
-                      onClick={() => setTableExportDropdown(!tableExportDropdown)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Export
-                    </button>
-                    {tableExportDropdown && (
-                      <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                        <div className="px-3 py-1.5 bg-indigo-50 border-b border-gray-100">
-                          <p className="text-xs font-semibold text-indigo-700">Pilih Format</p>
-                        </div>
-                        <button onClick={() => { exportTableToPDF(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-red-50 transition-colors text-xs">
-                          <div className="w-6 h-6 bg-red-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg></div>
-                          <span className="text-gray-700">PDF</span>
-                        </button>
-                        <button onClick={() => { exportTableToExcel(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-green-50 transition-colors text-xs">
-                          <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/></svg></div>
-                          <span className="text-gray-700">Excel</span>
-                        </button>
-                        <button onClick={() => { exportTableToWhatsApp(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-emerald-50 transition-colors text-xs">
-                          <div className="w-6 h-6 bg-emerald-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
-                          <span className="text-gray-700">WhatsApp</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
