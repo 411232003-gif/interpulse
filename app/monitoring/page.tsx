@@ -144,13 +144,9 @@ export default function MonitoringPage() {
         const rw = d.rw
         if (rw && data[rw]) {
           const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-          // Only count if resident still exists (check by NIK or userId)
-          const residentExists = Object.values(residentsData).some((r: any) =>
-            r.nik === d.nik || r.id === d.userId || r.id === d.residentId
-          )
           // Count unique residents per month per RW (4 types = 1 warga)
           const uniqueKey = `${d.nik}-${month}-${rw}`
-          if (residentExists && !uniqueReadings.has(uniqueKey) && data[rw][month] !== undefined) {
+          if (!uniqueReadings.has(uniqueKey) && data[rw][month] !== undefined) {
             uniqueReadings.add(uniqueKey)
             data[rw][month]++
           }
