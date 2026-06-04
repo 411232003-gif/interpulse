@@ -197,11 +197,7 @@ export default function MonitoringPage() {
         const rw = d.rw
         if (rw && data[rw]) {
           const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-          // Only count if resident still exists (check by NIK or userId)
-          const residentExists = Object.values(residentsData).some((r: any) =>
-            r.nik === d.nik || r.id === d.userId || r.id === d.residentId
-          )
-          if (residentExists && data[rw][month] !== undefined) {
+          if (data[rw][month] !== undefined) {
             data[rw][month]++
           }
         }
@@ -329,10 +325,6 @@ export default function MonitoringPage() {
           if (reading.type !== 'tensi' || !reading.nadi) return
           const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
           if (month !== selectedMonth) return
-          const residentExists = Object.values(residentsData).some((r: any) =>
-            r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
-          )
-          if (!residentExists) return
           const status = getHealthStatus('nadi', reading.nadi)
           if (status.status === 'Normal') distribution.normal++
           else if (status.status === 'Batas') distribution.batas++
@@ -350,8 +342,6 @@ export default function MonitoringPage() {
           return month === selectedMonth
         })
         if (!monthRecord?.tinggiBadan || !monthRecord?.beratBadan) return
-        const residentExists = Object.values(residentsData).some((r: any) => r.nik === nik)
-        if (!residentExists) return
         const tbM = monthRecord.tinggiBadan / 100
         const imtVal = monthRecord.beratBadan / (tbM * tbM)
         const status = getHealthStatus('imt', imtVal)
@@ -369,11 +359,6 @@ export default function MonitoringPage() {
 
         const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
         if (month !== selectedMonth) return
-
-        const residentExists = Object.values(residentsData).some((r: any) =>
-          r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
-        )
-        if (!residentExists) return
 
         let value: number
         if (healthType === 'tensi') value = reading.sistolik || reading.value || 0
@@ -402,10 +387,6 @@ export default function MonitoringPage() {
           if (reading.type !== 'tensi' || !reading.nadi) return
           const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
           if (month !== selectedMonth) return
-          const residentExists = Object.values(residentsData).some((r: any) =>
-            r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
-          )
-          if (!residentExists) return
           const status = getHealthStatus('nadi', reading.nadi)
           if (status.status === 'Normal') distribution.normal++
           else if (status.status === 'Batas') distribution.batas++
@@ -423,8 +404,6 @@ export default function MonitoringPage() {
           return month === selectedMonth
         })
         if (!monthRecord?.tinggiBadan || !monthRecord?.beratBadan) return
-        const residentExists = Object.values(residentsData).some((r: any) => r.nik === nik)
-        if (!residentExists) return
         const tbM = monthRecord.tinggiBadan / 100
         const imtVal = monthRecord.beratBadan / (tbM * tbM)
         const status = getHealthStatus('imt', imtVal)
@@ -444,11 +423,6 @@ export default function MonitoringPage() {
 
         const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
         if (month !== selectedMonth) return
-
-        const residentExists = Object.values(residentsData).some((r: any) =>
-          r.nik === reading.nik || r.id === reading.userId || r.id === reading.residentId
-        )
-        if (!residentExists) return
 
         let value: number
         if (filterHealthType === 'tensi') value = reading.sistolik || reading.value || 0
