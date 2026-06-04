@@ -280,9 +280,6 @@ export default function Profil() {
     console.log('[Profile] Saving profile data:', editedProfile)
     try {
       // Update Firestore - only save simplified fields
-      const userRef = doc(db, 'users', authProfile.uid)
-      console.log('[Profile] Updating document:', authProfile.uid)
-
       const updateData: any = {
         name: editedProfile.name,
         email: editedProfile.email,
@@ -291,8 +288,25 @@ export default function Profil() {
       }
 
       console.log('[Profile] Update data prepared:', updateData)
-      await updateDoc(userRef, updateData)
-      console.log('[Profile] Firestore update successful')
+      console.log('[Profile] User role:', authProfile.role)
+      
+      // If user is admin, save to admins collection only
+      if (authProfile.role === 'admin') {
+        const adminRef = doc(db, 'admins', authProfile.uid)
+        const adminUpdateData: any = {
+          ...updateData,
+          adminKelurahan: editedProfile.kelurahan || '',
+        }
+        console.log('[Profile] Updating admin document:', adminUpdateData)
+        await updateDoc(adminRef, adminUpdateData)
+        console.log('[Profile] Admin document updated with adminKelurahan')
+      } else {
+        // For non-admin users, update users collection
+        const userRef = doc(db, 'users', authProfile.uid)
+        console.log('[Profile] Updating user document:', updateData)
+        await updateDoc(userRef, updateData)
+        console.log('[Profile] User document update successful')
+      }
 
       setProfile({ ...editedProfile })
       setIsEditing(false)
@@ -596,7 +610,7 @@ export default function Profil() {
                     gender: 'Laki-laki',
                     rt: '', 
                     rw: '', 
-                    kelurahan: '' 
+                    kelurahan: authProfile?.kelurahan || '' 
                   })
                   setShowPassword(false)
                   setShowCreateUserModal(true)
@@ -649,8 +663,8 @@ export default function Profil() {
                       <input id="edit-phone" type="tel" value={editedProfile.phone} onChange={(e) => handleChange('phone', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                     </div>
                     <div>
-                      <label htmlFor="edit-kelurahan" className="text-sm font-medium text-gray-700 mb-1 block">Alamat Kelurahan</label>
-                      <input id="edit-kelurahan" type="text" value={editedProfile.kelurahan || ''} onChange={(e) => handleChange('kelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Isi alamat kelurahan" />
+                      <label htmlFor="edit-kelurahan" className="text-sm font-medium text-gray-700 mb-1 block">Kelurahan</label>
+                      <input id="edit-kelurahan" type="text" value={editedProfile.kelurahan || ''} onChange={(e) => handleChange('kelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" />
                     </div>
                     <div className="flex gap-3 pt-4">
                       <Button variant="outline" className="flex-1" onClick={handleCancel}>
@@ -699,7 +713,7 @@ export default function Profil() {
                     <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                       <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">📍</span></div>
                       <div className="flex-1">
-                        <p className="text-sm text-gray-500">Alamat Kelurahan</p>
+                        <p className="text-sm text-gray-500">Kelurahan</p>
                         <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
                       </div>
                     </div>
@@ -966,7 +980,7 @@ export default function Profil() {
                 </div>
               </div>
               <div className="border-t pt-3 mt-3">
-                <p className="text-sm font-medium text-gray-700 mb-3">Alamat Kelurahan</p>
+                <p className="text-sm font-medium text-gray-700 mb-3">Kelurahan</p>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">RT</label>

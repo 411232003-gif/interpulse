@@ -9,6 +9,7 @@ import { db } from '@/lib/firebase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
+import { exportMonitoring, exportMonitoringPDF } from '@/lib/export-monitoring'
 
 const months = ['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember']
 const monthLabels: Record<string, string> = {
@@ -32,6 +33,7 @@ export default function TrafikUser() {
   const [rwHealthData, setRwHealthData] = useState<Record<string, number>>({})
   const [selectedMonth, setSelectedMonth] = useState('april')
   const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   // Fetch user's health readings from Firebase (real data from admin)
   useEffect(() => {
@@ -115,154 +117,46 @@ export default function TrafikUser() {
   }
 
   // Export functions
-  const exportToPDF = () => {
-    if (!userProfile) return
+  const handleExportExcel = async () => {
+    if (!userProfile?.kelurahan) return
     
-    const doc = new jsPDF()
-    const kelurahan = userProfile.kelurahan || 'Duri Selatan'
-    
-    // Header with gradient background
-    doc.setFillColor(20, 184, 166)
-    doc.rect(0, 0, 210, 50, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Trafik Kesehatan', 105, 20, { align: 'center' })
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} - RW ${userProfile.rw}`, 105, 30, { align: 'center' })
-    doc.text(`${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 38, { align: 'center' })
-    
-    // User info
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Nama: ${userProfile.name}`, 14, 65)
-    doc.text(`NIK: ${userProfile.nik}`, 14, 73)
-    doc.text(`RW: ${userProfile.rw}`, 14, 81)
-    
-    // RW-level data
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.text(`Trafik Kesehatan RW ${userProfile.rw}`, 14, 95)
-    const rwTableData = months.map(m => [
-      monthLabels[m],
-      rwHealthData[m] || 0
-    ])
-    
-    autoTable(doc, {
-      head: [['Bulan', 'Jumlah Pemeriksaan']],
-      body: rwTableData,
-      startY: 100,
-      theme: 'grid',
-      headStyles: { fillColor: [20, 184, 166] },
-      styles: { fontSize: 10 }
-    })
-    
-    // Personal data
-    const userMonthData = healthReadings.filter(r => {
-      const month = new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-      return month === selectedMonth
-    })
-    
-    const finalY = (doc as any).lastAutoTable.finalY + 15
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Data Kesehatan Pribadi', 14, finalY)
-    
-    const personalTableData = userMonthData.map(r => [
-      new Date(r.timestamp).toLocaleDateString('id-ID'),
-      r.type || '-',
-      r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
-      r.type === 'kolesterol' ? `${r.total} mg/dL` :
-      `${r.nilai || '-'} mg/dL`
-    ])
-    
-    autoTable(doc, {
-      head: [['Tanggal', 'Jenis', 'Nilai']],
-      body: personalTableData,
-      startY: finalY + 8,
-      theme: 'grid',
-      headStyles: { fillColor: [20, 184, 166] },
-      styles: { fontSize: 10 }
-    })
-    
-    doc.save(`trafik-rw${userProfile.rw}-${userProfile.name}.pdf`)
-    setShowExportDropdown(false)
-  }
-
-  const exportToExcel = () => {
-    if (!userProfile) return
-    
-    const kelurahan = userProfile.kelurahan || 'Duri Selatan'
-    
-    const excelData = healthReadings.map(r => ({
-      Tanggal: new Date(r.timestamp).toLocaleDateString('id-ID'),
-      Jenis: r.type || '-',
-      Nilai: r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
-             r.type === 'kolesterol' ? `${r.total} mg/dL` :
-             `${r.nilai || '-'} mg/dL`,
-      Bulan: new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' })
-    }))
-    
-    const ws = XLSX.utils.json_to_sheet(excelData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Data Kesehatan Pribadi')
-    
-    // Set column widths
-    ws['!cols'] = [
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 15 }
-    ]
-    
-    XLSX.writeFile(wb, `trafik-rw${userProfile.rw}-${userProfile.name}.xlsx`)
-    setShowExportDropdown(false)
-  }
-
-  const exportToWhatsApp = () => {
-    if (!userProfile) return
-    
-    const kelurahan = userProfile.kelurahan || 'Duri Selatan'
-    
-    let message = `📊 *TRAFIK KESEHATAN*\n`
-    message += `🏥 Kelurahan ${kelurahan}\n`
-    message += `📍 RW ${userProfile.rw}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `👤 *DATA DIRI*\n`
-    message += `• Nama: ${userProfile.name}\n`
-    message += `• NIK: ${userProfile.nik}\n`
-    message += `• Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `📈 *TRAFIK RW ${userProfile.rw} BULAN INI*\n`
-    message += `• Total Pemeriksaan: ${rwHealthData[selectedMonth] || 0}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `🏥 *DATA KESEHATAN PRIBADI*\n\n`
-    
-    const userMonthData = healthReadings.filter(r => {
-      const month = new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-      return month === selectedMonth
-    })
-    
-    if (userMonthData.length === 0) {
-      message += `Belum ada data kesehatan untuk bulan ini.\n`
-    } else {
-      userMonthData.forEach(r => {
-        message += `📅 ${new Date(r.timestamp).toLocaleDateString('id-ID')}\n`
-        message += `🏥 ${r.type || '-'}\n`
-        message += `📊 ${r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
-                   r.type === 'kolesterol' ? `${r.total} mg/dL` :
-                   `${r.nilai || '-'} mg/dL`}\n\n`
-      })
+    setIsExporting(true)
+    try {
+      const now = new Date()
+      const month = now.getMonth()
+      const year = now.getFullYear()
+      
+      const success = await exportMonitoring(userProfile, month, year)
+      if (success) {
+        console.log('Excel export successful')
+      }
+    } catch (error) {
+      console.error('Error exporting Excel:', error)
+    } finally {
+      setIsExporting(false)
+      setShowExportDropdown(false)
     }
+  }
+
+  const handleExportPDF = async () => {
+    if (!userProfile?.kelurahan) return
     
-    message += `━━━━━━━━━━━━━━━━━━━━\n`
-    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
-    
-    const encodedMessage = encodeURIComponent(message)
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
-    setShowExportDropdown(false)
+    setIsExporting(true)
+    try {
+      const now = new Date()
+      const month = now.getMonth()
+      const year = now.getFullYear()
+      
+      const success = await exportMonitoringPDF(userProfile, month, year)
+      if (success) {
+        console.log('PDF export successful')
+      }
+    } catch (error) {
+      console.error('Error exporting PDF:', error)
+    } finally {
+      setIsExporting(false)
+      setShowExportDropdown(false)
+    }
   }
 
   const userMonthData = healthReadings.filter(r => {
@@ -300,16 +194,46 @@ export default function TrafikUser() {
           </div>
         </div>
 
-        {/* RW-level Overview */}
+        {/* RW-level Overview - Ringkasan */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <Users className="w-5 h-5 text-teal-600" />
-              Trafik Kesehatan RW {userProfile?.rw}
-            </h2>
-            <span className="text-sm text-gray-500">
-              {monthLabels[selectedMonth]} {new Date().getFullYear()}
-            </span>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Users className="w-5 h-5 text-teal-600" />
+                Ringkasan Kesehatan RW {userProfile?.rw}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {monthLabels[selectedMonth]} {new Date().getFullYear()}
+              </p>
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" />
+                {isExporting ? 'Mengekspor...' : 'Export'}
+              </button>
+              {showExportDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
+                  <button
+                    onClick={handleExportExcel}
+                    disabled={isExporting}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <FileText className="w-4 h-4" /> Excel (5 Sheet)
+                  </button>
+                  <button
+                    onClick={handleExportPDF}
+                    disabled={isExporting}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <FileText className="w-4 h-4" /> PDF
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -381,28 +305,6 @@ export default function TrafikUser() {
               <Heart className="w-5 h-5 text-teal-600" />
               Data Kesehatan Pribadi
             </h2>
-            <div className="relative">
-              <button
-                onClick={() => setShowExportDropdown(!showExportDropdown)}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              {showExportDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
-                  <button onClick={exportToPDF} className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> PDF
-                  </button>
-                  <button onClick={exportToExcel} className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Excel
-                  </button>
-                  <button onClick={exportToWhatsApp} className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2">
-                    <MessageCircle className="w-4 h-4" /> WhatsApp
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
 
           {userMonthData.length === 0 ? (

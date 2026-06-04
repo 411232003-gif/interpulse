@@ -359,6 +359,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
+      // Check if user is admin first
+      if (userProfile?.role === 'admin') {
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid))
+        if (adminDoc.exists()) {
+          const adminData = adminDoc.data()
+          setUserProfile({
+            uid: adminData.uid,
+            email: adminData.email,
+            nik: adminData.nik || '',
+            name: adminData.name || '',
+            phone: adminData.phone || '',
+            birthDate: '',
+            height: 0,
+            weight: 0,
+            targetWeight: 0,
+            gender: '',
+            rt: adminData.rt || '',
+            rw: adminData.rw || '',
+            kelurahan: adminData.adminKelurahan || '',
+            adminKelurahan: adminData.adminKelurahan || '',
+            role: 'admin',
+            createdAt: adminData.createdAt || new Date().toISOString()
+          })
+          return
+        }
+      }
+      
+      // Otherwise, read from users collection
       const profileDoc = await getDoc(doc(db, 'users', user.uid))
       if (profileDoc.exists()) {
         setUserProfile(profileDoc.data() as UserProfile)

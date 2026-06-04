@@ -41,3 +41,6 @@ scripts/serviceAccountKey.json
 
 # scripts dependencies
 scripts/node_modules
+
+# IDE
+.vscode/

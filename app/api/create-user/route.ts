@@ -35,7 +35,20 @@ export async function POST(request: NextRequest) {
     const { db, auth } = getFirebaseAdmin()
 
     const body = await request.json()
-    const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat } = body
+    const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat, adminId } = body
+
+    // If alamat not provided, fetch from admin profile
+    let kelurahan = alamat
+    if (!kelurahan && adminId) {
+      try {
+        const adminDoc = await db.collection('admins').doc(adminId).get()
+        if (adminDoc.exists) {
+          kelurahan = adminDoc.data()?.adminKelurahan || ''
+        }
+      } catch (err) {
+        console.error('Error fetching admin kelurahan:', err)
+      }
+    }
 
     // Check if NIK already exists in users collection
     const existingUserSnapshot = await db.collection('users').where('nik', '==', nik).get()
@@ -95,7 +108,7 @@ export async function POST(request: NextRequest) {
       rt: rt,
       birthDate: birthDate,
       gender: jenisKelamin,
-      kelurahan: alamat,
+      kelurahan: kelurahan,
       role: 'user',
       password: password,
       phone: '',
@@ -112,7 +125,7 @@ export async function POST(request: NextRequest) {
       birthDate: birthDate,
       umur: age,
       jenisKelamin: jenisKelamin,
-      alamat: alamat,
+      alamat: kelurahan,
       password: password
     })
 
