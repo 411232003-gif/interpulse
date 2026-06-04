@@ -459,83 +459,38 @@ export default function MonitoringPage() {
     const data: any[] = []
     const uniqueResidents = new Set<string>()
 
-    Object.entries(residentsData).forEach(([key, resident]: [string, any]) => {
-      // Only process entries where the key matches the document ID (to avoid duplicates)
-      // residentsData has multiple keys per resident (id, nik, uid, name), but we only want to process once
-      if (key !== resident.id) return
+    Object.entries(healthReadingsDetails).forEach(([rw, readings]: [string, any[]]) => {
+      readings.forEach((reading: any) => {
+        const nik = reading.nik
+        if (!nik || uniqueResidents.has(nik)) return
+        uniqueResidents.add(nik)
 
-      // Filter by RW
-      if (tableFilterRW !== 'all' && resident.rw !== tableFilterRW) return
+        const resident = residentsData[nik] || residentsData[reading.userId]
+        if (tableFilterRW !== 'all' && rw !== tableFilterRW) return
+        if (tableFilterRT !== 'all' && resident?.rt !== tableFilterRT) return
+        if (tableSearchTerm && !resident?.nama?.toLowerCase().includes(tableSearchTerm.toLowerCase()) && !nik.includes(tableSearchTerm)) return
 
-      // Filter by RT
-      if (tableFilterRT !== 'all' && resident.rt !== tableFilterRT) return
+        const tbbbList = tbbbData[nik] || []
+        const tbbb = tbbbList.find((t: any) => new Date(t.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase() === selectedMonth)
+        const monthReadings = readings.filter((r: any) => r.nik === nik && new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase() === selectedMonth)
+        if (monthReadings.length === 0 && !tbbb) return
 
-      // Filter by search term
-      if (tableSearchTerm) {
-        const searchLower = tableSearchTerm.toLowerCase()
-        const matchesName = resident.nama?.toLowerCase().includes(searchLower)
-        const matchesNIK = resident.nik?.includes(searchLower)
-        if (!matchesName && !matchesNIK) return
-      }
+        const tensiReading = monthReadings.find((r: any) => r.type === 'tensi')
+        const gdsReading = monthReadings.find((r: any) => r.type === 'guladarah')
+        const uaReading = monthReadings.find((r: any) => r.type === 'asamurat')
+        const colReading = monthReadings.find((r: any) => r.type === 'kolesterol')
+        let imt = '-'
+        if (tbbb?.tinggiBadan && tbbb?.beratBadan) imt = (tbbb.beratBadan / Math.pow(tbbb.tinggiBadan / 100, 2)).toFixed(1)
 
-      // Skip duplicates by document ID
-      if (uniqueResidents.has(resident.id)) return
-      uniqueResidents.add(resident.id)
-
-      // Get TB/BB data for this resident in selected month
-      const tbbbList = tbbbData[resident.nik] || []
-      const tbbb = tbbbList.find((t: any) => {
-        const month = new Date(t.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-        return month === selectedMonth
-      })
-
-      // Get health readings for this resident
-      const rwReadings = healthReadingsDetails[resident.rw] || []
-      const residentReadings = rwReadings.filter((r: any) => r.nik === resident.nik)
-
-      // Find readings for selected month
-      const monthReadings = residentReadings.filter((r: any) => {
-        const month = new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-        return month === selectedMonth
-      })
-
-      // Only include resident if they have data in the selected month (health readings OR TB/BB)
-      if (monthReadings.length === 0 && !tbbb) return
-
-      // Get values from readings
-      const tensiReading = monthReadings.find((r: any) => r.type === 'tensi')
-      const gdsReading = monthReadings.find((r: any) => r.type === 'guladarah')
-      const uaReading = monthReadings.find((r: any) => r.type === 'asamurat')
-      const colReading = monthReadings.find((r: any) => r.type === 'kolesterol')
-
-      // Calculate IMT if TB and BB are available
-      let imt = '-'
-      if (tbbb && tbbb.tinggiBadan && tbbb.beratBadan) {
-        const tbInMeters = tbbb.tinggiBadan / 100
-        imt = (tbbb.beratBadan / (tbInMeters * tbInMeters)).toFixed(1)
-      }
-
-      data.push({
-        nik: resident.nik || '-',
-        nama: resident.nama || '-',
-        rw: resident.rw || '-',
-        rt: resident.rt || '-',
-        tglLahir: resident.birthDate || '-',
-        umur: resident.umur || '-',
-        alamat: resident.alamat || '-',
-        jenisKelamin: resident.jenisKelamin || '-',
-        tb: tbbb?.tinggiBadan || '-',
-        bb: tbbb?.beratBadan || '-',
-        lp: tbbb?.lingkarPinggang || '-',
-        td: tensiReading ? `${tensiReading.sistolik}/${tensiReading.diastolik}` : '-',
-        gds: gdsReading?.nilai || '-',
-        imt: imt,
-        ua: uaReading?.nilai || '-',
-        col: colReading?.total || '-',
-        nadi: tensiReading?.nadi || '-',
+        data.push({
+          nik, nama: resident?.nama || reading.userName || '-', rw, rt: resident?.rt || '-',
+          tglLahir: resident?.birthDate || '-', umur: resident?.umur || '-', alamat: resident?.alamat || '-',
+          jenisKelamin: resident?.jenisKelamin || '-', tb: tbbb?.tinggiBadan || '-', bb: tbbb?.beratBadan || '-',
+          lp: tbbb?.lingkarPinggang || '-', td: tensiReading ? `${tensiReading.sistolik}/${tensiReading.diastolik}` : '-',
+          gds: gdsReading?.nilai || '-', imt, ua: uaReading?.nilai || '-', col: colReading?.total || '-', nadi: tensiReading?.nadi || '-'
+        })
       })
     })
-
     return data
   }, [selectedMonth, residentsData, tbbbData, healthReadingsDetails, tableFilterRW, tableFilterRT, tableSearchTerm])
 
