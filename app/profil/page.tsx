@@ -585,44 +585,15 @@ export default function Profil() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Profil Saya</h1>
-          <p className="text-gray-600">Kelola informasi dan pengaturan akun Anda</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {isAdmin ? 'admin' : 'Profil Saya'}
+          </h1>
+          <p className="text-gray-600">
+            {isAdmin
+              ? 'kelola informasi dan pengaturan akun admin'
+              : 'Kelola informasi dan pengaturan akun Anda'}
+          </p>
         </div>
-
-        {/* Admin: Buat Akun User */}
-        {isAdmin && (
-          <div className="mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold">Manajemen Akun</h2>
-                <p className="text-blue-100 text-sm mt-0.5">Buat akun baru untuk warga</p>
-              </div>
-              <button
-                onClick={() => {
-                  setCreateUserForm({ 
-                    nik: '', 
-                    password: '', 
-                    name: '', 
-                    phone: '',
-                    birthDate: '',
-                    height: 170,
-                    weight: 65,
-                    gender: 'Laki-laki',
-                    rt: '', 
-                    rw: '', 
-                    kelurahan: authProfile?.kelurahan || '' 
-                  })
-                  setShowPassword(false)
-                  setShowCreateUserModal(true)
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Buat Akun Warga
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
@@ -630,7 +601,7 @@ export default function Profil() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Informasi Pribadi</CardTitle>
+                  <CardTitle>{isAdmin ? 'admin kelurahan' : 'Informasi Pribadi'}</CardTitle>
                   <div className="flex gap-2">
                     {isEditing ? (
                       <Button variant="outline" size="sm" onClick={handleCancel}>
