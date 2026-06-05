@@ -9,7 +9,6 @@ import { db } from '@/lib/firebase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
-import { exportMonitoring, exportMonitoringPDF } from '@/lib/export-monitoring'
 
 const months = ['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember']
 const monthLabels: Record<string, string> = {
@@ -116,20 +115,34 @@ export default function TrafikUser() {
     )
   }
 
-  // Export functions
-  const handleExportExcel = async () => {
-    if (!userProfile?.kelurahan) return
-    
+  const userMonthData = healthReadings.filter(r => {
+    const month = new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+    return month === selectedMonth
+  })
+
+  const monthNamesId = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+  const exportFileBase = `trafik-kesehatan-${monthNamesId[months.indexOf(selectedMonth)]}-${new Date().getFullYear()}`
+
+  const formatReadingValue = (reading: HealthReading) => {
+    if (reading.type === 'tensi') return `${reading.sistolik}/${reading.diastolik} mmHg`
+    if (reading.type === 'kolesterol') return `${reading.total} mg/dL`
+    return `${reading.nilai || '-'} mg/dL`
+  }
+
+  const handleExportExcel = () => {
+    if (!userProfile) return
     setIsExporting(true)
     try {
-      const now = new Date()
-      const month = now.getMonth()
-      const year = now.getFullYear()
-      
-      const success = await exportMonitoring(userProfile, month, year)
-      if (success) {
-        console.log('Excel export successful')
-      }
+      const rows = userMonthData.map(r => ({
+        Tanggal: new Date(r.timestamp).toLocaleDateString('id-ID'),
+        Pemeriksaan: r.type,
+        Nilai: formatReadingValue(r),
+        RW: r.rw || userProfile.rw,
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Data Kesehatan')
+      XLSX.writeFile(wb, `${exportFileBase}.xlsx`)
     } catch (error) {
       console.error('Error exporting Excel:', error)
     } finally {
@@ -138,19 +151,26 @@ export default function TrafikUser() {
     }
   }
 
-  const handleExportPDF = async () => {
-    if (!userProfile?.kelurahan) return
-    
+  const handleExportPDF = () => {
+    if (!userProfile) return
     setIsExporting(true)
     try {
-      const now = new Date()
-      const month = now.getMonth()
-      const year = now.getFullYear()
-      
-      const success = await exportMonitoringPDF(userProfile, month, year)
-      if (success) {
-        console.log('PDF export successful')
-      }
+      const doc = new jsPDF()
+      doc.setFontSize(14)
+      doc.text('Laporan Trafik Kesehatan Pribadi', 14, 18)
+      doc.setFontSize(10)
+      doc.text(`${userProfile.name || '-'} | RW ${userProfile.rw} | ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 14, 26)
+      autoTable(doc, {
+        startY: 32,
+        head: [['Tanggal', 'Pemeriksaan', 'Nilai', 'RW']],
+        body: userMonthData.map(r => [
+          new Date(r.timestamp).toLocaleDateString('id-ID'),
+          r.type,
+          formatReadingValue(r),
+          r.rw || userProfile.rw,
+        ]),
+      })
+      doc.save(`${exportFileBase}.pdf`)
     } catch (error) {
       console.error('Error exporting PDF:', error)
     } finally {
@@ -158,11 +178,6 @@ export default function TrafikUser() {
       setShowExportDropdown(false)
     }
   }
-
-  const userMonthData = healthReadings.filter(r => {
-    const month = new Date(r.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-    return month === selectedMonth
-  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 p-4">
@@ -222,7 +237,7 @@ export default function TrafikUser() {
                     disabled={isExporting}
                     className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
                   >
-                    <FileText className="w-4 h-4" /> Excel (5 Sheet)
+                    <FileText className="w-4 h-4" /> Excel
                   </button>
                   <button
                     onClick={handleExportPDF}

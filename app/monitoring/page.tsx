@@ -7,10 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
-const XLSXStyle = require('xlsx-js-style')
+import { exportMonitoringExcel, exportMonitoringPDF, type MonitoringExportContext, type HealthStatus } from '@/lib/export-monitoring'
 
 const rwTargets: Record<string, number> = {
   '01': 32, '02': 65, '03': 60, '04': 60, '05': 70, '06': 33, '07': 0, '08': 0, '09': 0, '10': 0
@@ -22,19 +19,34 @@ const monthLabels: Record<string, string> = {
   juli:'Jul', agustus:'Agu', september:'Sep', oktober:'Okt', november:'Nov', desember:'Des'
 }
 
+const calculateAge = (birthDate: string): number => {
+  if (!birthDate) return 0
+  const birth = new Date(birthDate)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const monthDiff = today.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--
+  return age
+}
+
+const normalizeGender = (gender?: string): string => {
+  if (!gender) return '-'
+  if (gender === 'P' || gender === 'Perempuan') return 'P'
+  if (gender === 'L' || gender === 'Laki-laki') return 'L'
+  return gender
+}
+
 export default function MonitoringPage() {
   const router = useRouter()
   const { isAdmin, userProfile } = useAuth()
   const [healthReadings, setHealthReadings] = useState<Record<string, Record<string, number>>>({})
   const [attendanceData, setAttendanceData] = useState<Record<string, Record<string, number>>>({})
+  const [attendanceByNik, setAttendanceByNik] = useState<Record<string, any>>({})
   const [healthReadingsDetails, setHealthReadingsDetails] = useState<Record<string, any[]>>({})
   const [residentsData, setResidentsData] = useState<Record<string, any>>({})
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('id-ID', { month: 'long' }).toLowerCase())
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
-  const [rwExportDropdown, setRwExportDropdown] = useState<string | null>(null)
-  const [attendanceExportDropdown, setAttendanceExportDropdown] = useState<string | null>(null)
-  const [tableExportDropdown, setTableExportDropdown] = useState(false)
-  const [healthDistExportDropdown, setHealthDistExportDropdown] = useState(false)
+  const [exporting, setExporting] = useState(false)
   
   // Editable targets per RW
   const [customTargets, setCustomTargets] = useState<Record<string, number>>({...rwTargets})
@@ -204,51 +216,87 @@ export default function MonitoringPage() {
       })
 
       setAttendanceData(data)
+
+      const byNik: Record<string, any> = {}
+      snapshot.docs.forEach(docSnap => {
+        const d = docSnap.data()
+        if (!d.nik) return
+        if (!byNik[d.nik] || new Date(d.timestamp) > new Date(byNik[d.nik].timestamp)) {
+          byNik[d.nik] = d
+        }
+      })
+      setAttendanceByNik(byNik)
     })
     return () => unsubscribe()
   }, [residentsData])
 
-  // Fetch residents data for names and NIK
+  // Fetch residents + users data (merged, same as halaman Absensi)
   useEffect(() => {
     const residentsRef = collection(db, 'residents')
     const usersRef = collection(db, 'users')
 
-    // First fetch users to get admin UIDs
     const unsubscribeUsers = onSnapshot(usersRef, (usersSnapshot) => {
       const adminUIDs = new Set<string>()
-      usersSnapshot.docs.forEach(doc => {
-        const user = doc.data()
+      usersSnapshot.docs.forEach(docSnap => {
+        const user = docSnap.data()
         if (user.role === 'admin') {
-          adminUIDs.add(doc.id)
+          adminUIDs.add(docSnap.id)
           if (user.nik) adminUIDs.add(user.nik)
         }
       })
 
-      // Then fetch residents and filter out admin users
       const unsubscribeResidents = onSnapshot(residentsRef, (snapshot) => {
         const data: Record<string, any> = {}
-        const nameMap: Record<string, any> = {} // For name-based matching
-        snapshot.docs.forEach(doc => {
-          const d = doc.data()
+        const nameMap: Record<string, any> = {}
 
-          // Skip if this resident is an admin
-          if (adminUIDs.has(doc.id) || (d.nik && adminUIDs.has(d.nik)) || (d.uid && adminUIDs.has(d.uid))) {
-            return
+        const storeResident = (entry: any) => {
+          if (entry.id) data[entry.id] = entry
+          if (entry.nik) data[entry.nik] = entry
+          if (entry.uid) data[entry.uid] = entry
+          if (entry.nama) nameMap[entry.nama.toLowerCase()] = entry
+        }
+
+        snapshot.docs.forEach(docSnap => {
+          const d = docSnap.data()
+          if (adminUIDs.has(docSnap.id) || (d.nik && adminUIDs.has(d.nik)) || (d.uid && adminUIDs.has(d.uid))) return
+          storeResident({ ...d, id: docSnap.id })
+        })
+
+        usersSnapshot.docs.forEach(userDoc => {
+          const user = userDoc.data()
+          if (user.role === 'admin' || !user.nik) return
+
+          const userEntry = {
+            id: userDoc.id,
+            uid: userDoc.id,
+            nama: user.name || '',
+            nik: user.nik,
+            rw: user.rw || '',
+            rt: user.rt || '',
+            birthDate: user.birthDate || '',
+            umur: user.birthDate ? calculateAge(user.birthDate) : 0,
+            jenisKelamin: normalizeGender(user.gender),
+            alamat: user.kelurahan || user.alamat || '',
           }
 
-          // Use document ID (which should be Firebase Auth UID), NIK, and uid field as keys
-          data[doc.id] = { ...d, id: doc.id }
-          if (d.nik) {
-            data[d.nik] = { ...d, id: doc.id }
-          }
-          if (d.uid) {
-            data[d.uid] = { ...d, id: doc.id }
-          }
-          // Also store by name for fallback matching
-          if (d.nama) {
-            nameMap[d.nama.toLowerCase()] = { ...d, id: doc.id }
+          const existing = data[user.nik] || data[userDoc.id]
+          if (existing) {
+            const merged = {
+              ...existing,
+              nama: existing.nama || userEntry.nama,
+              rw: existing.rw || userEntry.rw,
+              rt: existing.rt || userEntry.rt,
+              birthDate: existing.birthDate || existing.tglLahir || userEntry.birthDate,
+              umur: existing.umur || userEntry.umur,
+              jenisKelamin: existing.jenisKelamin ? normalizeGender(existing.jenisKelamin) : userEntry.jenisKelamin,
+              alamat: existing.alamat || userEntry.alamat,
+            }
+            storeResident(merged)
+          } else {
+            storeResident(userEntry)
           }
         })
+
         setResidentsData({ ...data, ...nameMap })
       })
 
@@ -279,7 +327,7 @@ export default function MonitoringPage() {
   }, [])
 
   // Health status calculation functions
-  const getHealthStatus = (type: string, value: number, gender?: string) => {
+  const getHealthStatus = (type: string, value: number, gender?: string): { status: HealthStatus; color: string; textColor: string } => {
     if (type === 'kolesterol') {
       if (value < 200) return { status: 'Normal', color: 'bg-green-500', textColor: 'text-green-700' }
       return { status: 'Tinggi', color: 'bg-red-500', textColor: 'text-red-700' }
@@ -465,10 +513,15 @@ export default function MonitoringPage() {
         if (!nik || uniqueResidents.has(nik)) return
         uniqueResidents.add(nik)
 
-        const resident = residentsData[nik] || residentsData[reading.userId]
+        const resident = residentsData[nik] || residentsData[reading.userId] ||
+          (reading.userName ? residentsData[reading.userName.toLowerCase()] : undefined)
+        const attendance = attendanceByNik[nik]
+
         if (tableFilterRW !== 'all' && rw !== tableFilterRW) return
-        if (tableFilterRT !== 'all' && resident?.rt !== tableFilterRT) return
-        if (tableSearchTerm && !resident?.nama?.toLowerCase().includes(tableSearchTerm.toLowerCase()) && !nik.includes(tableSearchTerm)) return
+        const rtValue = resident?.rt || reading.rt || attendance?.rt || '-'
+        if (tableFilterRT !== 'all' && rtValue !== tableFilterRT) return
+        const namaValue = resident?.nama || reading.userName || attendance?.nama || '-'
+        if (tableSearchTerm && !namaValue.toLowerCase().includes(tableSearchTerm.toLowerCase()) && !nik.includes(tableSearchTerm)) return
 
         const tbbbList = tbbbData[nik] || []
         const tbbb = tbbbList.find((t: any) => new Date(t.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase() === selectedMonth)
@@ -482,17 +535,32 @@ export default function MonitoringPage() {
         let imt = '-'
         if (tbbb?.tinggiBadan && tbbb?.beratBadan) imt = (tbbb.beratBadan / Math.pow(tbbb.tinggiBadan / 100, 2)).toFixed(1)
 
+        const birthDate = resident?.birthDate || resident?.tglLahir || ''
+        const umur = resident?.umur || attendance?.umur || (birthDate ? calculateAge(birthDate) : '-')
+
         data.push({
-          nik, nama: resident?.nama || reading.userName || '-', rw, rt: resident?.rt || '-',
-          tglLahir: resident?.birthDate || '-', umur: resident?.umur || '-', alamat: resident?.alamat || '-',
-          jenisKelamin: resident?.jenisKelamin || '-', tb: tbbb?.tinggiBadan || '-', bb: tbbb?.beratBadan || '-',
-          lp: tbbb?.lingkarPinggang || '-', td: tensiReading ? `${tensiReading.sistolik}/${tensiReading.diastolik}` : '-',
-          gds: gdsReading?.nilai || '-', imt, ua: uaReading?.nilai || '-', col: colReading?.total || '-', nadi: tensiReading?.nadi || '-'
+          nik,
+          nama: namaValue,
+          rw,
+          rt: rtValue,
+          tglLahir: birthDate || '-',
+          umur: umur || '-',
+          alamat: resident?.alamat || attendance?.alamat || '-',
+          jenisKelamin: normalizeGender(resident?.jenisKelamin || resident?.gender),
+          tb: tbbb?.tinggiBadan || '-',
+          bb: tbbb?.beratBadan || '-',
+          lp: tbbb?.lingkarPinggang || '-',
+          td: tensiReading ? `${tensiReading.sistolik}/${tensiReading.diastolik}` : '-',
+          gds: gdsReading?.nilai || '-',
+          imt,
+          ua: uaReading?.nilai || '-',
+          col: colReading?.total || '-',
+          nadi: tensiReading?.nadi || '-'
         })
       })
     })
     return data
-  }, [selectedMonth, residentsData, tbbbData, healthReadingsDetails, tableFilterRW, tableFilterRT, tableSearchTerm])
+  }, [selectedMonth, residentsData, attendanceByNik, tbbbData, healthReadingsDetails, tableFilterRW, tableFilterRT, tableSearchTerm])
 
   // Map pemeriksaan field to getHealthStatus type
   const fieldToHealthType: Record<string, string> = {
@@ -652,884 +720,37 @@ export default function MonitoringPage() {
   const attendancePercentage = totalTarget > 0 ? ((totalAttendance / totalTarget) * 100).toFixed(1) : '0'
   const healthPercentage = totalTarget > 0 ? ((totalReadings / totalTarget) * 100).toFixed(1) : '0'
 
+  const buildExportContext = (): MonitoringExportContext => ({
+    kelurahan: userProfile?.kelurahan || 'Duri Selatan',
+    selectedMonth,
+    selectedMonthLabel: monthLabels[selectedMonth],
+    year: new Date().getFullYear(),
+    months,
+    monthLabels,
+    rwList: Object.keys(customTargets),
+    customTargets,
+    healthReadings,
+    healthReadingsDetails,
+    attendanceData,
+    residentsData,
+    tableData,
+    tbbbData,
+    getHealthStatus,
+  })
+
   const exportToPDF = () => {
-    const doc = new jsPDF()
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-
-    // Header
-    doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, 40, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Monitoring Kesehatan', 105, 20, { align: 'center' })
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
-
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(10)
-    doc.text(`Total Warga Diperiksa: ${totalReadings}`, 14, 50)
-
-    // Health Type Distribution
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Distribusi Jenis Pemeriksaan', 14, 60)
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    
-    const typeDistData = Object.entries(healthTypeDistribution).map(([type, count]) => {
-      const labels: Record<string, string> = {
-        tensi: 'Tekanan Darah',
-        kolesterol: 'Kolesterol',
-        asamurat: 'Asam Urat',
-        guladarah: 'Gula Darah'
-      }
-      return [labels[type] || type, count]
-    })
-
-    autoTable(doc, {
-      startY: 65,
-      head: [['Jenis Pemeriksaan', 'Jumlah']],
-      body: typeDistData,
-      styles: {
-        fontSize: 10,
-        cellPadding: 4,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
-      },
-    })
-
-    // Per-RW Data
-    const finalY = (doc as any).lastAutoTable.finalY + 10
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Pemeriksaan per RW', 14, finalY)
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-
-    const tableData = Object.entries(customTargets)
-      .sort(([a], [b]) => parseInt(a) - parseInt(b))
-      .map(([rw, target]) => {
-        const readings = healthReadings[rw] || {}
-        const count = readings[selectedMonth] || 0
-        const percentage = target > 0 ? ((count / target) * 100).toFixed(1) : '0'
-        return [
-          `RW ${rw}`,
-          count,
-          target,
-          `${percentage}%`,
-        ]
-      })
-
-    autoTable(doc, {
-      startY: finalY + 5,
-      head: [['RW', 'Jumlah Warga Diperiksa', 'Target', 'Persentase']],
-      body: tableData,
-      styles: {
-        fontSize: 10,
-        cellPadding: 4,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
-      },
-    })
-
-    // Monthly Trend Data
-    const finalY2 = (doc as any).lastAutoTable.finalY + 10
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Trafik Pemeriksaan Bulanan', 14, finalY2)
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-
-    const monthlyData = months.map(m => {
-      const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
-      return [monthLabels[m], total]
-    })
-
-    autoTable(doc, {
-      startY: finalY2 + 5,
-      head: [['Bulan', 'Total Warga Diperiksa']],
-      body: monthlyData,
-      styles: {
-        fontSize: 10,
-        cellPadding: 4,
-      },
-      headStyles: {
-        fillColor: [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [238, 242, 255],
-      },
-    })
-
-    doc.save(`monitoring-kesehatan-${selectedMonth}.pdf`)
+    exportMonitoringPDF(buildExportContext())
+    setExportDropdownOpen(false)
   }
 
-  const exportToExcel = () => {
-    // Sheet 1: Per-RW Data for Selected Month
-    const rwData = Object.entries(customTargets).map(([rw, target]) => {
-      const readings = healthReadings[rw] || {}
-      const count = readings[selectedMonth] || 0
-      const percentage = target > 0 ? ((count / target) * 100).toFixed(2) : '0'
-      return {
-        'RW': rw,
-        'Jumlah Warga Diperiksa': count,
-        'Target': target,
-        'Persentase (%)': parseFloat(percentage),
-        'Status': count >= target ? 'Tercapai' : 'Belum Tercapai'
-      }
-    })
-
-    // Sheet 2: Monthly Trend Data
-    const monthlyData = months.map(m => {
-      const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
-      const totalCustom = Object.values(customTargets).reduce((s, t) => s + t, 0)
-      const percentage = totalCustom > 0 ? ((total / totalCustom) * 100).toFixed(2) : '0'
-      return {
-        'Bulan': monthLabels[m],
-        'Total Warga Diperiksa': total,
-        'Total Target': totalCustom,
-        'Persentase (%)': parseFloat(percentage)
-      }
-    })
-
-    // Sheet 3: Health Type Distribution
-    const typeDistData = Object.entries(healthTypeDistribution).map(([type, count]) => {
-      const labels: Record<string, string> = {
-        tensi: 'Tekanan Darah',
-        kolesterol: 'Kolesterol',
-        asamurat: 'Asam Urat',
-        guladarah: 'Gula Darah'
-      }
-      const percentage = totalReadings > 0 ? ((count / totalReadings) * 100).toFixed(2) : '0'
-      return {
-        'Jenis Pemeriksaan': labels[type] || type,
-        'Jumlah': count,
-        'Persentase (%)': parseFloat(percentage)
-      }
-    })
-
-    // Create workbook with multiple sheets
-    const wb = XLSX.utils.book_new()
-
-    // Sheet 1: Per-RW
-    const ws1 = XLSX.utils.json_to_sheet(rwData)
-    ws1['!cols'] = [
-      { wch: 10 },
-      { wch: 18 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 15 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws1, 'Per RW')
-
-    // Sheet 2: Monthly Trend
-    const ws2 = XLSX.utils.json_to_sheet(monthlyData)
-    ws2['!cols'] = [
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 15 },
-      { wch: 15 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws2, 'Tren Bulanan')
-
-    // Sheet 3: Health Type Distribution
-    const ws3 = XLSX.utils.json_to_sheet(typeDistData)
-    ws3['!cols'] = [
-      { wch: 20 },
-      { wch: 10 },
-      { wch: 15 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws3, 'Jenis Pemeriksaan')
-
-    XLSX.writeFile(wb, `monitoring-kesehatan-${selectedMonth}.xlsx`)
-  }
-
-  const exportToWhatsApp = () => {
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    let message = `📊 *MONITORING KESEHATAN*\n`
-    message += `🏥 Kelurahan ${kelurahan}\n`
-    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `📈 *RINGKASAN DATA*\n`
-    message += `• Total Warga Diperiksa: ${totalReadings}\n\n`
-    
-    // Health Type Distribution
-    message += `📋 *DISTRIBUSI JENIS PEMERIKSAAN*\n\n`
-    const typeLabels: Record<string, string> = {
-      tensi: 'Tekanan Darah',
-      kolesterol: 'Kolesterol',
-      asamurat: 'Asam Urat',
-      guladarah: 'Gula Darah'
+  const exportToExcel = async () => {
+    setExporting(true)
+    try {
+      await exportMonitoringExcel(buildExportContext())
+    } finally {
+      setExporting(false)
+      setExportDropdownOpen(false)
     }
-    Object.entries(healthTypeDistribution).forEach(([type, count]) => {
-      const percentage = totalReadings > 0 ? ((count / totalReadings) * 100).toFixed(1) : '0'
-      message += `• ${typeLabels[type] || type}: ${count} (${percentage}%)\n`
-    })
-    message += `\n`
-    
-    // Per-RW Data with Targets
-    message += `📋 *DATA PER RW*\n\n`
-    Object.entries(customTargets).sort(([a], [b]) => parseInt(a) - parseInt(b)).forEach(([rw, target]) => {
-      const readings = healthReadings[rw] || {}
-      const count = readings[selectedMonth] || 0
-      const percentage = target > 0 ? ((count / target) * 100).toFixed(1) : '0'
-      const status = count >= target ? '✅ Tercapai' : '❌ Belum'
-      message += `RW ${rw}: ${count}/${target} (${percentage}%) ${status}\n`
-    })
-    message += `\n`
-    
-    // Monthly Trend Summary
-    message += `📈 *TREN BULANAN TAHUN INI*\n\n`
-    months.forEach(m => {
-      const total = Object.entries(healthReadings).reduce((s, [, d]) => s + (d[m] || 0), 0)
-      const icon = m === selectedMonth ? '👉' : '  '
-      message += `${icon} ${monthLabels[m]}: ${total} pemeriksaan\n`
-    })
-    
-    // Health Status Distribution
-    const distWA = getHealthStatusDistribution()
-    const distWATotal = distWA.rendah + distWA.normal + distWA.batas + distWA.tinggi
-    const typeLabel = filterHealthType === 'kolesterol' ? 'Kolesterol' : filterHealthType === 'tensi' ? 'Tensi' : filterHealthType === 'guladarah' ? 'Gula Darah' : 'Asam Urat'
-    message += `📊 *HASIL PEMERIKSAAN (${typeLabel})*\n\n`
-    message += `• Rendah: ${distWA.rendah} (${distWATotal > 0 ? ((distWA.rendah / distWATotal) * 100).toFixed(1) : 0}%)\n`
-    message += `• Normal: ${distWA.normal} (${distWATotal > 0 ? ((distWA.normal / distWATotal) * 100).toFixed(1) : 0}%)\n`
-    message += `• Batas Tinggi: ${distWA.batas} (${distWATotal > 0 ? ((distWA.batas / distWATotal) * 100).toFixed(1) : 0}%)\n`
-    message += `• Tinggi: ${distWA.tinggi} (${distWATotal > 0 ? ((distWA.tinggi / distWATotal) * 100).toFixed(1) : 0}%)\n`
-    message += `• Total Warga: ${distWATotal}\n`
-
-    message += `\n━━━━━━━━━━━━━━━━━━━━\n`
-    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
-
-    const encodedMessage = encodeURIComponent(message)
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
-  }
-
-  // Standalone export functions for Rekapitulasi Hasil Pemeriksaan
-  const exportHealthDistToPDF = () => {
-    const doc = new jsPDF()
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const allTypes = [
-      { key: 'tensi', label: 'Tekanan Darah (TD)' },
-      { key: 'guladarah', label: 'Gula Darah (GDS)' },
-      { key: 'imt', label: 'IMT' },
-      { key: 'asamurat', label: 'Asam Urat (UA)' },
-      { key: 'kolesterol', label: 'Kolesterol (COL)' },
-      { key: 'nadi', label: 'Nadi' },
-    ]
-
-    doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, 40, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Rekapitulasi Hasil Pemeriksaan', 105, 18, { align: 'center' })
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
-
-    let startY = 48
-    allTypes.forEach(({ key, label }, index) => {
-      const dist = getDistributionForType(key)
-      const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
-
-      doc.setTextColor(0, 0, 0)
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text(label, 14, startY)
-
-      autoTable(doc, {
-        startY: startY + 5,
-        head: [['Kategori Hasil', 'Jumlah Warga', 'Persentase']],
-        body: [
-          ['Rendah', dist.rendah, distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(2) + '%' : '0%'],
-          ['Normal', dist.normal, distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(2) + '%' : '0%'],
-          ['Batas Tinggi', dist.batas, distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(2) + '%' : '0%'],
-          ['Tinggi', dist.tinggi, distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(2) + '%' : '0%'],
-          ['Total Warga', distTotal, '100%'],
-        ],
-        styles: { fontSize: 10, cellPadding: 3 },
-        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [238, 242, 255] },
-      })
-
-      startY = (doc as any).lastAutoTable.finalY + 12
-      if (index < allTypes.length - 1 && startY > 220) {
-        doc.addPage()
-        startY = 15
-      }
-    })
-
-    doc.save(`rekapitulasi-hasil-pemeriksaan-${selectedMonth}.pdf`)
-  }
-
-  const exportHealthDistToExcel = () => {
-    const allTypes = [
-      { key: 'tensi', label: 'Tekanan Darah (TD)' },
-      { key: 'guladarah', label: 'Gula Darah (GDS)' },
-      { key: 'imt', label: 'IMT' },
-      { key: 'asamurat', label: 'Asam Urat (UA)' },
-      { key: 'kolesterol', label: 'Kolesterol (COL)' },
-      { key: 'nadi', label: 'Nadi' },
-    ]
-    const wb = XLSXStyle.utils.book_new()
-
-    allTypes.forEach(({ key, label }) => {
-      const dist = getDistributionForType(key)
-      const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
-      const data = [
-        { 'Kategori': 'Rendah', 'Jumlah Warga': dist.rendah, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.rendah / distTotal) * 100).toFixed(2)) : 0 },
-        { 'Kategori': 'Normal', 'Jumlah Warga': dist.normal, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.normal / distTotal) * 100).toFixed(2)) : 0 },
-        { 'Kategori': 'Batas Tinggi', 'Jumlah Warga': dist.batas, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.batas / distTotal) * 100).toFixed(2)) : 0 },
-        { 'Kategori': 'Tinggi', 'Jumlah Warga': dist.tinggi, 'Persentase (%)': distTotal > 0 ? parseFloat(((dist.tinggi / distTotal) * 100).toFixed(2)) : 0 },
-      ]
-      const ws = XLSXStyle.utils.json_to_sheet(data)
-      ws['!cols'] = [{ wch: 15 }, { wch: 14 }, { wch: 14 }]
-      XLSXStyle.utils.book_append_sheet(wb, ws, label)
-    })
-
-    XLSXStyle.writeFile(wb, `rekapitulasi-hasil-pemeriksaan-${selectedMonth}.xlsx`)
-  }
-
-  const exportHealthDistToWhatsApp = () => {
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const allTypes = [
-      { key: 'tensi', label: 'Tekanan Darah' },
-      { key: 'kolesterol', label: 'Kolesterol' },
-      { key: 'guladarah', label: 'Gula Darah' },
-      { key: 'asamurat', label: 'Asam Urat' },
-    ]
-
-    let message = `📊 *REKAPITULASI HASIL PEMERIKSAAN*\n`
-    message += `🏥 Kelurahan ${kelurahan}\n`
-    message += `� ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-
-    allTypes.forEach(({ key, label }) => {
-      const dist = getDistributionForType(key)
-      const distTotal = dist.rendah + dist.normal + dist.batas + dist.tinggi
-      message += `💊 *${label}*\n`
-      message += `• Rendah: ${dist.rendah} (${distTotal > 0 ? ((dist.rendah / distTotal) * 100).toFixed(1) : 0}%)\n`
-      message += `• Normal: ${dist.normal} (${distTotal > 0 ? ((dist.normal / distTotal) * 100).toFixed(1) : 0}%)\n`
-      message += `• Batas Tinggi: ${dist.batas} (${distTotal > 0 ? ((dist.batas / distTotal) * 100).toFixed(1) : 0}%)\n`
-      message += `• Tinggi: ${dist.tinggi} (${distTotal > 0 ? ((dist.tinggi / distTotal) * 100).toFixed(1) : 0}%)\n`
-      message += `• Total Warga: ${distTotal}\n\n`
-    })
-
-    message += `━━━━━━━━━━━━━━━━━━━━\n`
-    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
-
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank')
-  }
-
-  // Per-RW export functions for attendance
-  const exportAttendanceToPDF = (rw: string) => {
-    const doc = new jsPDF()
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const filteredTableData = tableData.filter(row => row.rw === rw)
-
-    // Header
-    doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, 50, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Data Kesehatan Warga', 105, 20, { align: 'center' })
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} - RW ${rw} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 30, { align: 'center' })
-
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(10)
-    doc.text(`Total Data: ${filteredTableData.length}`, 14, 60)
-
-    // Table data
-    const pdfData = filteredTableData.map(row => [
-      row.nama,
-      row.nik,
-      row.rw,
-      row.rt,
-      row.tglLahir,
-      row.umur,
-      row.alamat,
-      row.jenisKelamin,
-      row.tb,
-      row.bb,
-      row.lp,
-      row.td,
-      row.gds,
-      row.imt,
-      row.ua,
-      row.col,
-      row.nadi
-    ])
-
-    const colTypePDF: Record<number, string> = { 11: 'tensi', 12: 'guladarah', 13: 'imt', 14: 'asamurat', 15: 'kolesterol', 16: 'nadi' }
-    const statusBgPDF: Record<string, [number,number,number]> = { Rendah: [219,234,254], Normal: [220,252,231], Batas: [254,249,195], Tinggi: [254,226,226] }
-    const statusTxtPDF: Record<string, [number,number,number]> = { Rendah: [29,78,216], Normal: [21,128,61], Batas: [161,98,7], Tinggi: [185,28,28] }
-
-    autoTable(doc, {
-      startY: 65,
-      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
-      body: pdfData,
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [238, 242, 255] },
-      didParseCell: (data: any) => {
-        if (data.section !== 'body') return
-        const type = colTypePDF[data.column.index]
-        if (!type) return
-        const val = String(data.cell.raw ?? '')
-        if (!val || val === '-') return
-        const numVal = data.column.index === 11 ? parseInt(val.split('/')[0]) : parseFloat(val)
-        if (isNaN(numVal)) return
-        const rowGender = filteredTableData[data.row.index]?.jenisKelamin
-        const { status } = getHealthStatus(type, numVal, rowGender)
-        if (statusBgPDF[status]) {
-          data.cell.styles.fillColor = statusBgPDF[status]
-          data.cell.styles.textColor = statusTxtPDF[status]
-          data.cell.styles.fontStyle = 'bold'
-        }
-      },
-    })
-
-    doc.save(`data-kesehatan-warga-rw-${rw}-${selectedMonth}.pdf`)
-  }
-
-  const exportAttendanceToExcel = (rw: string) => {
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const filteredTableData = tableData.filter(row => row.rw === rw)
-
-    const metaRows: (string | number)[][] = [
-      [`DATA KESEHATAN WARGA - RW ${rw}`],
-      [`Kelurahan: ${kelurahan}`, '', `Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`],
-      [`Total Data: ${filteredTableData.length} warga`],
-      []
-    ]
-
-    const header = ['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']
-    const dataRows = filteredTableData.map((row: any) => [
-      row.nama, row.nik, row.tglLahir, row.umur, row.alamat,
-      row.jenisKelamin, row.tb, row.bb, row.lp,
-      row.td, row.gds, row.imt, row.ua, row.col, row.nadi
-    ])
-
-    const ws = XLSXStyle.utils.aoa_to_sheet([...metaRows, header, ...dataRows])
-    ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 6 }, { wch: 30 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }]
-
-    const xlsxHealthCols = [
-      { colIdx: 9, field: 'td', type: 'tensi' },
-      { colIdx: 10, field: 'gds', type: 'guladarah' },
-      { colIdx: 11, field: 'imt', type: 'imt' },
-      { colIdx: 12, field: 'ua', type: 'asamurat' },
-      { colIdx: 13, field: 'col', type: 'kolesterol' },
-      { colIdx: 14, field: 'nadi', type: 'nadi' },
-    ]
-    const xlsxFill: Record<string, string> = { Rendah: 'DBEAFE', Normal: 'DCFCE7', Batas: 'FEF9C3', Tinggi: 'FEE2E2' }
-    const xlsxFont: Record<string, string> = { Rendah: '1D4ED8', Normal: '15803D', Batas: 'A16207', Tinggi: 'B91C1C' }
-    const dataStartRow = metaRows.length + 2
-    filteredTableData.forEach((row: any, i: number) => {
-      const excelRow = dataStartRow + i
-      xlsxHealthCols.forEach(({ colIdx, field, type }) => {
-        const cellAddr = `${String.fromCharCode(65 + colIdx)}${excelRow}`
-        if (!ws[cellAddr]) return
-        const valStr = String(row[field] ?? '')
-        if (!valStr || valStr === '-') return
-        const numVal = field === 'td' ? parseInt(valStr.split('/')[0]) : parseFloat(valStr)
-        if (isNaN(numVal)) return
-        const { status } = getHealthStatus(type, numVal, row.jenisKelamin)
-        if (xlsxFill[status]) {
-          ws[cellAddr].s = { fill: { fgColor: { rgb: xlsxFill[status] } }, font: { color: { rgb: xlsxFont[status] }, bold: true } }
-        }
-      })
-    })
-
-    const wb = XLSXStyle.utils.book_new()
-    XLSXStyle.utils.book_append_sheet(wb, ws, `Data Kesehatan Warga RW ${rw}`.slice(0, 31))
-    XLSXStyle.writeFile(wb, `data-kesehatan-warga-rw-${rw}-${selectedMonth}.xlsx`)
-  }
-
-  const exportAttendanceToWhatsApp = (rw: string) => {
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const filteredTableData = tableData.filter(row => row.rw === rw)
-
-    let message = `📊 *DATA KESEHATAN WARGA RW ${rw}*\n`
-    message += `🏥 Kelurahan ${kelurahan}\n`
-    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `📈 *RINGKASAN DATA*\n`
-    message += `• Total Data: ${filteredTableData.length}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `🏥 *DATA KESEHATAN WARGA*\n\n`
-
-    if (filteredTableData.length === 0) {
-      message += `Belum ada data kesehatan untuk RW ${rw}.\n`
-    } else {
-      filteredTableData.forEach((row, index) => {
-        message += `${index + 1}. ${row.nama}\n`
-        message += `   NIK: ${row.nik}\n`
-        message += `   Umur: ${row.umur}\n`
-        message += `   Alamat: ${row.alamat}\n`
-        message += `   L/P: ${row.jenisKelamin}\n`
-        message += `   TB: ${row.tb} | BB: ${row.bb}\n`
-        message += `   TD: ${row.td} | GDS: ${row.gds}\n`
-        message += `   IMT: ${row.imt} | UA: ${row.ua}\n`
-        message += `   COL: ${row.col} | NADI: ${row.nadi}\n\n`
-      })
-    }
-
-    message += `━━━━━━━━━━━━━━━━━━━━\n`
-    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
-
-    const encodedMessage = encodeURIComponent(message)
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
-  }
-
-  // Per-RW export functions
-  const exportRWToPDF = (rw: string) => {
-    const doc = new jsPDF()
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const headerH = 50
-
-    doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, headerH, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
-    doc.setFont('helvetica', 'bold')
-    doc.text(`Pemeriksaan Kesehatan RW ${rw}`, 105, 20, { align: 'center' })
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 32, { align: 'center' })
-
-    const rwTableData = tableData.filter((row: any) => row.rw === rw)
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(9)
-    doc.text(`Total Data: ${rwTableData.length} warga`, 14, headerH + 10)
-
-    const pdfData = rwTableData.map((row: any) => [
-      row.nama, row.nik, row.rw, row.rt, row.tglLahir, row.umur, row.alamat,
-      row.jenisKelamin, row.tb, row.bb, row.lp, row.td, row.gds, row.imt, row.ua, row.col, row.nadi
-    ])
-
-    const colTypePDF: Record<number, string> = { 11: 'tensi', 12: 'guladarah', 13: 'imt', 14: 'asamurat', 15: 'kolesterol', 16: 'nadi' }
-    const statusBgPDF: Record<string, [number,number,number]> = { Rendah: [219,234,254], Normal: [220,252,231], Batas: [254,249,195], Tinggi: [254,226,226] }
-    const statusTxtPDF: Record<string, [number,number,number]> = { Rendah: [29,78,216], Normal: [21,128,61], Batas: [161,98,7], Tinggi: [185,28,28] }
-
-    autoTable(doc, {
-      startY: headerH + 14,
-      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
-      body: pdfData,
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [238, 242, 255] },
-      didParseCell: (data: any) => {
-        if (data.section !== 'body') return
-        const type = colTypePDF[data.column.index]
-        if (!type) return
-        const val = String(data.cell.raw ?? '')
-        if (!val || val === '-') return
-        const numVal = data.column.index === 11 ? parseInt(val.split('/')[0]) : parseFloat(val)
-        if (isNaN(numVal)) return
-        const rowGender = rwTableData[data.row.index]?.jenisKelamin
-        const { status } = getHealthStatus(type, numVal, rowGender)
-        if (statusBgPDF[status]) {
-          data.cell.styles.fillColor = statusBgPDF[status]
-          data.cell.styles.textColor = statusTxtPDF[status]
-          data.cell.styles.fontStyle = 'bold'
-        }
-      },
-    })
-
-    doc.save(`pemeriksaan-rw-${rw}-${selectedMonth}.pdf`)
-  }
-
-  const exportRWToExcel = (rw: string) => {
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const rwTableData = tableData.filter((row: any) => row.rw === rw)
-
-    const metaRows: (string | number)[][] = [
-      [`DATA KESEHATAN WARGA - RW ${rw}`],
-      [`Kelurahan: ${kelurahan}`, '', `Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`],
-      [`Total Data: ${rwTableData.length} warga`],
-      []
-    ]
-
-    const header = ['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']
-    const dataRows = rwTableData.map((row: any) => [
-      row.nama, row.nik, row.tglLahir, row.umur, row.alamat,
-      row.jenisKelamin, row.tb, row.bb, row.lp,
-      row.td, row.gds, row.imt, row.ua, row.col, row.nadi
-    ])
-
-    const ws = XLSXStyle.utils.aoa_to_sheet([...metaRows, header, ...dataRows])
-    ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 6 }, { wch: 30 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }]
-
-    const xlsxHealthCols = [
-      { colIdx: 9, field: 'td', type: 'tensi' },
-      { colIdx: 10, field: 'gds', type: 'guladarah' },
-      { colIdx: 11, field: 'imt', type: 'imt' },
-      { colIdx: 12, field: 'ua', type: 'asamurat' },
-      { colIdx: 13, field: 'col', type: 'kolesterol' },
-      { colIdx: 14, field: 'nadi', type: 'nadi' },
-    ]
-    const xlsxFill: Record<string, string> = { Rendah: 'DBEAFE', Normal: 'DCFCE7', Batas: 'FEF9C3', Tinggi: 'FEE2E2' }
-    const xlsxFont: Record<string, string> = { Rendah: '1D4ED8', Normal: '15803D', Batas: 'A16207', Tinggi: 'B91C1C' }
-    const dataStartRow = metaRows.length + 2
-    rwTableData.forEach((row: any, i: number) => {
-      const excelRow = dataStartRow + i
-      xlsxHealthCols.forEach(({ colIdx, field, type }) => {
-        const cellAddr = `${String.fromCharCode(65 + colIdx)}${excelRow}`
-        if (!ws[cellAddr]) return
-        const valStr = String(row[field] ?? '')
-        if (!valStr || valStr === '-') return
-        const numVal = field === 'td' ? parseInt(valStr.split('/')[0]) : parseFloat(valStr)
-        if (isNaN(numVal)) return
-        const { status } = getHealthStatus(type, numVal, row.jenisKelamin)
-        if (xlsxFill[status]) {
-          ws[cellAddr].s = { fill: { fgColor: { rgb: xlsxFill[status] } }, font: { color: { rgb: xlsxFont[status] }, bold: true } }
-        }
-      })
-    })
-
-    const wb = XLSXStyle.utils.book_new()
-    XLSXStyle.utils.book_append_sheet(wb, ws, `RW ${rw}`.slice(0, 31))
-    XLSXStyle.writeFile(wb, `pemeriksaan-rw-${rw}-${selectedMonth}.xlsx`)
-  }
-
-  const exportRWToWhatsApp = (rw: string) => {
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const rwData = healthReadingsDetails[rw] || []
-    const monthData = rwData.filter(d => {
-      const month = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
-      return month === selectedMonth
-    })
-    
-    let message = `📊 *PEMERIKSAAN KESEHATAN RW ${rw}*\n`
-    message += `🏥 Kelurahan ${kelurahan}\n`
-    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `📈 *RINGKASAN DATA*\n`
-    const uniqueWargaWA = new Set(monthData.map((d: any) => d.nik)).size
-    message += `• Total Warga Diperiksa: ${uniqueWargaWA}\n\n`
-    message += `📋 *DAFTAR WARGA YANG DIPERIKSA*\n\n`
-    
-    // No grouping, each reading as separate row
-    monthData.forEach((d, i) => {
-      const resident = residentsData[d.userId] || residentsData[d.nik] || residentsData[d.residentId] || 
-                      (d.nama ? residentsData[d.nama.toLowerCase()] : {}) || 
-                      (d.userName ? residentsData[d.userName.toLowerCase()] : {}) || {}
-      message += `${i + 1}. ${resident.nama || d.nama || d.userName || '-'}\n`
-      message += `   NIK: ${resident.nik || d.nik || '-'}\n`
-      message += `   Jenis: ${d.type || '-'}\n`
-      message += `   Tanggal: ${d.timestamp ? new Date(d.timestamp).toLocaleDateString('id-ID') : '-'}\n\n`
-    })
-    
-    message += `━━━━━━━━━━━━━━━━━━━━\n`
-    message += `📱 InterPulse - Aplikasi Kesehatan Terpadu\n`
-    
-    const encodedMessage = encodeURIComponent(message)
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
-  }
-
-  // Export functions for Data Kesehatan Warga table
-  const exportTableToPDF = () => {
-    const doc = new jsPDF()
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const pemLabels: Record<string, string> = { td: 'TD (Tensi)', gds: 'GDS (Gula Darah)', imt: 'IMT', ua: 'UA (Asam Urat)', col: 'COL (Kolesterol)', nadi: 'Nadi' }
-    const katLabels: Record<string, string> = { rendah: 'Rendah', normal: 'Normal', batas: 'Batas Tinggi', tinggi: 'Tinggi' }
-    const katColors: Record<string, [number,number,number]> = { rendah: [59,130,246], normal: [34,197,94], batas: [234,179,8], tinggi: [239,68,68] }
-    const fieldToCol: Record<string, number> = { td: 11, gds: 12, imt: 13, ua: 14, col: 15, nadi: 16 }
-    const hasFilter = tableFilterPemeriksaan !== 'all'
-    const headerH = hasFilter ? 58 : 50
-
-    doc.setFillColor(79, 70, 229)
-    doc.rect(0, 0, 210, headerH, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Data Kesehatan Warga', 105, 16, { align: 'center' })
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} - ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`, 105, 25, { align: 'center' })
-
-    if (hasFilter) {
-      const katColor = tableFilterKategori !== 'all' ? katColors[tableFilterKategori] : [255,255,255]
-      doc.setFillColor(255, 255, 255, 0.2)
-      doc.setDrawColor(255, 255, 255)
-      doc.roundedRect(14, 31, 182, 18, 3, 3, 'S')
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'bold')
-      doc.text(`Filter Pemeriksaan: ${pemLabels[tableFilterPemeriksaan]}`, 20, 40)
-      if (tableFilterKategori !== 'all') {
-        doc.setTextColor(katColor[0], katColor[1], katColor[2])
-        doc.text(`  |  Kategori: ${katLabels[tableFilterKategori]}`, 100, 40)
-        doc.setTextColor(255, 255, 255)
-      }
-    }
-
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(9)
-    doc.text(`Total Data: ${displayTableData.length} warga`, 14, headerH + 10)
-
-    const pdfData = displayTableData.map(row => [
-      row.nama, row.nik, row.rw, row.rt, row.tglLahir, row.umur, row.alamat,
-      row.jenisKelamin, row.tb, row.bb, row.lp, row.td, row.gds, row.imt, row.ua, row.col, row.nadi
-    ])
-
-    const colTypePDF: Record<number, string> = { 11: 'tensi', 12: 'guladarah', 13: 'imt', 14: 'asamurat', 15: 'kolesterol', 16: 'nadi' }
-    const statusBgPDF: Record<string, [number,number,number]> = { Rendah: [219,234,254], Normal: [220,252,231], Batas: [254,249,195], Tinggi: [254,226,226] }
-    const statusTxtPDF: Record<string, [number,number,number]> = { Rendah: [29,78,216], Normal: [21,128,61], Batas: [161,98,7], Tinggi: [185,28,28] }
-
-    autoTable(doc, {
-      startY: headerH + 14,
-      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
-      body: pdfData,
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [238, 242, 255] },
-      didParseCell: (data: any) => {
-        if (hasFilter && data.section === 'head' && data.column.index === fieldToCol[tableFilterPemeriksaan]) {
-          const bg = tableFilterKategori !== 'all' ? katColors[tableFilterKategori] : [79, 70, 229]
-          data.cell.styles.fillColor = bg
-        }
-        if (data.section !== 'body') return
-        const type = colTypePDF[data.column.index]
-        if (!type) return
-        const val = String(data.cell.raw ?? '')
-        if (!val || val === '-') return
-        const numVal = data.column.index === 11 ? parseInt(val.split('/')[0]) : parseFloat(val)
-        if (isNaN(numVal)) return
-        const { status } = getHealthStatus(type, numVal)
-        if (statusBgPDF[status]) {
-          data.cell.styles.fillColor = statusBgPDF[status]
-          data.cell.styles.textColor = statusTxtPDF[status]
-          data.cell.styles.fontStyle = 'bold'
-        }
-      },
-    })
-
-    const suffix = hasFilter ? `-${tableFilterPemeriksaan}${tableFilterKategori !== 'all' ? '-' + tableFilterKategori : ''}` : ''
-    doc.save(`data-kesehatan-warga-${selectedMonth}${suffix}.pdf`)
-    setTableExportDropdown(false)
-  }
-
-  const exportTableToExcel = () => {
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const pemLabels: Record<string, string> = { td: 'TD (Tensi)', gds: 'GDS (Gula Darah)', imt: 'IMT', ua: 'UA (Asam Urat)', col: 'COL (Kolesterol)', nadi: 'Nadi' }
-    const katLabels: Record<string, string> = { rendah: 'Rendah', normal: 'Normal', batas: 'Batas Tinggi', tinggi: 'Tinggi' }
-    const hasFilter = tableFilterPemeriksaan !== 'all'
-
-    const metaRows: (string | number)[][] = [
-      ['DATA KESEHATAN WARGA'],
-      [`Kelurahan: ${kelurahan}`, '', `Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}`],
-    ]
-    if (hasFilter) {
-      metaRows.push([`Filter Pemeriksaan: ${pemLabels[tableFilterPemeriksaan]}`, '', `Kategori: ${tableFilterKategori !== 'all' ? katLabels[tableFilterKategori] : 'Semua'}`])
-    }
-    metaRows.push([`Total Data: ${displayTableData.length} warga`])
-    metaRows.push([])
-
-    const header = ['Nama', 'NIK', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']
-    const dataRows = displayTableData.map(row => [
-      row.nama, row.nik, row.tglLahir, row.umur, row.alamat,
-      row.jenisKelamin, row.tb, row.bb, row.lp,
-      row.td, row.gds, row.imt, row.ua, row.col, row.nadi
-    ])
-
-    const ws = XLSXStyle.utils.aoa_to_sheet([...metaRows, header, ...dataRows])
-    ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 6 }, { wch: 30 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }]
-
-    const xlsxHealthCols = [
-      { colIdx: 9, field: 'td', type: 'tensi' },
-      { colIdx: 10, field: 'gds', type: 'guladarah' },
-      { colIdx: 11, field: 'imt', type: 'imt' },
-      { colIdx: 12, field: 'ua', type: 'asamurat' },
-      { colIdx: 13, field: 'col', type: 'kolesterol' },
-      { colIdx: 14, field: 'nadi', type: 'nadi' },
-    ]
-    const xlsxFill: Record<string, string> = { Rendah: 'DBEAFE', Normal: 'DCFCE7', Batas: 'FEF9C3', Tinggi: 'FEE2E2' }
-    const xlsxFont: Record<string, string> = { Rendah: '1D4ED8', Normal: '15803D', Batas: 'A16207', Tinggi: 'B91C1C' }
-    const dataStartRow = metaRows.length + 2
-    displayTableData.forEach((row: any, i: number) => {
-      const excelRow = dataStartRow + i
-      xlsxHealthCols.forEach(({ colIdx, field, type }) => {
-        const cellAddr = `${String.fromCharCode(65 + colIdx)}${excelRow}`
-        if (!ws[cellAddr]) return
-        const valStr = String((row as any)[field] ?? '')
-        if (!valStr || valStr === '-') return
-        const numVal = field === 'td' ? parseInt(valStr.split('/')[0]) : parseFloat(valStr)
-        if (isNaN(numVal)) return
-        const { status } = getHealthStatus(type, numVal)
-        if (xlsxFill[status]) {
-          ws[cellAddr].s = { fill: { fgColor: { rgb: xlsxFill[status] } }, font: { color: { rgb: xlsxFont[status] }, bold: true } }
-        }
-      })
-    })
-
-    const wb = XLSXStyle.utils.book_new()
-    const sheetName = hasFilter ? `${pemLabels[tableFilterPemeriksaan].split(' ')[0]}${tableFilterKategori !== 'all' ? '-' + katLabels[tableFilterKategori] : ''}` : 'Data Kesehatan Warga'
-    XLSXStyle.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31))
-
-    const suffix = hasFilter ? `-${tableFilterPemeriksaan}${tableFilterKategori !== 'all' ? '-' + tableFilterKategori : ''}` : ''
-    XLSXStyle.writeFile(wb, `data-kesehatan-warga-${selectedMonth}${suffix}.xlsx`)
-    setTableExportDropdown(false)
-  }
-
-  const exportTableToWhatsApp = () => {
-    const kelurahan = userProfile?.kelurahan || 'Duri Selatan'
-    const filteredTableData = displayTableData
-    const pemLabels: Record<string, string> = { td: 'TD (Tensi)', gds: 'GDS (Gula Darah)', imt: 'IMT', ua: 'UA (Asam Urat)', col: 'COL (Kolesterol)', nadi: 'Nadi' }
-    const katEmoji: Record<string, string> = { rendah: '🔵 Rendah', normal: '🟢 Normal', batas: '🟡 Batas Tinggi', tinggi: '🔴 Tinggi' }
-    const hasFilter = tableFilterPemeriksaan !== 'all'
-
-    let message = `📊 *DATA KESEHATAN WARGA*\n`
-    message += `🏥 Kelurahan ${kelurahan}\n`
-    message += `📅 ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n`
-    if (hasFilter) {
-      message += `🔍 Filter: *${pemLabels[tableFilterPemeriksaan]}*`
-      if (tableFilterKategori !== 'all') message += ` → ${katEmoji[tableFilterKategori]}`
-      message += `\n`
-    }
-    message += `\n━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `📈 *RINGKASAN DATA*\n`
-    message += `• Total Warga: ${filteredTableData.length}\n\n`
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`
-    message += `🏥 *DAFTAR WARGA*\n\n`
-    
-    filteredTableData.slice(0, 20).forEach(row => {
-      message += `� ${row.nama}\n`
-      message += `🆔 NIK: ${row.nik}\n`
-      message += `🎂 Umur: ${row.umur}\n`
-      message += `📍 Alamat: ${row.alamat}\n`
-      message += `🏥 TB: ${row.tb} | BB: ${row.bb} | LP: ${row.lp}\n`
-      message += `💓 TD: ${row.td} | GDS: ${row.gds} | IMT: ${row.imt}\n\n`
-    })
-    
-    if (filteredTableData.length > 20) {
-      message += `... dan ${filteredTableData.length - 20} data lainnya\n\n`
-    }
-    
-    message += `━━━━━━━━━━━━━━━━━━━━\n`
-    message += `� InterPulse - Aplikasi Kesehatan Terpadu\n`
-    
-    const encodedMessage = encodeURIComponent(message)
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank')
-    setTableExportDropdown(false)
   }
 
   return (
@@ -1562,10 +783,11 @@ export default function MonitoringPage() {
             <div className="relative">
               <button
                 onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                disabled={exporting}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Export</span>
+                <span className="hidden sm:inline">{exporting ? 'Mengekspor...' : 'Export'}</span>
               </button>
               {exportDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
@@ -1580,21 +802,12 @@ export default function MonitoringPage() {
                   </button>
                   <button
                     onClick={() => { exportToExcel(); setExportDropdownOpen(false); }}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
                   >
                     <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
                     </svg>
                     <span className="text-sm text-gray-700">Export Excel</span>
-                  </button>
-                  <button
-                    onClick={() => { exportToWhatsApp(); setExportDropdownOpen(false); }}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
-                  >
-                    <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                    </svg>
-                    <span className="text-sm text-gray-700">Export WhatsApp</span>
                   </button>
                 </div>
               )}
@@ -1646,39 +859,9 @@ export default function MonitoringPage() {
 
         {/* Tables Section */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-indigo-600" />
-                <span className="font-semibold text-gray-800 text-sm">Rekapitulasi Hasil Pemeriksaan</span>
-              </div>
-              <div className="relative">
-                <button
-                  onClick={() => setHealthDistExportDropdown(!healthDistExportDropdown)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Export
-                </button>
-                {healthDistExportDropdown && (
-                  <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                    <div className="px-3 py-1.5 bg-indigo-50 border-b border-gray-100">
-                      <p className="text-xs font-semibold text-indigo-700">Pilih Format</p>
-                    </div>
-                    <button onClick={() => { exportHealthDistToPDF(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-red-50 transition-colors text-xs">
-                      <div className="w-6 h-6 bg-red-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg></div>
-                      <span className="text-gray-700">PDF</span>
-                    </button>
-                    <button onClick={() => { exportHealthDistToExcel(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-green-50 transition-colors text-xs">
-                      <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/></svg></div>
-                      <span className="text-gray-700">Excel</span>
-                    </button>
-                    <button onClick={() => { exportHealthDistToWhatsApp(); setHealthDistExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-emerald-50 transition-colors text-xs">
-                      <div className="w-6 h-6 bg-emerald-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
-                      <span className="text-gray-700">WhatsApp</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="w-4 h-4 text-indigo-600" />
+              <span className="font-semibold text-gray-800 text-sm">Rekapitulasi Hasil Pemeriksaan</span>
             </div>
             {/* Filters */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
@@ -1865,7 +1048,6 @@ export default function MonitoringPage() {
                       <span className="ml-1 text-xs font-normal text-indigo-400">(klik untuk edit)</span>
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Capaian</th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Export</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1918,48 +1100,6 @@ export default function MonitoringPage() {
                           )}
                         </td>
                         <td className={`px-3 py-2 text-center font-bold ${colorClass}`}>{percentage}%</td>
-                        <td className="px-3 py-2 text-center">
-                          <div className="relative inline-block">
-                            <button
-                              onClick={() => setAttendanceExportDropdown(attendanceExportDropdown === rw ? null : rw)}
-                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                              title="Export"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                            {attendanceExportDropdown === rw && (
-                              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-                                <button
-                                  onClick={() => { exportAttendanceToPDF(rw); setAttendanceExportDropdown(null); }}
-                                  className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl text-xs"
-                                >
-                                  <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
-                                  </svg>
-                                  <span className="text-gray-700">PDF</span>
-                                </button>
-                                <button
-                                  onClick={() => { exportAttendanceToExcel(rw); setAttendanceExportDropdown(null); }}
-                                  className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors text-xs"
-                                >
-                                  <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
-                                  </svg>
-                                  <span className="text-gray-700">Excel</span>
-                                </button>
-                                <button
-                                  onClick={() => { exportAttendanceToWhatsApp(rw); setAttendanceExportDropdown(null); }}
-                                  className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl text-xs"
-                                >
-                                  <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                                  </svg>
-                                  <span className="text-gray-700">WhatsApp</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
                       </tr>
                     )
                   })}
@@ -1993,37 +1133,6 @@ export default function MonitoringPage() {
                 <div className="flex items-center gap-2 mt-0.5">
                   <Activity className="w-4 h-4 text-indigo-600" />
                   <span className="font-semibold text-gray-800 text-sm">Data Kesehatan Warga</span>
-                </div>
-                {/* Right: export button + search (desktop only) */}
-                <div className="flex flex-col items-end gap-1.5">
-                  <div className="relative">
-                    <button
-                      onClick={() => setTableExportDropdown(!tableExportDropdown)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Export
-                    </button>
-                    {tableExportDropdown && (
-                      <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                        <div className="px-3 py-1.5 bg-indigo-50 border-b border-gray-100">
-                          <p className="text-xs font-semibold text-indigo-700">Pilih Format</p>
-                        </div>
-                        <button onClick={() => { exportTableToPDF(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-red-50 transition-colors text-xs">
-                          <div className="w-6 h-6 bg-red-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg></div>
-                          <span className="text-gray-700">PDF</span>
-                        </button>
-                        <button onClick={() => { exportTableToExcel(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-green-50 transition-colors text-xs">
-                          <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/></svg></div>
-                          <span className="text-gray-700">Excel</span>
-                        </button>
-                        <button onClick={() => { exportTableToWhatsApp(); setTableExportDropdown(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-emerald-50 transition-colors text-xs">
-                          <div className="w-6 h-6 bg-emerald-100 rounded flex items-center justify-center"><svg className="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
-                          <span className="text-gray-700">WhatsApp</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

@@ -1,470 +1,695 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { db } from './firebase'
-import { collection, query, where, getDocs } from 'firebase/firestore'
 
-// Category colors and categorization functions
-export const categoryColors: Record<string, { bg: string; text: string; rgb: [number, number, number] }> = {
-  rendah: { bg: '#DBEAFE', text: '#1E40AF', rgb: [219, 234, 254] },
-  normal: { bg: '#DCFCE7', text: '#15803D', rgb: [220, 252, 231] },
-  batasTinggi: { bg: '#FEF3C7', text: '#B45309', rgb: [254, 243, 199] },
-  tinggi: { bg: '#FEE2E2', text: '#991B1B', rgb: [254, 226, 226] }
+export type HealthStatus = 'Rendah' | 'Normal' | 'Batas' | 'Tinggi'
+
+export interface MonitoringExportContext {
+  kelurahan: string
+  selectedMonth: string
+  selectedMonthLabel: string
+  year: number
+  months: string[]
+  monthLabels: Record<string, string>
+  rwList: string[]
+  customTargets: Record<string, number>
+  healthReadings: Record<string, Record<string, number>>
+  healthReadingsDetails: Record<string, any[]>
+  attendanceData: Record<string, Record<string, number>>
+  residentsData: Record<string, any>
+  tableData: any[]
+  tbbbData: Record<string, any[]>
+  getHealthStatus: (type: string, value: number, gender?: string) => { status: HealthStatus }
 }
 
-// Get category for health readings
-export function getCategory(type: string, value: number | string): 'rendah' | 'normal' | 'batasTinggi' | 'tinggi' {
-  if (typeof value === 'string') value = parseFloat(value)
-  
-  switch (type) {
-    case 'tensi':
-      if (value < 120) return 'normal'
-      if (value < 140) return 'batasTinggi'
-      return 'tinggi'
-    case 'guladarah':
-    case 'gds':
-      if (value < 100) return 'normal'
-      if (value < 126) return 'batasTinggi'
-      return 'tinggi'
-    case 'kolesterol':
-      if (value < 200) return 'normal'
-      if (value < 240) return 'batasTinggi'
-      return 'tinggi'
-    case 'asamurat':
-      if (value < 6) return 'rendah'
-      if (value < 7) return 'normal'
-      if (value < 8.5) return 'batasTinggi'
-      return 'tinggi'
-    case 'imt':
-      if (value < 18.5) return 'rendah'
-      if (value < 25) return 'normal'
-      if (value < 30) return 'batasTinggi'
-      return 'tinggi'
-    case 'nadi':
-      if (value < 60) return 'rendah'
-      if (value < 100) return 'normal'
-      if (value < 120) return 'batasTinggi'
-      return 'tinggi'
-    default:
-      return 'normal'
+const MONTH_NAMES_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+
+const EXAM_TYPES = [
+  { key: 'kolesterol', label: 'Kolesterol' },
+  { key: 'tensi', label: 'Tensi' },
+  { key: 'guladarah', label: 'Gula Darah' },
+  { key: 'asamurat', label: 'Asam Urat' },
+  { key: 'nadi', label: 'Nadi' },
+  { key: 'imt', label: 'IMT' },
+] as const
+
+const CATEGORIES: HealthStatus[] = ['Rendah', 'Normal', 'Batas', 'Tinggi']
+const CATEGORY_LABELS: Record<HealthStatus, string> = {
+  Rendah: 'Rendah', Normal: 'Normal', Batas: 'Batas Tinggi', Tinggi: 'Tinggi',
+}
+
+const CAT_COLORS: Record<HealthStatus, { fill: string; font: string; pdf: [number, number, number] }> = {
+  Rendah: { fill: 'FFDBEAFE', font: 'FF1D4ED8', pdf: [219, 234, 254] },
+  Normal: { fill: 'FFDCFCE7', font: 'FF15803D', pdf: [220, 252, 231] },
+  Batas: { fill: 'FFFEF9C3', font: 'FFA16207', pdf: [254, 249, 195] },
+  Tinggi: { fill: 'FFFEE2E2', font: 'FFB91C1C', pdf: [254, 226, 226] },
+}
+
+const HEADER_FILL = 'FF4F46E5'
+const HEADER_FONT = 'FFFFFFFF'
+const ALT_FILL = 'FFEEF2FF'
+
+function sortRw(a: string, b: string) {
+  return parseInt(a || '0', 10) - parseInt(b || '0', 10)
+}
+
+function getFileName(ctx: MonitoringExportContext, ext: string) {
+  const monthName = MONTH_NAMES_ID[ctx.months.indexOf(ctx.selectedMonth)] || ctx.selectedMonth
+  return `monitoring-kesehatan-${monthName}-${ctx.year}.${ext}`
+}
+
+function buildResidentsList(ctx: MonitoringExportContext) {
+  const seen = new Set<string>()
+  const list: any[] = []
+  Object.values(ctx.residentsData).forEach(r => {
+    if (!r?.nik || seen.has(r.nik)) return
+    seen.add(r.nik)
+    list.push({
+      nama: r.nama || r.name || '-',
+      nik: r.nik,
+      rw: r.rw || '-',
+      rt: r.rt || '-',
+      birthDate: r.birthDate || r.tglLahir || '-',
+      umur: r.umur ?? (r.birthDate ? calcAge(r.birthDate) : '-'),
+      alamat: r.alamat || r.kelurahan || '-',
+      jenisKelamin: normalizeGender(r.jenisKelamin || r.gender),
+    })
+  })
+  return list.sort((a, b) => sortRw(a.rw, b.rw))
+}
+
+function calcAge(birthDate: string) {
+  const birth = new Date(birthDate)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
+  return age
+}
+
+function normalizeGender(g?: string) {
+  if (!g) return '-'
+  if (g === 'P' || g === 'Perempuan') return 'P'
+  if (g === 'L' || g === 'Laki-laki') return 'L'
+  return g
+}
+
+function countRegisteredPerRw(ctx: MonitoringExportContext) {
+  const map: Record<string, number> = {}
+  buildResidentsList(ctx).forEach(r => {
+    const rw = String(r.rw || '').padStart(2, '0')
+    map[rw] = (map[rw] || 0) + 1
+  })
+  return map
+}
+
+function getDistributionForRw(ctx: MonitoringExportContext, rw: string, healthType: string) {
+  const dist = { rendah: 0, normal: 0, batas: 0, tinggi: 0 }
+
+  if (healthType === 'nadi') {
+    const readings = ctx.healthReadingsDetails[rw] || []
+    readings.forEach(reading => {
+      if (reading.type !== 'tensi' || !reading.nadi) return
+      const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+      if (month !== ctx.selectedMonth) return
+      const status = ctx.getHealthStatus('nadi', reading.nadi)
+      if (status.status === 'Normal') dist.normal++
+      else if (status.status === 'Batas') dist.batas++
+      else if (status.status === 'Tinggi') dist.tinggi++
+      else dist.rendah++
+    })
+    return dist
   }
+
+  if (healthType === 'imt') {
+    Object.entries(ctx.tbbbData).forEach(([nik, records]) => {
+      const rec = (records as any[]).find(t => {
+        const month = new Date(t.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+        return month === ctx.selectedMonth && String(t.rw || '').padStart(2, '0') === rw
+      })
+      if (!rec?.tinggiBadan || !rec?.beratBadan) return
+      const imt = rec.beratBadan / Math.pow(rec.tinggiBadan / 100, 2)
+      const status = ctx.getHealthStatus('imt', imt)
+      if (status.status === 'Normal') dist.normal++
+      else if (status.status === 'Batas') dist.batas++
+      else if (status.status === 'Tinggi') dist.tinggi++
+      else dist.rendah++
+    })
+    return dist
+  }
+
+  const readings = ctx.healthReadingsDetails[rw] || []
+  readings.forEach(reading => {
+    if (reading.type !== healthType) return
+    const month = new Date(reading.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+    if (month !== ctx.selectedMonth) return
+    let value = 0
+    if (healthType === 'tensi') value = reading.sistolik || 0
+    else if (healthType === 'kolesterol') value = reading.total || 0
+    else value = reading.nilai || 0
+    const status = ctx.getHealthStatus(healthType, value, reading.jenisKelamin)
+    if (status.status === 'Normal') dist.normal++
+    else if (status.status === 'Batas') dist.batas++
+    else if (status.status === 'Tinggi') dist.tinggi++
+    else dist.rendah++
+  })
+  return dist
 }
 
-// Fetch all residents data
-export async function fetchResidents(kelurahan: string) {
-  const residentsRef = collection(db, 'residents')
-  const q = query(residentsRef, where('kelurahan', '==', kelurahan))
-  const snapshot = await getDocs(q)
-  
-  return snapshot.docs.map(doc => {
-    const data = doc.data()
-    return {
-      id: doc.id,
-      nama: data.nama || '',
-      nik: data.nik || '',
-      rw: data.rw || '',
-      rt: data.rt || '',
-      birthDate: data.birthDate || '',
-      umur: data.umur || '',
-      alamat: data.alamat || '',
-      jenisKelamin: data.jenisKelamin || '',
-      kelurahan: data.kelurahan || ''
-    }
-  }).sort((a, b) => parseInt(a.rw) - parseInt(b.rw))
+function statusToKey(status: HealthStatus): keyof typeof distPlaceholder {
+  const map: Record<HealthStatus, keyof typeof distPlaceholder> = {
+    Rendah: 'rendah', Normal: 'normal', Batas: 'batas', Tinggi: 'tinggi',
+  }
+  return map[status]
+}
+const distPlaceholder = { rendah: 0, normal: 0, batas: 0, tinggi: 0 }
+
+function styleHeaderRow(row: ExcelJS.Row) {
+  row.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } }
+    cell.font = { bold: true, color: { argb: HEADER_FONT }, size: 11 }
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+    cell.border = thinBorder()
+  })
+  row.height = 22
 }
 
-// Fetch health readings
-export async function fetchHealthReadings(kelurahan: string) {
-  const healthRef = collection(db, 'healthReadings')
-  const q = query(healthRef, where('kelurahan', '==', kelurahan))
-  const snapshot = await getDocs(q)
-  
-  return snapshot.docs.map(doc => {
-    const data = doc.data()
-    return {
-      id: doc.id,
-      nik: data.nik || '',
-      rw: data.rw || '',
-      rt: data.rt || '',
-      type: data.type || '',
-      timestamp: data.timestamp || '',
-      nilai: data.nilai || '',
-      sistolik: data.sistolik || '',
-      diastolik: data.diastolik || '',
-      total: data.total || '',
-      ...data
-    }
+function styleDataRow(row: ExcelJS.Row, alt: boolean) {
+  row.eachCell(cell => {
+    if (alt) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ALT_FILL } }
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+    cell.border = thinBorder()
+    cell.font = { size: 10 }
   })
 }
 
-// Create sheet 1: Daftar Warga
-export function createDaftarWargaSheet(residents: any[]) {
-  const data = residents.map(r => ({
-    Nama: r.nama,
-    NIK: r.nik,
-    RW: r.rw,
-    RT: r.rt,
-    'Tgl Lahir': r.birthDate,
-    Umur: r.umur,
-    Alamat: r.alamat,
-    'Jenis Kelamin': r.jenisKelamin
-  }))
-  
-  const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [
-    { wch: 20 }, // Nama
-    { wch: 15 }, // NIK
-    { wch: 8 },  // RW
-    { wch: 8 },  // RT
-    { wch: 12 }, // Tgl Lahir
-    { wch: 8 },  // Umur
-    { wch: 20 }, // Alamat
-    { wch: 15 }  // Jenis Kelamin
+function thinBorder(): Partial<ExcelJS.Borders> {
+  const s: Partial<ExcelJS.Border> = { style: 'thin', color: { argb: 'FFD1D5DB' } }
+  return { top: s, left: s, bottom: s, right: s }
+}
+
+function applyHealthCellColor(cell: ExcelJS.Cell, status: HealthStatus) {
+  const c = CAT_COLORS[status]
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fill } }
+  cell.font = { bold: true, color: { argb: c.font }, size: 10 }
+}
+
+function chartToBase64(canvas: HTMLCanvasElement) {
+  return canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '')
+}
+
+function drawBarChart(title: string, labels: string[], datasets: { label: string; data: number[]; color: string }[]) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 720
+  canvas.height = 360
+  const g = canvas.getContext('2d')!
+  g.fillStyle = '#ffffff'
+  g.fillRect(0, 0, canvas.width, canvas.height)
+  g.fillStyle = '#1f2937'
+  g.font = 'bold 14px Arial'
+  g.fillText(title, 20, 24)
+
+  const padL = 50, padR = 20, padT = 40, padB = 60
+  const chartW = canvas.width - padL - padR
+  const chartH = canvas.height - padT - padB
+  const maxVal = Math.max(...datasets.flatMap(d => d.data), 1)
+  const groupW = chartW / labels.length
+  const barW = Math.min(24, groupW / (datasets.length + 1))
+
+  labels.forEach((label, i) => {
+    datasets.forEach((ds, j) => {
+      const val = ds.data[i] || 0
+      const h = (val / maxVal) * chartH
+      const x = padL + i * groupW + j * barW + 8
+      const y = padT + chartH - h
+      g.fillStyle = ds.color
+      g.fillRect(x, y, barW, h)
+    })
+    g.fillStyle = '#374151'
+    g.font = '10px Arial'
+    g.save()
+    g.translate(padL + i * groupW + groupW / 2, canvas.height - 20)
+    g.rotate(-0.4)
+    g.fillText(`RW ${label}`, 0, 0)
+    g.restore()
+  })
+
+  datasets.forEach((ds, i) => {
+    g.fillStyle = ds.color
+    g.fillRect(20, 40 + i * 16, 12, 12)
+    g.fillStyle = '#374151'
+    g.font = '10px Arial'
+    g.fillText(ds.label, 36, 50 + i * 16)
+  })
+
+  return chartToBase64(canvas)
+}
+
+function drawLineChart(title: string, labels: string[], datasets: { label: string; data: number[]; color: string }[]) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 720
+  canvas.height = 300
+  const g = canvas.getContext('2d')!
+  g.fillStyle = '#ffffff'
+  g.fillRect(0, 0, canvas.width, canvas.height)
+  g.fillStyle = '#1f2937'
+  g.font = 'bold 13px Arial'
+  g.fillText(title, 20, 22)
+
+  const padL = 50, padR = 20, padT = 36, padB = 50
+  const chartW = canvas.width - padL - padR
+  const chartH = canvas.height - padT - padB
+  const maxVal = Math.max(...datasets.flatMap(d => d.data), 1)
+
+  datasets.forEach(ds => {
+    g.strokeStyle = ds.color
+    g.lineWidth = 2
+    g.beginPath()
+    ds.data.forEach((val, i) => {
+      const x = padL + (i / Math.max(labels.length - 1, 1)) * chartW
+      const y = padT + chartH - (val / maxVal) * chartH
+      if (i === 0) g.moveTo(x, y)
+      else g.lineTo(x, y)
+    })
+    g.stroke()
+  })
+
+  labels.forEach((label, i) => {
+    const x = padL + (i / Math.max(labels.length - 1, 1)) * chartW
+    g.fillStyle = '#6b7280'
+    g.font = '9px Arial'
+    g.fillText(label, x - 12, canvas.height - 20)
+  })
+
+  datasets.forEach((ds, i) => {
+    g.fillStyle = ds.color
+    g.fillRect(20, 34 + i * 14, 10, 10)
+    g.fillStyle = '#374151'
+    g.font = '9px Arial'
+    g.fillText(ds.label, 34, 43 + i * 14)
+  })
+
+  return chartToBase64(canvas)
+}
+
+async function addChartImage(sheet: ExcelJS.Worksheet, workbook: ExcelJS.Workbook, base64: string, row: number) {
+  const imageId = workbook.addImage({ base64, extension: 'png' })
+  sheet.addImage(imageId, {
+    tl: { col: 0, row },
+    ext: { width: 680, height: 280 },
+  })
+}
+
+// ─── Sheet builders ───────────────────────────────────────────────
+
+function sheetDaftarWarga(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext) {
+  const sheet = workbook.addWorksheet('Daftar Warga')
+  const residents = buildResidentsList(ctx)
+  sheet.columns = [
+    { header: 'Nama', key: 'nama', width: 24 },
+    { header: 'NIK', key: 'nik', width: 22 },
+    { header: 'RW', key: 'rw', width: 8 },
+    { header: 'RT', key: 'rt', width: 8 },
+    { header: 'Tgl Lahir', key: 'birthDate', width: 14 },
+    { header: 'Umur', key: 'umur', width: 8 },
+    { header: 'Alamat', key: 'alamat', width: 28 },
+    { header: 'Jenis Kelamin', key: 'jenisKelamin', width: 14 },
   ]
-  
-  return ws
+  styleHeaderRow(sheet.getRow(1))
+  residents.forEach((r, i) => {
+    const row = sheet.addRow(r)
+    styleDataRow(row, i % 2 === 1)
+  })
+  sheet.views = [{ state: 'frozen', ySplit: 1 }]
 }
 
-// Create sheet 2: Kehadiran per RW
-export function createKehadiranSheet(residents: any[], healthReadings: any[]) {
-  const rwMap: Record<string, { terdaftar: number; diperiksa: Set<string>; target: number }> = {}
-  
-  // Count registered residents per RW
-  residents.forEach(r => {
-    if (!rwMap[r.rw]) {
-      rwMap[r.rw] = { terdaftar: 0, diperiksa: new Set(), target: 80 }
-    }
-    rwMap[r.rw].terdaftar++
+function sheetKehadiran(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext) {
+  const sheet = workbook.addWorksheet('Kehadiran per RW')
+  const registered = countRegisteredPerRw(ctx)
+  const rwSorted = [...ctx.rwList].sort(sortRw)
+
+  sheet.addRow(['RW', 'Jumlah Warga Diperiksa', 'Jumlah Warga Terdaftar', 'Target', 'Persentase (%)'])
+  styleHeaderRow(sheet.getRow(1))
+
+  const chartLabels: string[] = []
+  const chartDiperiksa: number[] = []
+  const chartPersen: number[] = []
+
+  rwSorted.forEach((rw, i) => {
+    const diperiksa = ctx.attendanceData[rw]?.[ctx.selectedMonth] || 0
+    const terdaftar = registered[rw] || 0
+    const target = ctx.customTargets[rw] || 0
+    const persen = target > 0 ? Math.round((diperiksa / target) * 100) : 0
+    const row = sheet.addRow([rw, diperiksa, terdaftar, target, persen])
+    styleDataRow(row, i % 2 === 1)
+    chartLabels.push(rw)
+    chartDiperiksa.push(diperiksa)
+    chartPersen.push(persen)
   })
-  
-  // Count examined per RW
-  healthReadings.forEach(h => {
-    if (h.rw && rwMap[h.rw]) {
-      rwMap[h.rw].diperiksa.add(h.nik)
-    }
+
+  sheet.columns = [{ width: 8 }, { width: 22 }, { width: 22 }, { width: 10 }, { width: 16 }]
+  sheet.views = [{ state: 'frozen', ySplit: 1 }]
+
+  const chartRow = rwSorted.length + 3
+  const base64 = drawBarChart(
+    `Kehadiran Pemeriksaan - ${ctx.selectedMonthLabel} ${ctx.year}`,
+    chartLabels,
+    [
+      { label: 'Warga Diperiksa', data: chartDiperiksa, color: '#4F46E5' },
+      { label: 'Persentase Target (%)', data: chartPersen, color: '#10B981' },
+    ]
+  )
+  return addChartImage(sheet, workbook, base64, chartRow)
+}
+
+function sheetTrenBulanan(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext) {
+  const sheet = workbook.addWorksheet('Tren Bulanan')
+  const rwSorted = [...ctx.rwList].sort(sortRw)
+  const headers = ['RW', ...MONTH_NAMES_ID, 'Total']
+  sheet.addRow(headers)
+  styleHeaderRow(sheet.getRow(1))
+
+  const monthTotals = new Array(12).fill(0)
+  rwSorted.forEach((rw, i) => {
+    const months = ctx.healthReadings[rw] || {}
+    let total = 0
+    const rowVals: (string | number)[] = [rw]
+    ctx.months.forEach((m, mi) => {
+      const v = months[m] || 0
+      rowVals.push(v)
+      monthTotals[mi] += v
+      total += v
+    })
+    rowVals.push(total)
+    const row = sheet.addRow(rowVals)
+    styleDataRow(row, i % 2 === 1)
   })
-  
-  const data = Object.entries(rwMap)
-    .sort(([a], [b]) => parseInt(a) - parseInt(b))
-    .map(([rw, stats]) => ({
-      RW: rw,
-      'Jumlah Warga Diperiksa': stats.diperiksa.size,
-      'Jumlah Warga Terdaftar': stats.terdaftar,
-      Target: stats.target,
-      'Persentase (%)': stats.terdaftar > 0 
-        ? Math.round((stats.diperiksa.size / stats.terdaftar) * 100) 
-        : 0
+
+  const footer = sheet.addRow(['Total', ...monthTotals, monthTotals.reduce((a, b) => a + b, 0)])
+  footer.eachCell(cell => {
+    cell.font = { bold: true, size: 10 }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } }
+    cell.border = thinBorder()
+    cell.alignment = { horizontal: 'center' }
+  })
+
+  sheet.columns = [{ width: 8 }, ...MONTH_NAMES_ID.map(() => ({ width: 10 })), { width: 10 }]
+  sheet.views = [{ state: 'frozen', ySplit: 1 }]
+
+  const chartRow = rwSorted.length + 4
+  const base64 = drawLineChart(
+    'Tren Pemeriksaan Bulanan',
+    MONTH_NAMES_ID.map(m => m.slice(0, 3)),
+    rwSorted.slice(0, 6).map((rw, idx) => ({
+      label: `RW ${rw}`,
+      data: ctx.months.map(m => ctx.healthReadings[rw]?.[m] || 0),
+      color: ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'][idx % 6],
     }))
-  
-  const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [
-    { wch: 8 },  // RW
-    { wch: 20 }, // Jumlah Diperiksa
-    { wch: 20 }, // Jumlah Terdaftar
-    { wch: 8 },  // Target
-    { wch: 15 }  // Persentase
-  ]
-  
-  return ws
+  )
+  return addChartImage(sheet, workbook, base64, chartRow)
 }
 
-// Create sheet 3: Tren Bulanan
-export function createTrenBulananSheet(healthReadings: any[]) {
-  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
-  const monthsLower = months.map(m => m.toLowerCase())
-  
-  const rwMonthMap: Record<string, Record<number, Set<string>>> = {}
-  
-  // Group by RW and month
-  healthReadings.forEach(h => {
-    const date = new Date(h.timestamp)
-    const monthIndex = date.getMonth()
-    const rw = h.rw || 'Unknown'
-    
-    if (!rwMonthMap[rw]) {
-      rwMonthMap[rw] = {}
-      for (let i = 0; i < 12; i++) rwMonthMap[rw][i] = new Set()
-    }
-    
-    rwMonthMap[rw][monthIndex].add(h.nik)
+function sheetRekapitulasi(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext) {
+  const sheet = workbook.addWorksheet('Rekapitulasi Hasil Pemeriksaan')
+  const rwSorted = [...ctx.rwList].sort(sortRw)
+
+  const headerRow1: (string | null)[] = ['RW']
+  const headerRow2: string[] = ['']
+  EXAM_TYPES.forEach(t => {
+    headerRow1.push(t.label, null, null, null)
+    CATEGORIES.forEach(c => headerRow2.push(CATEGORY_LABELS[c]))
   })
-  
-  const data = Object.entries(rwMonthMap)
-    .sort(([a], [b]) => parseInt(a) - parseInt(b))
-    .map(([rw, monthData]) => {
-      const row: any = { RW: rw }
-      let total = 0
-      
-      for (let i = 0; i < 12; i++) {
-        row[months[i]] = monthData[i]?.size || 0
-        total += row[months[i]]
-      }
-      
-      row['Total'] = total
-      return row
+  headerRow1.push('Total')
+  headerRow2.push('')
+
+  sheet.addRow(headerRow1)
+  sheet.addRow(headerRow2)
+  styleHeaderRow(sheet.getRow(1))
+  const h2 = sheet.getRow(2)
+  h2.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } }
+  let col = 2
+  EXAM_TYPES.forEach(() => {
+    CATEGORIES.forEach(cat => {
+      const cell = h2.getCell(col)
+      const c = CAT_COLORS[cat]
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fill } }
+      cell.font = { bold: true, color: { argb: c.font }, size: 10 }
+      cell.alignment = { horizontal: 'center' }
+      cell.border = thinBorder()
+      col++
     })
-  
-  const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [
-    { wch: 8 },  // RW
-    ...months.map(() => ({ wch: 10 })), // Bulan
-    { wch: 10 }  // Total
-  ]
-  
-  return ws
-}
-
-// Create sheet 4: Rekapitulasi Hasil Pemeriksaan
-export function createRekapitulasiSheet(healthReadings: any[]) {
-  const jenisMap: Record<string, string> = {
-    'tensi': 'Tensi',
-    'kolesterol': 'Kolesterol',
-    'guladarah': 'Gula Darah',
-    'gds': 'Gula Darah',
-    'asamurat': 'Asam Urat',
-    'imt': 'IMT',
-    'nadi': 'Nadi',
-    'tb': 'TB',
-    'bb': 'BB',
-    'lp': 'LP'
-  }
-  
-  const rwTypeMap: Record<string, Record<string, { rendah: number; normal: number; batasTinggi: number; tinggi: number }>> = {}
-  
-  healthReadings.forEach(h => {
-    const rw = h.rw || 'Unknown'
-    const type = jenisMap[h.type] || h.type
-    
-    if (!rwTypeMap[rw]) rwTypeMap[rw] = {}
-    if (!rwTypeMap[rw][type]) {
-      rwTypeMap[rw][type] = { rendah: 0, normal: 0, batasTinggi: 0, tinggi: 0 }
-    }
-    
-    const category = getCategory(h.type, h.nilai || h.total || 0)
-    rwTypeMap[rw][type][category]++
   })
-  
-  const data = Object.entries(rwTypeMap)
-    .sort(([a], [b]) => parseInt(a) - parseInt(b))
-    .flatMap(([rw, types]) => {
-      return Object.entries(types)
-        .map(([type, stats]) => ({
-          RW: rw,
-          'Jenis Pemeriksaan': type,
-          Rendah: stats.rendah,
-          Normal: stats.normal,
-          'Batas Tinggi': stats.batasTinggi,
-          Tinggi: stats.tinggi,
-          Total: stats.rendah + stats.normal + stats.batasTinggi + stats.tinggi
-        }))
+  h2.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } }
+
+  EXAM_TYPES.forEach((t, ti) => {
+    const startCol = 2 + ti * 4
+    sheet.mergeCells(1, startCol, 1, startCol + 3)
+    const cell = sheet.getCell(1, startCol)
+    cell.value = t.label
+    cell.alignment = { horizontal: 'center' }
+  })
+
+  const colTotals = new Array(EXAM_TYPES.length * CATEGORIES.length).fill(0)
+
+  rwSorted.forEach((rw, ri) => {
+    const rowVals: number[] = []
+    EXAM_TYPES.forEach(t => {
+      const dist = getDistributionForRw(ctx, rw, t.key)
+      CATEGORIES.forEach(cat => rowVals.push(dist[statusToKey(cat)]))
     })
-  
-  const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [
-    { wch: 8 },  // RW
-    { wch: 20 }, // Jenis Pemeriksaan
-    { wch: 10 }, // Rendah
-    { wch: 10 }, // Normal
-    { wch: 15 }, // Batas Tinggi
-    { wch: 10 }, // Tinggi
-    { wch: 10 }  // Total
-  ]
-  
-  return ws
-}
-
-// Create sheet 5: Data Kesehatan Warga
-export function createDataKesehatanWargaSheet(residents: any[], healthReadings: any[]) {
-  // Create map of latest health readings by NIK and type
-  const latestReadingsMap: Record<string, Record<string, any>> = {}
-  
-  healthReadings.forEach(h => {
-    if (!latestReadingsMap[h.nik]) latestReadingsMap[h.nik] = {}
-    
-    const existing = latestReadingsMap[h.nik][h.type]
-    const isNewer = !existing || new Date(h.timestamp) > new Date(existing.timestamp)
-    
-    if (isNewer) {
-      latestReadingsMap[h.nik][h.type] = h
-    }
+    const rowTotal = rowVals.reduce((a, b) => a + b, 0)
+    const row = sheet.addRow([rw, ...rowVals, rowTotal])
+    styleDataRow(row, ri % 2 === 1)
+    let cIdx = 2
+    EXAM_TYPES.forEach(() => {
+      CATEGORIES.forEach(cat => {
+        const cell = row.getCell(cIdx)
+        const c = CAT_COLORS[cat]
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fill } }
+        cell.font = { bold: true, color: { argb: c.font }, size: 10 }
+        cIdx++
+      })
+    })
+    rowVals.forEach((v, i) => { colTotals[i] += v })
   })
-  
-  const data = residents.map(r => {
-    const readings = latestReadingsMap[r.nik] || {}
-    
-    return {
-      Nama: r.nama,
-      NIK: r.nik,
-      RW: r.rw,
-      RT: r.rt,
-      'Tgl Lahir': r.birthDate,
-      Umur: r.umur,
-      Alamat: r.alamat,
-      'Jenis Kelamin': r.jenisKelamin,
-      TB: readings.tb?.nilai || '-',
-      BB: readings.bb?.nilai || '-',
-      LP: readings.lp?.nilai || '-',
-      TD: readings.tensi ? `${readings.tensi.sistolik}/${readings.tensi.diastolik}` : '-',
-      GDS: readings.gds?.nilai || readings.guladarah?.nilai || '-',
-      IMT: readings.imt?.nilai || '-',
-      UA: readings.asamurat?.nilai || '-',
-      COL: readings.kolesterol?.total || '-',
-      Nadi: readings.nadi?.nilai || '-'
-    }
-  }).sort((a, b) => parseInt(a.RW) - parseInt(b.RW))
-  
-  const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [
-    { wch: 20 }, // Nama
-    { wch: 15 }, // NIK
-    { wch: 8 },  // RW
-    { wch: 8 },  // RT
-    { wch: 12 }, // Tgl Lahir
-    { wch: 8 },  // Umur
-    { wch: 20 }, // Alamat
-    { wch: 15 }, // Jenis Kelamin
-    { wch: 8 },  // TB
-    { wch: 8 },  // BB
-    { wch: 8 },  // LP
-    { wch: 12 }, // TD
-    { wch: 8 },  // GDS
-    { wch: 8 },  // IMT
-    { wch: 8 },  // UA
-    { wch: 8 },  // COL
-    { wch: 8 }   // Nadi
+
+  const footer = sheet.addRow(['Total', ...colTotals, colTotals.reduce((a, b) => a + b, 0)])
+  footer.eachCell(cell => {
+    cell.font = { bold: true, size: 10 }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } }
+    cell.border = thinBorder()
+    cell.alignment = { horizontal: 'center' }
+  })
+
+  sheet.getColumn(1).width = 8
+  const chartRow = rwSorted.length + 5
+
+  return Promise.all(EXAM_TYPES.map((t, ti) => {
+    const datasets = CATEGORIES.map((cat, ci) => ({
+      label: cat,
+      data: rwSorted.map(rw => getDistributionForRw(ctx, rw, t.key)[statusToKey(cat)]),
+      color: ['#3B82F6', '#22C55E', '#EAB308', '#EF4444'][ci],
+    }))
+    const base64 = drawLineChart(`${t.label} per RW`, rwSorted.map(r => `RW${r}`), datasets)
+    return addChartImage(sheet, workbook, base64, chartRow + ti * 16)
+  }))
+}
+
+function sheetDataKesehatan(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext) {
+  const sheet = workbook.addWorksheet('Data Kesehatan Warga')
+  const headers = ['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'Jenis Kelamin', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'Nadi']
+  sheet.addRow(headers)
+  styleHeaderRow(sheet.getRow(1))
+
+  const healthCols: { idx: number; type: string; field: string }[] = [
+    { idx: 12, type: 'tensi', field: 'td' },
+    { idx: 13, type: 'guladarah', field: 'gds' },
+    { idx: 14, type: 'imt', field: 'imt' },
+    { idx: 15, type: 'asamurat', field: 'ua' },
+    { idx: 16, type: 'kolesterol', field: 'col' },
+    { idx: 17, type: 'nadi', field: 'nadi' },
   ]
-  
-  return ws
-}
 
-// Main export function
-export async function exportMonitoring(userProfile: any, month: number, year: number) {
-  const kelurahan = userProfile.kelurahan || 'Unknown'
-  
-  try {
-    // Fetch all data
-    const residents = await fetchResidents(kelurahan)
-    const healthReadings = await fetchHealthReadings(kelurahan)
-    
-    // Create workbook with 5 sheets
-    const wb = XLSX.utils.book_new()
-    
-    XLSX.utils.book_append_sheet(wb, createDaftarWargaSheet(residents), 'Daftar Warga')
-    XLSX.utils.book_append_sheet(wb, createKehadiranSheet(residents, healthReadings), 'Kehadiran per RW')
-    XLSX.utils.book_append_sheet(wb, createTrenBulananSheet(healthReadings), 'Tren Bulanan')
-    XLSX.utils.book_append_sheet(wb, createRekapitulasiSheet(healthReadings), 'Rekapitulasi')
-    XLSX.utils.book_append_sheet(wb, createDataKesehatanWargaSheet(residents, healthReadings), 'Data Kesehatan Warga')
-    
-    // Generate filename
-    const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
-    const monthName = monthNames[month] || monthNames[new Date().getMonth()]
-    const fileName = `monitoring-kesehatan-${monthName}-${year}.xlsx`
-    
-    XLSX.writeFile(wb, fileName)
-    return true
-  } catch (error) {
-    console.error('Error exporting to Excel:', error)
-    return false
-  }
-}
-
-// Export to PDF
-export async function exportMonitoringPDF(userProfile: any, month: number, year: number) {
-  const kelurahan = userProfile.kelurahan || 'Unknown'
-  
-  try {
-    const residents = await fetchResidents(kelurahan)
-    const healthReadings = await fetchHealthReadings(kelurahan)
-    
-    const doc = new jsPDF()
-    let currentY = 20
-    
-    const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
-    const monthName = monthNames[month] || monthNames[new Date().getMonth()]
-    
-    // Header
-    doc.setFillColor(20, 184, 166)
-    doc.rect(0, 0, 210, 25, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(16)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Laporan Monitoring Kesehatan', 105, 10, { align: 'center' })
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Kelurahan ${kelurahan} | ${monthName} ${year}`, 105, 18, { align: 'center' })
-    
-    currentY = 35
-    
-    // Sheet 1: Daftar Warga
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('1. Daftar Warga', 14, currentY)
-    currentY += 5
-    
-    const daftarWargaData = residents.map(r => [
-      r.nama, r.nik, r.rw, r.rt, r.birthDate, r.umur, r.alamat, r.jenisKelamin
+  const sorted = [...ctx.tableData].sort((a, b) => sortRw(a.rw, b.rw))
+  sorted.forEach((row, i) => {
+    const excelRow = sheet.addRow([
+      row.nama, row.nik, row.rw, row.rt, row.tglLahir, row.umur, row.alamat, row.jenisKelamin,
+      row.tb, row.bb, row.lp, row.td, row.gds, row.imt, row.ua, row.col, row.nadi,
     ])
-    
-    autoTable(doc, {
-      head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'Jenis Kelamin']],
-      body: daftarWargaData,
-      startY: currentY,
-      theme: 'grid',
-      headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255] },
-      styles: { fontSize: 8 },
-      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 18 } }
+    styleDataRow(excelRow, i % 2 === 1)
+    healthCols.forEach(({ idx, type, field }) => {
+      const valStr = String(row[field] ?? '')
+      if (!valStr || valStr === '-') return
+      const numVal = field === 'td' ? parseInt(valStr.split('/')[0]) : parseFloat(valStr)
+      if (isNaN(numVal)) return
+      const { status } = ctx.getHealthStatus(type, numVal, row.jenisKelamin)
+      applyHealthCellColor(excelRow.getCell(idx), status)
     })
-    
-    currentY = (doc as any).lastAutoTable.finalY + 10
-    
-    // Sheet 2: Kehadiran per RW
-    doc.setFontSize(12)
+  })
+
+  sheet.columns = headers.map((_, i) => ({ width: i === 0 ? 22 : i === 6 ? 26 : 10 }))
+  sheet.views = [{ state: 'frozen', ySplit: 1 }]
+}
+
+// ─── Public exports ───────────────────────────────────────────────
+
+export async function exportMonitoringExcel(ctx: MonitoringExportContext) {
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'InterPulse'
+  workbook.created = new Date()
+
+  sheetDaftarWarga(workbook, ctx)
+  await sheetKehadiran(workbook, ctx)
+  await sheetTrenBulanan(workbook, ctx)
+  await sheetRekapitulasi(workbook, ctx)
+  sheetDataKesehatan(workbook, ctx)
+
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = getFileName(ctx, 'xlsx')
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function exportMonitoringPDF(ctx: MonitoringExportContext) {
+  const doc = new jsPDF({ orientation: 'landscape' })
+  const kelurahan = ctx.kelurahan
+  const monthName = MONTH_NAMES_ID[ctx.months.indexOf(ctx.selectedMonth)] || ctx.selectedMonth
+  const headStyle = { fillColor: [79, 70, 229] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: 'bold' as const }
+  const altStyle = { fillColor: [238, 242, 255] as [number, number, number] }
+
+  const addHeader = (title: string) => {
+    doc.setFillColor(79, 70, 229)
+    doc.rect(0, 0, 297, 22, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
-    doc.text('2. Kehadiran per RW', 14, currentY)
-    currentY += 5
-    
-    const rwMap: Record<string, { terdaftar: number; diperiksa: Set<string> }> = {}
-    residents.forEach(r => {
-      if (!rwMap[r.rw]) rwMap[r.rw] = { terdaftar: 0, diperiksa: new Set() }
-      rwMap[r.rw].terdaftar++
-    })
-    healthReadings.forEach(h => {
-      if (h.rw && rwMap[h.rw]) rwMap[h.rw].diperiksa.add(h.nik)
-    })
-    
-    const kehadiranData = Object.entries(rwMap)
-      .sort(([a], [b]) => parseInt(a) - parseInt(b))
-      .map(([rw, stats]) => [
-        rw,
-        stats.diperiksa.size,
-        stats.terdaftar,
-        80,
-        Math.round((stats.diperiksa.size / stats.terdaftar) * 100) + '%'
-      ])
-    
-    autoTable(doc, {
-      head: [['RW', 'Diperiksa', 'Terdaftar', 'Target', 'Persentase']],
-      body: kehadiranData,
-      startY: currentY,
-      theme: 'grid',
-      headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255] },
-      styles: { fontSize: 10 }
-    })
-    
-    currentY = (doc as any).lastAutoTable.finalY + 10
-    
-    // Continue with other sheets as needed...
-    // For PDF, we're simplifying and showing the most important sheets
-    
-    const fileName = `monitoring-kesehatan-${monthName}-${year}.pdf`
-    doc.save(fileName)
-    return true
-  } catch (error) {
-    console.error('Error exporting to PDF:', error)
-    return false
+    doc.text('Laporan Monitoring Kesehatan', 148, 9, { align: 'center' })
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Kelurahan ${kelurahan} | ${monthName} ${ctx.year}`, 148, 16, { align: 'center' })
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text(title, 14, 30)
   }
+
+  // 1. Daftar Warga
+  addHeader('1. Daftar Warga')
+  const residents = buildResidentsList(ctx)
+  autoTable(doc, {
+    startY: 34,
+    head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P']],
+    body: residents.map(r => [r.nama, r.nik, r.rw, r.rt, r.birthDate, r.umur, r.alamat, r.jenisKelamin]),
+    styles: { fontSize: 7, cellPadding: 2 },
+    headStyles: headStyle,
+    alternateRowStyles: altStyle,
+  })
+
+  // 2. Kehadiran per RW
+  doc.addPage()
+  addHeader('2. Kehadiran per RW')
+  const registered = countRegisteredPerRw(ctx)
+  const rwSorted = [...ctx.rwList].sort(sortRw)
+  autoTable(doc, {
+    startY: 34,
+    head: [['RW', 'Diperiksa', 'Terdaftar', 'Target', 'Persentase (%)']],
+    body: rwSorted.map(rw => {
+      const diperiksa = ctx.attendanceData[rw]?.[ctx.selectedMonth] || 0
+      const target = ctx.customTargets[rw] || 0
+      return [rw, diperiksa, registered[rw] || 0, target, target > 0 ? Math.round((diperiksa / target) * 100) : 0]
+    }),
+    styles: { fontSize: 9 },
+    headStyles: headStyle,
+    alternateRowStyles: altStyle,
+  })
+
+  // 3. Tren Bulanan
+  doc.addPage()
+  addHeader('3. Tren Bulanan')
+  const monthTotals = new Array(12).fill(0)
+  const trenBody = rwSorted.map(rw => {
+    const months = ctx.healthReadings[rw] || {}
+    let total = 0
+    const vals = ctx.months.map((m, mi) => {
+      const v = months[m] || 0
+      monthTotals[mi] += v
+      total += v
+      return v
+    })
+    return [rw, ...vals, total]
+  })
+  trenBody.push(['Total', ...monthTotals, monthTotals.reduce((a, b) => a + b, 0)])
+  autoTable(doc, {
+    startY: 34,
+    head: [['RW', ...MONTH_NAMES_ID.map(m => m.slice(0, 3)), 'Total']],
+    body: trenBody,
+    styles: { fontSize: 6, cellPadding: 1 },
+    headStyles: headStyle,
+    alternateRowStyles: altStyle,
+  })
+
+  // 4. Rekapitulasi
+  doc.addPage()
+  addHeader('4. Rekapitulasi Hasil Pemeriksaan')
+  const rekapHead = ['RW', ...EXAM_TYPES.flatMap(t => CATEGORIES.map(c => `${t.label.slice(0, 4)}-${CATEGORY_LABELS[c].slice(0, 5)}`)), 'Total']
+  const rekapBody = rwSorted.map(rw => {
+    const vals: number[] = []
+    EXAM_TYPES.forEach(t => {
+      const dist = getDistributionForRw(ctx, rw, t.key)
+      CATEGORIES.forEach(c => vals.push(dist[statusToKey(c)]))
+    })
+    return [rw, ...vals, vals.reduce((a, b) => a + b, 0)]
+  })
+  autoTable(doc, {
+    startY: 34,
+    head: [rekapHead],
+    body: rekapBody,
+    styles: { fontSize: 5, cellPadding: 1 },
+    headStyles: headStyle,
+    alternateRowStyles: altStyle,
+  })
+
+  // 5. Data Kesehatan Warga
+  doc.addPage()
+  addHeader('5. Data Kesehatan Warga')
+  const sorted = [...ctx.tableData].sort((a, b) => sortRw(a.rw, b.rw))
+  const colTypePDF: Record<number, string> = { 11: 'tensi', 12: 'guladarah', 13: 'imt', 14: 'asamurat', 15: 'kolesterol', 16: 'nadi' }
+  const statusBgPDF: Record<string, [number, number, number]> = {
+    Rendah: CAT_COLORS.Rendah.pdf, Normal: CAT_COLORS.Normal.pdf,
+    Batas: CAT_COLORS.Batas.pdf, Tinggi: CAT_COLORS.Tinggi.pdf,
+  }
+  const statusTxtPDF: Record<string, [number, number, number]> = {
+    Rendah: [29, 78, 216], Normal: [21, 128, 61], Batas: [161, 98, 7], Tinggi: [185, 28, 28],
+  }
+
+  autoTable(doc, {
+    startY: 34,
+    head: [['Nama', 'NIK', 'RW', 'RT', 'Tgl Lahir', 'Umur', 'Alamat', 'L/P', 'TB', 'BB', 'LP', 'TD', 'GDS', 'IMT', 'UA', 'COL', 'NADI']],
+    body: sorted.map(r => [r.nama, r.nik, r.rw, r.rt, r.tglLahir, r.umur, r.alamat, r.jenisKelamin, r.tb, r.bb, r.lp, r.td, r.gds, r.imt, r.ua, r.col, r.nadi]),
+    styles: { fontSize: 6, cellPadding: 1 },
+    headStyles: headStyle,
+    alternateRowStyles: altStyle,
+    didParseCell: (data: any) => {
+      if (data.section !== 'body') return
+      const type = colTypePDF[data.column.index]
+      if (!type) return
+      const val = String(data.cell.raw ?? '')
+      if (!val || val === '-') return
+      const numVal = data.column.index === 11 ? parseInt(val.split('/')[0]) : parseFloat(val)
+      if (isNaN(numVal)) return
+      const rowGender = sorted[data.row.index]?.jenisKelamin
+      const { status } = ctx.getHealthStatus(type, numVal, rowGender)
+      if (statusBgPDF[status]) {
+        data.cell.styles.fillColor = statusBgPDF[status]
+        data.cell.styles.textColor = statusTxtPDF[status]
+        data.cell.styles.fontStyle = 'bold'
+      }
+    },
+  })
+
+  doc.save(getFileName(ctx, 'pdf'))
 }
