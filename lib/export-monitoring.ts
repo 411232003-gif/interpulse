@@ -350,16 +350,19 @@ function sheetKehadiran(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext
   sheet.columns = [{ width: 8 }, { width: 22 }, { width: 22 }, { width: 10 }, { width: 16 }]
   sheet.views = [{ state: 'frozen', ySplit: 1 }]
 
-  const chartRow = rwSorted.length + 3
-  const base64 = drawBarChart(
-    `Kehadiran Pemeriksaan - ${ctx.selectedMonthLabel} ${ctx.year}`,
-    chartLabels,
-    [
-      { label: 'Warga Diperiksa', data: chartDiperiksa, color: '#4F46E5' },
-      { label: 'Persentase Target (%)', data: chartPersen, color: '#10B981' },
-    ]
-  )
-  return addChartImage(sheet, workbook, base64, chartRow)
+  // Add footer total
+  const totalDiperiksa = rwSorted.reduce((sum, rw) => sum + (ctx.attendanceData[rw]?.[ctx.selectedMonth] || 0), 0)
+  const totalTerdaftar = rwSorted.reduce((sum, rw) => sum + (registered[rw] || 0), 0)
+  const totalTarget = rwSorted.reduce((sum, rw) => sum + (ctx.customTargets[rw] || 0), 0)
+  const totalPersen = totalTarget > 0 ? Math.round((totalDiperiksa / totalTarget) * 100) : 0
+
+  const footer = sheet.addRow(['Total', totalDiperiksa, totalTerdaftar, totalTarget, totalPersen])
+  footer.eachCell(cell => {
+    cell.font = { bold: true, size: 10 }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } }
+    cell.border = thinBorder()
+    cell.alignment = { horizontal: 'center' }
+  })
 }
 
 function sheetTrenBulanan(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext) {
@@ -395,42 +398,22 @@ function sheetTrenBulanan(workbook: ExcelJS.Workbook, ctx: MonitoringExportConte
 
   sheet.columns = [{ width: 8 }, ...MONTH_NAMES_ID.map(() => ({ width: 10 })), { width: 10 }]
   sheet.views = [{ state: 'frozen', ySplit: 1 }]
-
-  const chartRow = rwSorted.length + 4
-  const base64 = drawLineChart(
-    'Tren Pemeriksaan Bulanan',
-    MONTH_NAMES_ID.map(m => m.slice(0, 3)),
-    rwSorted.slice(0, 6).map((rw, idx) => ({
-      label: `RW ${rw}`,
-      data: ctx.months.map(m => ctx.healthReadings[rw]?.[m] || 0),
-      color: ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'][idx % 6],
-    }))
-  )
-  return addChartImage(sheet, workbook, base64, chartRow)
 }
 
 function sheetRekapitulasi(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext) {
-  const sheet = workbook.addWorksheet('Rekapitulasi Hasil Pemeriksaan')
   const rwSorted = [...ctx.rwList].sort(sortRw)
 
-  const headerRow1: (string | null)[] = ['RW']
-  const headerRow2: string[] = ['']
+  // Create 6 separate sheets, one for each exam type
   EXAM_TYPES.forEach(t => {
-    headerRow1.push(t.label, null, null, null)
-    CATEGORIES.forEach(c => headerRow2.push(CATEGORY_LABELS[c]))
-  })
-  headerRow1.push('Total')
-  headerRow2.push('')
+    const sheet = workbook.addWorksheet(t.label)
+    const headers = ['RW', ...CATEGORIES.map(c => CATEGORY_LABELS[c]), 'Total']
+    sheet.addRow(headers)
+    styleHeaderRow(sheet.getRow(1))
 
-  sheet.addRow(headerRow1)
-  sheet.addRow(headerRow2)
-  styleHeaderRow(sheet.getRow(1))
-  const h2 = sheet.getRow(2)
-  h2.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } }
-  let col = 2
-  EXAM_TYPES.forEach(() => {
+    // Add category colors to header row
+    let col = 2
     CATEGORIES.forEach(cat => {
-      const cell = h2.getCell(col)
+      const cell = sheet.getRow(1).getCell(col)
       const c = CAT_COLORS[cat]
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fill } }
       cell.font = { bold: true, color: { argb: c.font }, size: 10 }
@@ -438,30 +421,18 @@ function sheetRekapitulasi(workbook: ExcelJS.Workbook, ctx: MonitoringExportCont
       cell.border = thinBorder()
       col++
     })
-  })
-  h2.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } }
 
-  EXAM_TYPES.forEach((t, ti) => {
-    const startCol = 2 + ti * 4
-    sheet.mergeCells(1, startCol, 1, startCol + 3)
-    const cell = sheet.getCell(1, startCol)
-    cell.value = t.label
-    cell.alignment = { horizontal: 'center' }
-  })
+    const colTotals = new Array(CATEGORIES.length).fill(0)
 
-  const colTotals = new Array(EXAM_TYPES.length * CATEGORIES.length).fill(0)
-
-  rwSorted.forEach((rw, ri) => {
-    const rowVals: number[] = []
-    EXAM_TYPES.forEach(t => {
+    rwSorted.forEach((rw, ri) => {
       const dist = getDistributionForRw(ctx, rw, t.key)
-      CATEGORIES.forEach(cat => rowVals.push(dist[statusToKey(cat)]))
-    })
-    const rowTotal = rowVals.reduce((a, b) => a + b, 0)
-    const row = sheet.addRow([rw, ...rowVals, rowTotal])
-    styleDataRow(row, ri % 2 === 1)
-    let cIdx = 2
-    EXAM_TYPES.forEach(() => {
+      const rowVals = CATEGORIES.map(cat => dist[statusToKey(cat)])
+      const rowTotal = rowVals.reduce((a, b) => a + b, 0)
+      const row = sheet.addRow([rw, ...rowVals, rowTotal])
+      styleDataRow(row, ri % 2 === 1)
+
+      // Apply category colors to data cells
+      let cIdx = 2
       CATEGORIES.forEach(cat => {
         const cell = row.getCell(cIdx)
         const c = CAT_COLORS[cat]
@@ -469,30 +440,23 @@ function sheetRekapitulasi(workbook: ExcelJS.Workbook, ctx: MonitoringExportCont
         cell.font = { bold: true, color: { argb: c.font }, size: 10 }
         cIdx++
       })
+
+      rowVals.forEach((v, i) => { colTotals[i] += v })
     })
-    rowVals.forEach((v, i) => { colTotals[i] += v })
+
+    // Add footer total
+    const footer = sheet.addRow(['Total', ...colTotals, colTotals.reduce((a, b) => a + b, 0)])
+    footer.eachCell(cell => {
+      cell.font = { bold: true, size: 10 }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } }
+      cell.border = thinBorder()
+      cell.alignment = { horizontal: 'center' }
+    })
+
+    sheet.getColumn(1).width = 8
+    sheet.columns = [{ width: 8 }, ...CATEGORIES.map(() => ({ width: 14 })), { width: 10 }]
+    sheet.views = [{ state: 'frozen', ySplit: 1 }]
   })
-
-  const footer = sheet.addRow(['Total', ...colTotals, colTotals.reduce((a, b) => a + b, 0)])
-  footer.eachCell(cell => {
-    cell.font = { bold: true, size: 10 }
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } }
-    cell.border = thinBorder()
-    cell.alignment = { horizontal: 'center' }
-  })
-
-  sheet.getColumn(1).width = 8
-  const chartRow = rwSorted.length + 5
-
-  return Promise.all(EXAM_TYPES.map((t, ti) => {
-    const datasets = CATEGORIES.map((cat, ci) => ({
-      label: cat,
-      data: rwSorted.map(rw => getDistributionForRw(ctx, rw, t.key)[statusToKey(cat)]),
-      color: ['#3B82F6', '#22C55E', '#EAB308', '#EF4444'][ci],
-    }))
-    const base64 = drawLineChart(`${t.label} per RW`, rwSorted.map(r => `RW${r}`), datasets)
-    return addChartImage(sheet, workbook, base64, chartRow + ti * 16)
-  }))
 }
 
 function sheetDataKesehatan(workbook: ExcelJS.Workbook, ctx: MonitoringExportContext) {
@@ -539,9 +503,9 @@ export async function exportMonitoringExcel(ctx: MonitoringExportContext) {
   workbook.created = new Date()
 
   sheetDaftarWarga(workbook, ctx)
-  await sheetKehadiran(workbook, ctx)
-  await sheetTrenBulanan(workbook, ctx)
-  await sheetRekapitulasi(workbook, ctx)
+  sheetKehadiran(workbook, ctx)
+  sheetTrenBulanan(workbook, ctx)
+  sheetRekapitulasi(workbook, ctx)
   sheetDataKesehatan(workbook, ctx)
 
   const buffer = await workbook.xlsx.writeBuffer()
