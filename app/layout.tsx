@@ -44,7 +44,7 @@ export default function RootLayout({
         
         {/* PWA Icons - Only use logo-app.png */}
         <link rel="icon" type="image/png" href="/logo-app.png" />
-        <link rel="apple-touch-icon" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/logo-app.png" />
         <link rel="shortcut icon" type="image/png" href="/logo-app.png" />
         
         {/* Manifest */}
