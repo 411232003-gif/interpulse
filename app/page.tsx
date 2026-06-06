@@ -198,7 +198,7 @@ export default function Home() {
             >
               {bannerImages.map((image, index) => (
                 <div key={index} className="w-full flex-shrink-0 relative">
-                  <div className="relative w-full h-48 bg-gray-200">
+                  <div className="relative w-full h-56 bg-gray-200">
                     <img
                       src={image.src}
                       alt=""
@@ -298,7 +298,7 @@ export default function Home() {
         )}
 
         {/* Feature Cards */}
-        <div className={isMobile ? `grid gap-2 grid-cols-1 flex-1` : `grid gap-5 mb-6 ${featureCards.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <div className={isMobile ? `grid gap-0 grid-cols-1 flex-1` : `grid gap-5 mb-6 ${featureCards.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {featureCards.map((card, index) => {
             const Icon = card.icon
             return (
@@ -308,7 +308,7 @@ export default function Home() {
                 className="group"
               >
                 {isMobile ? (
-                  <div className={`${card.bgColor} rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-32 flex items-center justify-center`}>
+                  <div className={`${card.bgColor} rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-white/50 h-36 flex items-center justify-center`}>
                     <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${card.gradient} p-3 shadow-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0 mr-3`}>
                       <Icon className="w-full h-full text-white" />
                     </div>
