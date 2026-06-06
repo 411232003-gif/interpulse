@@ -25,7 +25,16 @@ export default function LoginPage() {
       await loginWithNIK(userId, password)
       router.push('/')
     } catch (err: any) {
-      setError(err.message || 'Login gagal. Periksa Interpulse ID dan password.')
+      console.error('Login error:', err)
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+        setError('Interpulse ID atau password salah. Silakan periksa kembali.')
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Format Interpulse ID tidak valid.')
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Terlalu banyak percobaan login. Silakan coba lagi nanti.')
+      } else {
+        setError(err.message || 'Login gagal. Periksa Interpulse ID dan password.')
+      }
     } finally {
       setLoading(false)
     }
@@ -95,6 +104,7 @@ export default function LoginPage() {
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                   placeholder="Masukkan email Anda"
                   required
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -112,6 +122,7 @@ export default function LoginPage() {
                   className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                   placeholder="••••••••"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
