@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { PlayCircle, Activity, Heart, Loader2, ChevronRight, TrendingUp, LogIn, Calendar, Scale, FileText } from 'lucide-react'
+import { PlayCircle, Activity, Heart, Loader2, ChevronRight, TrendingUp, LogIn, Calendar, Scale, FileText, X, Grid3x3 } from 'lucide-react'
 import NotificationBell from '@/components/NotificationBell'
 
 export default function Home() {
@@ -14,6 +14,7 @@ export default function Home() {
   const [touchStart, setTouchStart] = useState(0)
   const [touchEnd, setTouchEnd] = useState(0)
   const carouselRef = useRef<HTMLDivElement>(null)
+  const [showFiturModal, setShowFiturModal] = useState(false)
 
   const bannerImages = [
     {
@@ -41,6 +42,16 @@ export default function Home() {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Check for fitur query param
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('fitur') === 'true') {
+      setShowFiturModal(true)
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
   }, [])
 
   // Auto-slide every 5 seconds
@@ -135,6 +146,15 @@ export default function Home() {
       gradient: 'from-purple-500 to-pink-500',
       bgColor: 'bg-purple-50'
     },
+    // Trafik/riwayat pemeriksaan on mobile (below FASCA)
+    ...(isMobile ? [{
+      title: 'Riwayat Pemeriksaan',
+      description: userProfile?.name || 'Pengguna',
+      href: '/trafik-user',
+      icon: TrendingUp,
+      gradient: 'from-teal-500 to-cyan-500',
+      bgColor: 'bg-teal-50'
+    }] : []),
     // Trafik only on desktop
     ...(!isMobile ? [{
       title: 'Trafik',
@@ -171,6 +191,49 @@ export default function Home() {
             {user && !isAdmin && <NotificationBell />}
           </div>
         </div>
+
+        {/* Fitur Modal */}
+        {showFiturModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Fitur</h2>
+                <button onClick={() => setShowFiturModal(false)} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Tutup" title="Tutup">
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <Link href="/kalori-tracker" onClick={() => setShowFiturModal(false)} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 transition-all border border-orange-200">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 p-2.5">
+                    <Activity className="w-full h-full text-white" />
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-xs font-semibold text-gray-800">Kalori</h3>
+                    <p className="text-[10px] text-gray-600">Tracker</p>
+                  </div>
+                </Link>
+                <Link href="/deteksi-jantung" onClick={() => setShowFiturModal(false)} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 p-2.5">
+                    <Heart className="w-full h-full text-white" />
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-xs font-semibold text-gray-800">Skrining</h3>
+                    <p className="text-[10px] text-gray-600">Jantung</p>
+                  </div>
+                </Link>
+                <Link href="/musik-relaksasi" onClick={() => setShowFiturModal(false)} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 p-2.5">
+                    <PlayCircle className="w-full h-full text-white" />
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-xs font-semibold text-gray-800">Musik</h3>
+                    <p className="text-[10px] text-gray-600">Relaksasi</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Sehat Sentosa Banner Carousel - Top, below welcome message */}
         {isMobile && (
