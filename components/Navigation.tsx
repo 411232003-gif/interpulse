@@ -110,7 +110,7 @@ export default function Navigation() {
   // Mobile view - Beranda, Fitur, Profil
   const mobileNavItems = [
     { href: '/', label: 'Beranda', icon: Home },
-    { href: '/?fitur=true', label: 'Fitur', icon: Grid3x3, isAction: true },
+    { href: '/fitur', label: 'Fitur', icon: Grid3x3 },
     { href: '/profil', label: 'Profil', icon: User },
   ]
 

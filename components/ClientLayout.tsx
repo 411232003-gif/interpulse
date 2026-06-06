@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth-context'
 
 const publicRoutes = [
   '/login', '/register', '/login-qr',
-  '/video-edukasi', '/Fasca', '/kalori-tracker', '/deteksi-jantung', '/musik-relaksasi', '/sehat-sentosa', '/monitoring', '/partisipasi'
+  '/video-edukasi', '/Fasca', '/kalori-tracker', '/deteksi-jantung', '/musik-relaksasi', '/sehat-sentosa', '/monitoring', '/partisipasi', '/fitur'
 ]
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
