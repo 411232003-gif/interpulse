@@ -84,9 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (hoursDiff < 24) {
             // Check if user is admin first
-            const adminDoc = await getDoc(doc(db, 'admins', loginData.uid))
-            if (adminDoc.exists()) {
-              const adminData = adminDoc.data()
+            const adminsQuery = query(collection(db, 'admins'), where('uid', '==', loginData.uid))
+            const adminsSnapshot = await getDocs(adminsQuery)
+            
+            if (!adminsSnapshot.empty) {
+              const adminData = adminsSnapshot.docs[0].data()
               setUserProfile({
                 uid: adminData.uid,
                 email: adminData.email,
@@ -101,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 rt: adminData.rt || '',
                 rw: adminData.rw || '',
                 kelurahan: adminData.adminKelurahan || '',
-                role: 'admin',
+                role: adminData.role || 'admin',
                 createdAt: adminData.createdAt || new Date().toISOString()
               })
               // Create a mock Firebase user object
@@ -153,9 +155,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Check if user is admin first
           try {
-            const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid))
-            if (adminDoc.exists()) {
-              const adminData = adminDoc.data()
+            const adminsQuery = query(collection(db, 'admins'), where('uid', '==', firebaseUser.uid))
+            const adminsSnapshot = await getDocs(adminsQuery)
+            
+            if (!adminsSnapshot.empty) {
+              const adminData = adminsSnapshot.docs[0].data()
               setUserProfile({
                 uid: adminData.uid,
                 email: adminData.email,
@@ -170,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 rt: adminData.rt || '',
                 rw: adminData.rw || '',
                 kelurahan: adminData.adminKelurahan || '',
-                role: 'admin',
+                role: adminData.role || 'admin',
                 createdAt: adminData.createdAt || new Date().toISOString()
               })
               setLoading(false)
