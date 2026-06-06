@@ -68,6 +68,10 @@ export default function PosbinduMonitoring() {
     jenisKelamin: 'L',
     alamat: '',
     password: '',
+    phone: '',
+    height: 170,
+    weight: 65,
+    targetWeight: 60,
   })
 
   // Check-in form state
@@ -360,7 +364,11 @@ export default function PosbinduMonitoring() {
           rt: residentForm.rt,
           birthDate: residentForm.birthDate,
           jenisKelamin: residentForm.jenisKelamin,
-          alamat: residentForm.alamat
+          alamat: residentForm.alamat,
+          phone: residentForm.phone,
+          height: residentForm.height,
+          weight: residentForm.weight,
+          targetWeight: residentForm.targetWeight,
         })
       })
 
@@ -412,7 +420,11 @@ export default function PosbinduMonitoring() {
             nik: residentForm.nik,
             rt: residentForm.rt,
             rw: residentForm.rw,
-            alamat: residentForm.alamat
+            alamat: residentForm.alamat,
+            phone: residentForm.phone,
+            height: residentForm.height,
+            weight: residentForm.weight,
+            targetWeight: residentForm.targetWeight,
           })
         }
       } catch (syncError) {
@@ -585,6 +597,10 @@ export default function PosbinduMonitoring() {
       jenisKelamin: resident.jenisKelamin,
       alamat: resident.alamat,
       password: resident.password || '',
+      phone: '',
+      height: 170,
+      weight: 65,
+      targetWeight: 60,
     })
     setIsModalOpen(true)
   }
@@ -647,6 +663,10 @@ export default function PosbinduMonitoring() {
       jenisKelamin: 'L',
       alamat: '',
       password: '',
+      phone: '',
+      height: 170,
+      weight: 65,
+      targetWeight: 60,
     })
   }
 
@@ -1423,6 +1443,52 @@ export default function PosbinduMonitoring() {
                       onChange={(e) => setResidentForm({ ...residentForm, alamat: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Alamat lengkap"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">No. Telepon</label>
+                    <input
+                      type="text"
+                      value={residentForm.phone}
+                      onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="+62 8xx xxxx xxxx"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tinggi Badan (cm)</label>
+                    <input
+                      type="number"
+                      value={residentForm.height}
+                      onChange={(e) => setResidentForm({ ...residentForm, height: parseInt(e.target.value) || 170 })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="170"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Berat Badan (kg)</label>
+                    <input
+                      type="number"
+                      value={residentForm.weight}
+                      onChange={(e) => setResidentForm({ ...residentForm, weight: parseInt(e.target.value) || 65 })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="65"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Target Berat (kg)</label>
+                    <input
+                      type="number"
+                      value={residentForm.targetWeight}
+                      onChange={(e) => setResidentForm({ ...residentForm, targetWeight: parseInt(e.target.value) || 60 })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="60"
                     />
                   </div>
                 </div>
