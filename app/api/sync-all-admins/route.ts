@@ -100,10 +100,17 @@ export async function POST(request: NextRequest) {
           emailVerified: true
         })
 
-        // Update admin document with uid if not set
+        // Update admin document with uid and role if not set
         if (!adminData.uid) {
           await db.collection('admins').doc(adminDoc.id).update({
             uid: userRecord.uid
+          })
+        }
+        
+        // Ensure role field exists
+        if (!adminData.role) {
+          await db.collection('admins').doc(adminDoc.id).update({
+            role: 'admin'
           })
         }
 
