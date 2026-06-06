@@ -111,6 +111,9 @@ export default function PosbinduMonitoring() {
   const [healthReadings, setHealthReadings] = useState<Record<string, any>>({})
   const [tbbbData, setTbbbData] = useState<Record<string, any>>({})
   const [todayAttendance, setTodayAttendance] = useState<Record<string, any>>({})
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; nama: string; nik: string } | null>(null)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
   // Fetch residents from Firestore
   useEffect(() => {
@@ -448,20 +451,24 @@ export default function PosbinduMonitoring() {
   }
 
   const handleDeleteResident = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus data warga ini? Ini akan menghapus semua data user termasuk akun login.')) return
-    try {
-      const resident = residents.find(r => r.id === id)
-      if (!resident || !resident.nik) {
-        showNotification('error', 'Data warga tidak ditemukan')
-        return
-      }
+    const resident = residents.find(r => r.id === id)
+    if (!resident || !resident.nik) {
+      showNotification('error', 'Data warga tidak ditemukan')
+      return
+    }
+    setDeleteTarget({ id, nama: resident.nama, nik: resident.nik })
+    setShowDeleteConfirm(true)
+  }
 
+  const confirmDeleteResident = async () => {
+    if (!deleteTarget) return
+    try {
       const response = await fetch('/api/delete-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ nik: resident.nik })
+        body: JSON.stringify({ nik: deleteTarget.nik })
       })
 
       const data = await response.json()
@@ -471,6 +478,8 @@ export default function PosbinduMonitoring() {
       }
 
       showNotification('success', 'Data warga dan akun user berhasil dihapus')
+      setShowDeleteConfirm(false)
+      setDeleteTarget(null)
     } catch (error: any) {
       console.error('Error deleting resident:', error)
       showNotification('error', error.message || 'Gagal menghapus data warga')
@@ -482,8 +491,10 @@ export default function PosbinduMonitoring() {
       showNotification('info', 'Pilih minimal satu warga untuk dihapus')
       return
     }
-    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedResidents.size} data warga? Ini akan menghapus semua data user termasuk akun login.`)) return
+    setShowBulkDeleteConfirm(true)
+  }
 
+  const confirmBulkDelete = async () => {
     try {
       let successCount = 0
       let failCount = 0
@@ -518,6 +529,7 @@ export default function PosbinduMonitoring() {
 
       setSelectedResidents(new Set())
       setIsSelectionMode(false)
+      setShowBulkDeleteConfirm(false)
 
       if (failCount === 0) {
         showNotification('success', `${successCount} data warga dan akun user berhasil dihapus`)
@@ -1558,6 +1570,124 @@ export default function PosbinduMonitoring() {
           </div>
         </div>
       )}
+
+      {/* Modern Delete Confirmation Modal */}
+      {showDeleteConfirm && deleteTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header with gradient */}
+            <div className="bg-gradient-to-r from-red-500 to-rose-600 p-6 text-white">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                  <AlertCircle className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Hapus Data Warga</h3>
+                  <p className="text-red-100 text-sm mt-1">Konfirmasi penghapusan data</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+                <p className="text-red-800 text-sm font-medium mb-2">⚠️ Peringatan Penting</p>
+                <p className="text-red-700 text-xs leading-relaxed">
+                  Tindakan ini akan menghapus semua data warga termasuk akun login, riwayat kesehatan, dan data absensi. Tindakan ini tidak dapat dibatalkan.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 rounded-2xl p-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center text-white font-bold text-lg">
+                    {deleteTarget.nama.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">{deleteTarget.nama}</p>
+                    <p className="text-sm text-gray-500">NIK: {deleteTarget.nik}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setDeleteTarget(null)
+                  }}
+                  className="flex-1 px-4 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium hover:border-gray-300"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmDeleteResident}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:from-red-600 hover:to-rose-700 transition-all font-medium shadow-lg shadow-red-500/30 hover:shadow-red-500/40"
+                >
+                  Ya, Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header with gradient */}
+            <div className="bg-gradient-to-r from-orange-500 to-amber-600 p-6 text-white">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                  <Trash2 className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Hapus Banyak Data</h3>
+                  <p className="text-orange-100 text-sm mt-1">{selectedResidents.size} warga terpilih</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-4">
+                <p className="text-orange-800 text-sm font-medium mb-2">⚠️ Peringatan Penting</p>
+                <p className="text-orange-700 text-xs leading-relaxed">
+                  Tindakan ini akan menghapus {selectedResidents.size} data warga sekaligus termasuk akun login, riwayat kesehatan, dan data absensi. Tindakan ini tidak dapat dibatalkan.
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-3xl font-bold text-gray-800">{selectedResidents.size}</p>
+                    <p className="text-sm text-gray-500">Warga akan dihapus</p>
+                  </div>
+                  <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-amber-500 rounded-2xl flex items-center justify-center">
+                    <Users className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                  className="flex-1 px-4 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium hover:border-gray-300"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmBulkDelete}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all font-medium shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40"
+                >
+                  Ya, Hapus Semua
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

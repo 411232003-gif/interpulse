@@ -92,6 +92,7 @@ export default function Navigation() {
   if (!isMobile) {
     const desktopNavItems = [
       { href: '/', label: 'Beranda', icon: Home },
+      { href: '/fitur', label: 'Fitur', icon: Grid3x3 },
       { href: '/profil', label: 'Profil', icon: User }
     ]
     return (

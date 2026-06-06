@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X, ArrowLeft } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X, ArrowLeft, Info } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -72,6 +72,10 @@ export default function MonitoringPage() {
   const [selectedResidents, setSelectedResidents] = useState<Set<string>>(new Set())
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingResident, setEditingResident] = useState<any>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; nama: string; nik: string } | null>(null)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
   // Resident form state for editing
   const [residentForm, setResidentForm] = useState({
@@ -83,6 +87,11 @@ export default function MonitoringPage() {
     jenisKelamin: 'L' as 'L' | 'P',
     alamat: ''
   })
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 4000)
+  }
 
   // Toggle selection mode
   const toggleSelectionMode = () => {
@@ -622,11 +631,10 @@ export default function MonitoringPage() {
   // Delete selected residents
   const deleteSelectedResidents = async () => {
     if (selectedResidents.size === 0) return
+    setShowBulkDeleteConfirm(true)
+  }
 
-    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedResidents.size} data warga? Ini akan menghapus semua data user termasuk akun login.`)) {
-      return
-    }
-
+  const confirmBulkDelete = async () => {
     try {
       let successCount = 0
       let failCount = 0
@@ -655,17 +663,18 @@ export default function MonitoringPage() {
 
       setSelectedResidents(new Set())
       setIsSelectionMode(false)
+      setShowBulkDeleteConfirm(false)
 
       if (failCount === 0) {
-        alert(`${successCount} data warga dan akun user berhasil dihapus`)
+        showNotification('success', `${successCount} data warga dan akun user berhasil dihapus`)
       } else if (successCount === 0) {
-        alert('Gagal menghapus semua data warga')
+        showNotification('error', 'Gagal menghapus semua data warga')
       } else {
-        alert(`${successCount} berhasil dihapus, ${failCount} gagal`)
+        showNotification('error', `${successCount} berhasil dihapus, ${failCount} gagal`)
       }
     } catch (error) {
       console.error('Error deleting residents:', error)
-      alert('Gagal menghapus data warga')
+      showNotification('error', 'Gagal menghapus data warga')
     }
   }
 
@@ -752,6 +761,74 @@ export default function MonitoringPage() {
       setExportDropdownOpen(false)
     }
   }
+
+  // Export functions for Rekapitulasi Partisipasi Warga per RW
+  const exportAttendanceToPDF = (rw: string) => {
+    // Filter data to only include the selected RW
+    const filteredCtx = {
+      ...buildExportContext(),
+      rwList: [rw],
+      customTargets: { [rw]: customTargets[rw] },
+      attendanceData: { [rw]: attendanceData[rw] },
+      healthReadings: { [rw]: healthReadings[rw] },
+      healthReadingsDetails: { [rw]: healthReadingsDetails[rw] },
+      residentsData: Object.fromEntries(
+        Object.entries(residentsData).filter(([_, data]) => data?.rw === rw)
+      ),
+      tableData: tableData.filter(row => row.rw === rw),
+      tbbbData: Object.fromEntries(
+        Object.entries(tbbbData).filter(([_, records]) => {
+          const rec = Array.isArray(records) ? records[0] : records
+          return rec?.rw === rw
+        })
+      )
+    }
+    exportMonitoringPDF(filteredCtx)
+  }
+
+  const exportAttendanceToExcel = async (rw: string) => {
+    // Filter data to only include the selected RW
+    const filteredCtx = {
+      ...buildExportContext(),
+      rwList: [rw],
+      customTargets: { [rw]: customTargets[rw] },
+      attendanceData: { [rw]: attendanceData[rw] },
+      healthReadings: { [rw]: healthReadings[rw] },
+      healthReadingsDetails: { [rw]: healthReadingsDetails[rw] },
+      residentsData: Object.fromEntries(
+        Object.entries(residentsData).filter(([_, data]) => data?.rw === rw)
+      ),
+      tableData: tableData.filter(row => row.rw === rw),
+      tbbbData: Object.fromEntries(
+        Object.entries(tbbbData).filter(([_, records]) => {
+          const rec = Array.isArray(records) ? records[0] : records
+          return rec?.rw === rw
+        })
+      )
+    }
+    await exportMonitoringExcel(filteredCtx)
+  }
+
+  const exportAttendanceToWhatsApp = (rw: string) => {
+    const attendance = attendanceData[rw]?.[selectedMonth] || 0
+    const target = customTargets[rw] || 0
+    const percentage = target > 0 ? ((attendance / target) * 100).toFixed(0) : '0'
+    
+    const message = `*REKAPITULASI PARTISIPASI WARGA*\n\n` +
+      `RW: ${rw}\n` +
+      `Bulan: ${monthLabels[selectedMonth]} ${new Date().getFullYear()}\n\n` +
+      `📊 *Data Partisipasi:*\n` +
+      `• Hadir/Partisipasi: ${attendance} warga\n` +
+      `• Target Warga: ${target} warga\n` +
+      `• Capaian: ${percentage}%\n\n` +
+      `📱 Laporan generated via InterPulse System`
+    
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
+    window.open(whatsappUrl, '_blank')
+  }
+
+  // State for dropdown per RW
+  const [attendanceExportDropdown, setAttendanceExportDropdown] = useState<Record<string, boolean>>({})
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -1041,13 +1118,14 @@ export default function MonitoringPage() {
               <table className="w-full text-sm border border-gray-200">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b">Wilayah</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Wilayah</th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Hadir / Partisipasi</th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">
                       <span>Total Target Warga</span>
                       <span className="ml-1 text-xs font-normal text-indigo-400">(klik untuk edit)</span>
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Capaian</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-b">Export</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1058,7 +1136,7 @@ export default function MonitoringPage() {
                     const colorClass = percentageNum >= 80 ? 'text-green-600' : percentageNum >= 60 ? 'text-yellow-600' : 'text-red-600'
                     return (
                       <tr key={rw} className="border-b">
-                        <td className="px-3 py-2">RW {rw}</td>
+                        <td className="px-3 py-2 text-center">RW {rw}</td>
                         <td className="px-3 py-2 text-center">{attendance}</td>
                         <td className="px-3 py-2 text-center">
                           {editingTarget === rw ? (
@@ -1100,6 +1178,48 @@ export default function MonitoringPage() {
                           )}
                         </td>
                         <td className={`px-3 py-2 text-center font-bold ${colorClass}`}>{percentage}%</td>
+                        <td className="px-3 py-2 text-center">
+                          <div className="relative inline-block">
+                            <button
+                              onClick={() => setAttendanceExportDropdown(prev => ({ ...prev, [rw]: !prev[rw] }))}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                            >
+                              <Download className="w-3 h-3" />
+                              <span>Export</span>
+                            </button>
+                            {attendanceExportDropdown[rw] && (
+                              <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                                <button
+                                  onClick={() => { exportAttendanceToPDF(rw); setAttendanceExportDropdown(prev => ({ ...prev, [rw]: false })); }}
+                                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl"
+                                >
+                                  <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+                                  </svg>
+                                  <span className="text-sm text-gray-700">Export PDF</span>
+                                </button>
+                                <button
+                                  onClick={() => { exportAttendanceToExcel(rw); setAttendanceExportDropdown(prev => ({ ...prev, [rw]: false })); }}
+                                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                                >
+                                  <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM4 22h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V8H4v2z"/>
+                                  </svg>
+                                  <span className="text-sm text-gray-700">Export Excel</span>
+                                </button>
+                                <button
+                                  onClick={() => { exportAttendanceToWhatsApp(rw); setAttendanceExportDropdown(prev => ({ ...prev, [rw]: false })); }}
+                                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-xl"
+                                >
+                                  <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                                  </svg>
+                                  <span className="text-sm text-gray-700">Export WA</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     )
                   })}
@@ -1120,6 +1240,7 @@ export default function MonitoringPage() {
                         return totalTgt > 0 ? ((totalAtt / totalTgt) * 100).toFixed(0) : '0'
                       })()}%
                     </td>
+                    <td className="px-3 py-2 border-t"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -1378,6 +1499,92 @@ export default function MonitoringPage() {
               </div>
             </div>
           )}
+
+      {/* Modern Notification Banner */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] ${
+            notification.type === 'success'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+              : notification.type === 'error'
+              ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              {notification.type === 'success' && <CheckCircle className="w-6 h-6" />}
+              {notification.type === 'error' && <AlertCircle className="w-6 h-6" />}
+              {notification.type === 'info' && <Info className="w-6 h-6" />}
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-white">{notification.message}</p>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Tutup notifikasi"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header with gradient */}
+            <div className="bg-gradient-to-r from-orange-500 to-amber-600 p-6 text-white">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                  <Trash2 className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Hapus Banyak Data</h3>
+                  <p className="text-orange-100 text-sm mt-1">{selectedResidents.size} warga terpilih</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-4">
+                <p className="text-orange-800 text-sm font-medium mb-2">⚠️ Peringatan Penting</p>
+                <p className="text-orange-700 text-xs leading-relaxed">
+                  Tindakan ini akan menghapus {selectedResidents.size} data warga sekaligus termasuk akun login, riwayat kesehatan, dan data absensi. Tindakan ini tidak dapat dibatalkan.
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-3xl font-bold text-gray-800">{selectedResidents.size}</p>
+                    <p className="text-sm text-gray-500">Warga akan dihapus</p>
+                  </div>
+                  <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-amber-500 rounded-2xl flex items-center justify-center">
+                    <Users className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                  className="flex-1 px-4 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium hover:border-gray-300"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmBulkDelete}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all font-medium shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40"
+                >
+                  Ya, Hapus Semua
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )
