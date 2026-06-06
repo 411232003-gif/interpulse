@@ -8,8 +8,11 @@ import { GlobalAudioProvider } from '@/contexts/GlobalAudioContext'
 import { useAuth } from '@/lib/auth-context'
 
 const publicRoutes = [
-  '/login', '/register', '/login-qr',
-  '/video-edukasi', '/Fasca', '/kalori-tracker', '/deteksi-jantung', '/musik-relaksasi', '/sehat-sentosa', '/monitoring', '/partisipasi', '/fitur'
+  '/login', '/register', '/login-qr'
+]
+
+const noNavRoutes = [
+  '/video-edukasi', '/Fasca', '/kalori-tracker', '/deteksi-jantung', '/musik-relaksasi', '/sehat-sentosa', '/monitoring', '/partisipasi'
 ]
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -46,6 +49,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }
 
   const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route))
+  const isNoNavRoute = noNavRoutes.some(route => pathname?.startsWith(route))
+  const shouldShowNav = !isPublicRoute && !isNoNavRoute
 
   // For public routes (login/register), don't show navigation but wrap with audio provider
   if (isPublicRoute) {
@@ -63,10 +68,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <GlobalAudioProvider>
-      <div className="pb-nav">
+      <div className={shouldShowNav ? 'pb-nav' : ''}>
         {children}
       </div>
-      <Navigation />
+      {shouldShowNav && <Navigation />}
       <MiniPlayer />
     </GlobalAudioProvider>
   )
