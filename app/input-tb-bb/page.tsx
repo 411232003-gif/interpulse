@@ -249,6 +249,30 @@ export default function InputTBBBPage() {
         await addDoc(collection(db, 'tb-bb'), tbData)
       }
 
+      // Add notification to user
+      try {
+        const usersQuery = query(
+          collection(db, 'users'),
+          where('nik', '==', selectedResident.nik)
+        )
+        const usersSnapshot = await getDocs(usersQuery)
+
+        if (!usersSnapshot.empty) {
+          const userDoc = usersSnapshot.docs[0]
+          const userId = userDoc.id
+
+          await addDoc(collection(db, 'notifications'), {
+            userId: userId,
+            type: 'tbbb',
+            message: `Data TB/BB Anda telah diinput (TB: ${tb} cm, BB: ${bb} kg)`,
+            timestamp: new Date().toISOString(),
+            read: false
+          })
+        }
+      } catch (notifError) {
+        console.error('Error adding notification:', notifError)
+      }
+
       closeModal()
       showNotification('success', 'Data tinggi badan dan berat badan tersimpan')
     } catch (error) {

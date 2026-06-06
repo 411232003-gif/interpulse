@@ -615,6 +615,30 @@ export default function CatatKesehatan() {
           await addDoc(collection(db, 'healthReadings'), reading)
         }
 
+        // Add notification to user
+        try {
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('nik', '==', userInfo.nik)
+          )
+          const usersSnapshot = await getDocs(usersQuery)
+
+          if (!usersSnapshot.empty) {
+            const userDoc = usersSnapshot.docs[0]
+            const userId = userDoc.id
+
+            await addDoc(collection(db, 'notifications'), {
+              userId: userId,
+              type: 'health',
+              message: `Data kesehatan Anda telah diinput (${readings.length} jenis pemeriksaan)`,
+              timestamp: new Date().toISOString(),
+              read: false
+            })
+          }
+        } catch (notifError) {
+          console.error('Error adding notification:', notifError)
+        }
+
         setResult({
           title: 'Data Berhasil Disimpan',
           color: 'text-green-600',

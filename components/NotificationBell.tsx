@@ -48,13 +48,34 @@ export default function NotificationBell() {
     )
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      const now = new Date()
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      
       const notifs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Notification))
 
-      setNotifications(notifs)
-      setUnreadCount(notifs.filter(n => !n.read).length)
+      // Filter out notifications older than 1 day
+      const validNotifs = notifs.filter(n => {
+        const notifTime = new Date(n.timestamp)
+        return notifTime > oneDayAgo
+      })
+
+      // Delete old notifications
+      notifs.forEach(async (n) => {
+        const notifTime = new Date(n.timestamp)
+        if (notifTime <= oneDayAgo) {
+          try {
+            await deleteDoc(doc(db, 'notifications', n.id))
+          } catch (error) {
+            console.error('Error deleting old notification:', error)
+          }
+        }
+      })
+
+      setNotifications(validNotifs)
+      setUnreadCount(validNotifs.filter(n => !n.read).length)
     })
 
     return () => unsubscribe()

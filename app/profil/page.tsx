@@ -287,6 +287,13 @@ export default function Profil() {
         kelurahan: editedProfile.kelurahan || '',
       }
 
+      // For non-admin users, also save NIK, RT, RW
+      if (authProfile.role !== 'admin') {
+        updateData.nik = editedProfile.nik || ''
+        updateData.rt = editedProfile.rt || ''
+        updateData.rw = editedProfile.rw || ''
+      }
+
       console.log('[Profile] Update data prepared:', updateData)
       console.log('[Profile] User role:', authProfile.role)
       
@@ -629,10 +636,24 @@ export default function Profil() {
                       <label htmlFor="edit-email" className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
                       <input id="edit-email" type="email" value={editedProfile.email} onChange={(e) => handleChange('email', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                     </div>
-                    <div>
-                      <label htmlFor="edit-phone" className="text-sm font-medium text-gray-700 mb-1 block">No Telepon</label>
-                      <input id="edit-phone" type="tel" value={editedProfile.phone} onChange={(e) => handleChange('phone', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
-                    </div>
+                    {!isAdmin && (
+                      <>
+                        <div>
+                          <label htmlFor="edit-nik" className="text-sm font-medium text-gray-700 mb-1 block">NIK</label>
+                          <input id="edit-nik" type="text" value={editedProfile.nik || ''} onChange={(e) => handleChange('nik', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nomor Induk Kependudukan" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label htmlFor="edit-rt" className="text-sm font-medium text-gray-700 mb-1 block">RT</label>
+                            <input id="edit-rt" type="text" value={editedProfile.rt || ''} onChange={(e) => handleChange('rt', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="RT" />
+                          </div>
+                          <div>
+                            <label htmlFor="edit-rw" className="text-sm font-medium text-gray-700 mb-1 block">RW</label>
+                            <input id="edit-rw" type="text" value={editedProfile.rw || ''} onChange={(e) => handleChange('rw', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="RW" />
+                          </div>
+                        </div>
+                      </>
+                    )}
                     <div>
                       <label htmlFor="edit-kelurahan" className="text-sm font-medium text-gray-700 mb-1 block">Kelurahan</label>
                       <input id="edit-kelurahan" type="text" value={editedProfile.kelurahan || ''} onChange={(e) => handleChange('kelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" />
@@ -674,20 +695,54 @@ export default function Profil() {
                         <p className="font-semibold text-gray-900 break-all">{profile.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="bg-green-100 p-3 rounded-full"><Phone className="w-6 h-6 text-green-600" /></div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-500">No Telepon</p>
-                        <p className="font-semibold text-gray-900">{profile.phone}</p>
+                    {!isAdmin && (
+                      <>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-indigo-100 p-3 rounded-full"><span className="text-indigo-600 text-xs font-bold">🆔</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">NIK</p>
+                            <p className="font-semibold text-gray-900">{profile.nik || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">📍</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">Kelurahan</p>
+                            <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-pink-100 p-3 rounded-full"><span className="text-pink-600 text-xs font-bold">🏠</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">RT</p>
+                            <p className="font-semibold text-gray-900">{profile.rt || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-rose-100 p-3 rounded-full"><span className="text-rose-600 text-xs font-bold">🏘️</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">RW</p>
+                            <p className="font-semibold text-gray-900">{profile.rw || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-orange-100 p-3 rounded-full"><span className="text-orange-600 text-xs font-bold">📌</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">Alamat</p>
+                            <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {isAdmin && (
+                      <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                        <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">📍</span></div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-500">Kelurahan</p>
+                          <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">📍</span></div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-500">Kelurahan</p>
-                        <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
-                      </div>
-                    </div>
+                    )}
                   </>
                 )}
               </CardContent>

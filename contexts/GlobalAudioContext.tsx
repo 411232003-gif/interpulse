@@ -31,7 +31,7 @@ const GlobalAudioContext = createContext<AudioContextType | undefined>(undefined
 const createAmbientSound = (trackId: string, audioContext: AudioContext): { gainNode: GainNode; cleanup: () => void } => {
   const masterGain = audioContext.createGain()
   masterGain.connect(audioContext.destination)
-  masterGain.gain.value = 0.3
+  masterGain.gain.value = 1.0
 
   const oscillators: OscillatorNode[] = []
   const gainNodes: GainNode[] = []
@@ -176,7 +176,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     audioNodesRef.current = createAmbientSound(track.id, audioContextRef.current)
     
     // Set volume
-    audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : volume * 0.3
+    audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : volume
     
     setCurrentTrack(track)
     setIsPlaying(true)
@@ -192,7 +192,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const resumeTrack = useCallback(() => {
     initAudioContext()
     if (audioNodesRef.current && currentTrack) {
-      audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : volume * 0.3
+      audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : volume
       setIsPlaying(true)
     } else if (currentTrack) {
       playTrack(currentTrack)
@@ -211,7 +211,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const setVolume = useCallback((newVolume: number) => {
     setVolumeState(newVolume)
     if (audioNodesRef.current) {
-      audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : newVolume * 0.3
+      audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : newVolume
     }
   }, [isMuted])
 
@@ -219,7 +219,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     setIsMuted(prev => {
       const newMuted = !prev
       if (audioNodesRef.current) {
-        audioNodesRef.current.gainNode.gain.value = newMuted ? 0 : volume * 0.3
+        audioNodesRef.current.gainNode.gain.value = newMuted ? 0 : volume
       }
       return newMuted
     })
