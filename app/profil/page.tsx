@@ -672,7 +672,7 @@ export default function Profil() {
                         </div>
                         <div>
                           <label htmlFor="edit-alamat" className="text-sm font-medium text-gray-700 mb-1 block">Alamat *</label>
-                          <textarea id="edit-alamat" value={editedProfile.alamat || ''} onChange={(e) => handleChange('alamat', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" rows="3" placeholder="Alamat lengkap" required />
+                          <textarea id="edit-alamat" value={editedProfile.alamat || ''} onChange={(e) => handleChange('alamat', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" rows={3} placeholder="Alamat lengkap" required />
                         </div>
                         <div>
                           <label htmlFor="edit-phone" className="text-sm font-medium text-gray-700 mb-1 block">No. Telepon</label>
