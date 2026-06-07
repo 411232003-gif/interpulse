@@ -758,27 +758,27 @@ export default function Profil() {
                   <QrCode className="w-5 h-5 text-teal-600" />
                   Akses Cepat
                 </CardTitle>
-                <CardDescription>Scan untuk login otomatis tanpa password</CardDescription>
+                <CardDescription>Scan untuk membuka halaman login InterPulse</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex flex-col items-center">
                   <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 mb-3">
                     <QRCodeSVG 
-                      value={`${appUrl}/login-qr?userId=${profile.uid}&email=${encodeURIComponent(profile.email)}`}
+                      value={`${appUrl}/login`}
                       size={180}
                       level="H"
                       includeMargin={true}
                     />
                   </div>
                   <p className="text-xs text-gray-500 text-center mb-3">
-                    Scan QR code ini dengan kamera HP untuk login otomatis ke InterPulse
+                    Scan QR code ini untuk membuka halaman login InterPulse
                   </p>
                   <Button
                     variant="outline"
                     size="sm"
                     className="w-full text-teal-600 border-teal-200 hover:bg-teal-50"
                     onClick={() => {
-                      const loginUrl = `${appUrl}/login-qr?userId=${profile.uid}&email=${encodeURIComponent(profile.email)}`
+                      const loginUrl = `${appUrl}/login`
                       navigator.clipboard.writeText(loginUrl)
                       showNotification('success', 'Link login telah disalin ke clipboard!')
                     }}
