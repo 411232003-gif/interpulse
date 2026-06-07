@@ -33,7 +33,7 @@ interface AnemiaResult {
   color: string
   bgColor: string
   advice: string
-  method: 'kuku' | 'konjungtiva' | 'ppg'
+  method: 'kuku' | 'konjungtiva'
   hbEstimate?: string
 }
 
@@ -255,104 +255,6 @@ const analyzeConjunctiva = (imageData: ImageData): AnemiaResult => {
   }
 }
 
-// ==================== 1.3. CEK ANEMIA - PPG ANALYZER ====================
-
-const analyzePPG = (ppgValues: number[]): AnemiaResult => {
-  if (ppgValues.length < 10) {
-    return {
-      score: 50,
-      status: 'ringan',
-      label: 'Data Tidak Cukup',
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
-      advice: 'Data PPG tidak cukup untuk analisis. Silakan coba lagi dengan durasi lebih lama.',
-      method: 'ppg',
-      hbEstimate: 'Tidak dapat ditentukan'
-    }
-  }
-  
-  // Calculate PPG metrics
-  const avgValue = ppgValues.reduce((a, b) => a + b, 0) / ppgValues.length
-  const maxValue = Math.max(...ppgValues)
-  const minValue = Math.min(...ppgValues)
-  const amplitude = maxValue - minValue
-  const variance = ppgValues.reduce((sum, val) => sum + Math.pow(val - avgValue, 2), 0) / ppgValues.length
-  
-  // PPG amplitude correlates with blood volume/hemoglobin
-  // Higher amplitude = better blood flow = likely higher Hb
-  let score = 0
-  
-  // Amplitude contribution (higher is better)
-  score += Math.min(40, (amplitude / 50) * 40)
-  
-  // Variance contribution (indicates pulse strength)
-  score += Math.min(30, (variance / 1000) * 30)
-  
-  // Average value contribution
-  if (avgValue > 150) {
-    score += 20
-  } else if (avgValue > 100) {
-    score += 10
-  } else {
-    score -= 10
-  }
-  
-  // Normalize score
-  score = Math.min(100, Math.max(0, score))
-  
-  // Add randomization
-  score += (Math.random() * 4 - 2)
-  score = Math.min(100, Math.max(0, Math.round(score)))
-  
-  const hbEstimate = score >= 70 ? '12-16 g/dL' : score >= 50 ? '10-12 g/dL' : score >= 30 ? '8-10 g/dL' : '<8 g/dL'
-
-  if (score >= 70) {
-    return {
-      score,
-      status: 'normal',
-      label: 'PPG Normal',
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
-      advice: 'Sinyal PPG menunjukkan aliran darah yang baik. Tidak ada indikasi anemia dari pembuluh darah kapiler.',
-      method: 'ppg',
-      hbEstimate
-    }
-  } else if (score >= 50) {
-    return {
-      score,
-      status: 'ringan',
-      label: 'PPG Lemah Ringan',
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
-      advice: 'Sinyal PPG sedikit lemah. Konsumsi makanan kaya zat besi dan vitamin C untuk meningkatkan hemoglobin.',
-      method: 'ppg',
-      hbEstimate
-    }
-  } else if (score >= 30) {
-    return {
-      score,
-      status: 'sedang',
-      label: 'PPG Lemah Sedang',
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
-      advice: 'Sinyal PPG cukup lemah. Disarankan cek hemoglobin. Aliran darah kapiler mungkin terganggu.',
-      method: 'ppg',
-      hbEstimate
-    }
-  } else {
-    return {
-      score,
-      status: 'berat',
-      label: 'PPG Sangat Lemah',
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
-      advice: 'Sinyal PPG sangat lemah! Segera periksa ke dokter. Kemungkinan anemia berat atau masalah sirkulasi.',
-      method: 'ppg',
-      hbEstimate
-    }
-  }
-}
-
 // ==================== 2. TES PENDENGARAN ====================
 
 const HEARING_FREQUENCIES = [
@@ -373,16 +275,10 @@ export default function HealthTools() {
   // ========== ANEMIA STATE ==========
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [anemiaMethod, setAnemiaMethod] = useState<'kuku' | 'konjungtiva' | 'ppg'>('kuku')
+  const [anemiaMethod, setAnemiaMethod] = useState<'kuku' | 'konjungtiva'>('kuku')
   const [anemiaResult, setAnemiaResult] = useState<AnemiaResult | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
-  const [ppgData, setPpgData] = useState<number[]>([])
-  const [isRecordingPpg, setIsRecordingPpg] = useState(false)
-  const isRecordingPpgRef = useRef(false)
-  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
-  const [isFlashOn, setIsFlashOn] = useState(false)
-  const streamRef = useRef<MediaStream | null>(null)
 
   // ========== HEARING TEST STATE ==========
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -396,24 +292,13 @@ export default function HealthTools() {
 
   // ==================== ANEMIA FUNCTIONS ====================
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-  }
 
   const initAnemiaCamera = async () => {
     try {
-      stopCamera()
       setCameraError(null)
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facingMode, width: 640, height: 480 }
+        video: { facingMode: 'environment', width: 640, height: 480 }
       })
-      streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
@@ -423,33 +308,8 @@ export default function HealthTools() {
     }
   }
 
-  const toggleFacingMode = () => {
-    setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')
-    setTimeout(initAnemiaCamera, 100)
-  }
-
-  const toggleFlash = async () => {
-    const newState = !isFlashOn
-    setIsFlashOn(newState)
-    if (!streamRef.current) return
-    try {
-      const videoTrack = streamRef.current.getVideoTracks()[0]
-      if (!videoTrack) return
-      await (videoTrack as any).applyConstraints({
-        advanced: [{ torch: newState }]
-      })
-    } catch (err) {
-      console.warn('Torch constraint not supported:', err)
-      // State already updated above for UI feedback
-    }
-  }
 
   const captureAndAnalyze = () => {
-    if (anemiaMethod === 'ppg') {
-      startPpgRecording()
-      return
-    }
-
     if (!videoRef.current || !canvasRef.current) return
     
     setIsAnalyzing(true)
@@ -474,118 +334,12 @@ export default function HealthTools() {
     
     setAnemiaResult(result)
     setIsAnalyzing(false)
-    
-    stopCamera()
   }
 
-  const startPpgRecording = async () => {
-    isRecordingPpgRef.current = true
-    setIsRecordingPpg(true)
-    setPpgData([])
-    setCameraError(null)
-    
-    try {
-      await initAnemiaCamera()
-      
-      // Auto-enable flash for PPG mode
-      if (!isFlashOn && streamRef.current) {
-        try {
-          const videoTrack = streamRef.current.getVideoTracks()[0]
-          if (videoTrack) {
-            await (videoTrack as any).applyConstraints({ advanced: [{ torch: true }] })
-            setIsFlashOn(true)
-          }
-        } catch (flashErr) {
-          console.warn('Could not auto-enable flash:', flashErr)
-        }
-      }
-      
-      // Wait for flash + camera to stabilize
-      await new Promise(resolve => setTimeout(resolve, 800))
-      
-      const canvas = canvasRef.current
-      const ctx = canvas?.getContext('2d')
-      
-      if (!videoRef.current || !canvas || !ctx) {
-        throw new Error('Kamera atau canvas tidak tersedia')
-      }
-
-      const recordingDuration = 5000
-      const interval = 100
-      const frames = recordingDuration / interval
-      let frameCount = 0
-      
-      const recordFrame = () => {
-        // Use ref (not state) to avoid stale closure
-        if (frameCount >= frames || !isRecordingPpgRef.current) {
-          if (isRecordingPpgRef.current) {
-            isRecordingPpgRef.current = false
-            stopPpgRecording()
-          }
-          return
-        }
-        
-        if (!videoRef.current || videoRef.current.videoWidth === 0) {
-          frameCount++
-          setTimeout(recordFrame, interval)
-          return
-        }
-
-        canvas.width = videoRef.current.videoWidth
-        canvas.height = videoRef.current.videoHeight
-        ctx.drawImage(videoRef.current, 0, 0)
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-        const data = imageData.data
-        
-        let totalRed = 0
-        const startX = Math.floor(canvas.width * 0.35)
-        const endX = Math.floor(canvas.width * 0.65)
-        const startY = Math.floor(canvas.height * 0.35)
-        const endY = Math.floor(canvas.height * 0.65)
-        let count = 0
-        
-        for (let y = startY; y < endY; y += 2) {
-          for (let x = startX; x < endX; x += 2) {
-            const i = (y * canvas.width + x) * 4
-            totalRed += data[i] // Red channel only for PPG
-            count++
-          }
-        }
-        
-        const avgRed = count > 0 ? totalRed / count : 0
-        setPpgData(prev => [...prev, avgRed])
-        
-        frameCount++
-        setTimeout(recordFrame, interval)
-      }
-      
-      recordFrame()
-    } catch (err) {
-      console.error('Error in PPG recording:', err)
-      setCameraError('Gagal merekam PPG. Pastikan kamera aktif dan izin diberikan.')
-      isRecordingPpgRef.current = false
-      setIsRecordingPpg(false)
-    }
-  }
-
-  const stopPpgRecording = () => {
-    isRecordingPpgRef.current = false
-    setIsRecordingPpg(false)
-    setIsAnalyzing(true)
-    
-    // Analyze PPG data
-    const result = analyzePPG(ppgData)
-    setAnemiaResult(result)
-    setIsAnalyzing(false)
-    
-    stopCamera()
-  }
 
   const resetAnemia = () => {
     setAnemiaResult(null)
     setCameraError(null)
-    setIsFlashOn(false)
     initAnemiaCamera()
   }
 
@@ -747,7 +501,7 @@ export default function HealthTools() {
               <Card className="mb-4">
                 <CardContent className="p-4">
                   <h3 className="font-semibold mb-3 text-sm">Pilih Metode Pemeriksaan</h3>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => { setAnemiaMethod('kuku'); setAnemiaResult(null); initAnemiaCamera() }}
                       className={`p-3 rounded-lg text-center transition-all ${anemiaMethod === 'kuku' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
@@ -762,108 +516,46 @@ export default function HealthTools() {
                       <div className="text-lg mb-1">👁️</div>
                       <div className="text-xs font-medium">Kelopak Mata</div>
                     </button>
-                    <button
-                      onClick={() => { setAnemiaMethod('ppg'); setAnemiaResult(null); initAnemiaCamera() }}
-                      className={`p-3 rounded-lg text-center transition-all ${anemiaMethod === 'ppg' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                    >
-                      <div className="text-lg mb-1">📱</div>
-                      <div className="text-xs font-medium">Jari+Flash</div>
-                    </button>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Camera Preview */}
-              {!isRecordingPpg && (
-                <Card className="overflow-hidden mb-4">
-                  <div className="relative aspect-[4/3] bg-black">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
-                    <canvas ref={canvasRef} className="hidden" />
-                    
-                    {/* Camera Controls */}
-                    <div className="absolute top-3 right-3 flex gap-2">
-                      <button
-                        onClick={toggleFacingMode}
-                        className="p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                        title="Ganti Kamera"
-                      >
-                        <Camera className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={toggleFlash}
-                        className={`p-2 rounded-full text-white transition-colors ${isFlashOn ? 'bg-yellow-500/80' : 'bg-black/50 hover:bg-black/70'}`}
-                        title={isFlashOn ? 'Matikan Flash' : 'Nyalakan Flash'}
-                      >
-                        {isFlashOn ? '🔦' : '🔌'}
-                      </button>
-                    </div>
-                    
-                    {/* Guide overlay - different for each method */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      {anemiaMethod === 'kuku' && (
-                        <>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-32 h-32 border-2 border-white/70 rounded-lg" />
-                          </div>
-                          <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
-                            Letakkan kuku jari di dalam kotak
-                          </p>
-                        </>
-                      )}
-                      {anemiaMethod === 'konjungtiva' && (
-                        <>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-40 h-24 border-2 border-white/70 rounded-full" />
-                          </div>
-                          <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
-                            Tarik kelopak mata bawah, fokus ke bagian dalam
-                          </p>
-                        </>
-                      )}
-                      {anemiaMethod === 'ppg' && (
-                        <>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-24 h-24 border-2 border-white/70 rounded-full" />
-                          </div>
-                          <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
-                            Tekan ujung jari di atas kamera & flash
-                          </p>
-                        </>
-                      )}
-                    </div>
+              <Card className="overflow-hidden mb-4">
+                <div className="relative aspect-[4/3] bg-black">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                  
+                  {/* Guide overlay - different for each method */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    {anemiaMethod === 'kuku' && (
+                      <>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-32 h-32 border-2 border-white/70 rounded-lg" />
+                        </div>
+                        <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
+                          Letakkan kuku jari di dalam kotak
+                        </p>
+                      </>
+                    )}
+                    {anemiaMethod === 'konjungtiva' && (
+                      <>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-40 h-24 border-2 border-white/70 rounded-full" />
+                        </div>
+                        <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs px-4">
+                          Tarik kelopak mata bawah, fokus ke bagian dalam
+                        </p>
+                      </>
+                    )}
                   </div>
-                </Card>
-              )}
-
-              {/* PPG Recording Indicator */}
-              {isRecordingPpg && (
-                <Card className="mb-4 border-2 border-red-400">
-                  <CardContent className="p-6 text-center">
-                    <div className="animate-pulse mb-3">
-                      <div className="w-16 h-16 bg-red-500 rounded-full mx-auto flex items-center justify-center">
-                        <Droplets className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                    <h3 className="font-bold text-lg mb-2">Merekam PPG...</h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Tetap tekan jari di atas kamera dan flash. Jangan bergerak.
-                    </p>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-red-500 h-2 rounded-full transition-all duration-100"
-                        style={{ width: `${(ppgData.length / 50) * 100}%` }}
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">{ppgData.length}/50 frame</p>
-                  </CardContent>
-                </Card>
-              )}
+                </div>
+              </Card>
 
               {cameraError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -893,23 +585,15 @@ export default function HealthTools() {
                       <li>Tekan tombol &quot;Analisis&quot; untuk memindai</li>
                     </ol>
                   )}
-                  {anemiaMethod === 'ppg' && (
-                    <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                      <li>Tekan tombol 🔦 untuk menyalakan flash</li>
-                      <li>Letakkan ujung jari di atas kamera & flash</li>
-                      <li>Tekan dengan lembut, jangan terlalu kuat</li>
-                      <li>Tahan selama 5 detik saat perekaman</li>
-                    </ol>
-                  )}
                 </CardContent>
               </Card>
 
               <Button 
                 onClick={captureAndAnalyze}
-                disabled={isAnalyzing || isRecordingPpg || cameraError !== null}
+                disabled={isAnalyzing || cameraError !== null}
                 className="w-full bg-red-500 hover:bg-red-600 text-white py-6"
               >
-                {isAnalyzing ? 'Menganalisis...' : isRecordingPpg ? 'Merekam...' : anemiaMethod === 'ppg' ? 'Mulai Perekaman' : anemiaMethod === 'konjungtiva' ? 'Analisis Kelopak Mata' : 'Analisis Warna Kuku'}
+                {isAnalyzing ? 'Menganalisis...' : anemiaMethod === 'konjungtiva' ? 'Analisis Kelopak Mata' : 'Analisis Warna Kuku'}
               </Button>
             </div>
           ) : (
@@ -933,7 +617,7 @@ export default function HealthTools() {
                     <div className="bg-blue-50 rounded-lg p-3 text-center">
                       <p className="text-xs text-blue-600 mb-1">Metode</p>
                       <p className="text-sm font-semibold text-blue-800">
-                        {anemiaResult.method === 'kuku' ? 'Kuku' : anemiaResult.method === 'konjungtiva' ? 'Kelopak Mata' : 'PPG'}
+                        {anemiaResult.method === 'kuku' ? 'Kuku' : 'Kelopak Mata'}
                       </p>
                     </div>
                     <div className="bg-purple-50 rounded-lg p-3 text-center">

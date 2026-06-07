@@ -7,7 +7,6 @@ interface Track {
   name: string
   description: string
   color: string
-  audioUrl?: string
 }
 
 interface AudioState {
@@ -39,17 +38,6 @@ const createAmbientSound = (trackId: string, audioContext: AudioContext): { gain
   const filters: (BiquadFilterNode | StereoPannerNode)[] = []
 
   switch (trackId) {
-    case 'dj-mbg': {
-      // Use simple HTML5 Audio for file-based tracks (no Web Audio API)
-      const audio = new Audio('/DJ MBG MAS BAHLIL GANTENG FYP TIKTOK BASS HOREG TERBARU 2026.mp4')
-      audio.loop = true
-      audio.volume = 0.5
-      audio.play().catch(err => console.error('Audio play error:', err))
-      
-      ;(masterGain as any).audioElement = audio
-      break
-    }
-    
     case 'wind': {
       // Pink noise simulation for wind
       const bufferSize = 4096
@@ -168,7 +156,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioNodesRef = useRef<{ gainNode: GainNode; cleanup: () => void } | null>(null)
-  const htmlAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
@@ -181,30 +168,13 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const playTrack = useCallback((track: Track) => {
-    // Stop any existing HTML audio
-    if (htmlAudioRef.current) {
-      htmlAudioRef.current.pause()
-      htmlAudioRef.current = null
-    }
     // Stop any existing Web Audio nodes
     if (audioNodesRef.current) {
       audioNodesRef.current.cleanup()
       audioNodesRef.current = null
     }
 
-    // File-based track: use HTML5 Audio directly
-    if (track.audioUrl) {
-      const audio = new Audio(track.audioUrl)
-      audio.loop = true
-      audio.volume = isMuted ? 0 : volume
-      audio.play().catch(err => console.error('Audio play error:', err))
-      htmlAudioRef.current = audio
-      setCurrentTrack(track)
-      setIsPlaying(true)
-      return
-    }
-
-    // Synthesized track: use Web Audio API
+    // Use Web Audio API for all tracks
     initAudioContext()
     if (!audioContextRef.current) return
     audioNodesRef.current = createAmbientSound(track.id, audioContextRef.current)
@@ -214,9 +184,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [currentTrack, volume, isMuted, initAudioContext])
 
   const pauseTrack = useCallback(() => {
-    if (htmlAudioRef.current) {
-      htmlAudioRef.current.pause()
-    }
     if (audioNodesRef.current) {
       audioNodesRef.current.gainNode.gain.value = 0
     }
@@ -224,11 +191,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const resumeTrack = useCallback(() => {
-    if (htmlAudioRef.current) {
-      htmlAudioRef.current.play().catch(err => console.error('Resume error:', err))
-      setIsPlaying(true)
-      return
-    }
     initAudioContext()
     if (audioNodesRef.current && currentTrack) {
       audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : volume
@@ -239,11 +201,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [currentTrack, volume, isMuted, initAudioContext, playTrack])
 
   const stopTrack = useCallback(() => {
-    if (htmlAudioRef.current) {
-      htmlAudioRef.current.pause()
-      htmlAudioRef.current.currentTime = 0
-      htmlAudioRef.current = null
-    }
     if (audioNodesRef.current) {
       audioNodesRef.current.cleanup()
       audioNodesRef.current = null
@@ -254,9 +211,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
 
   const setVolume = useCallback((newVolume: number) => {
     setVolumeState(newVolume)
-    if (htmlAudioRef.current) {
-      htmlAudioRef.current.volume = isMuted ? 0 : newVolume
-    }
     if (audioNodesRef.current) {
       audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : newVolume
     }
@@ -265,9 +219,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
       const newMuted = !prev
-      if (htmlAudioRef.current) {
-        htmlAudioRef.current.volume = newMuted ? 0 : volume
-      }
       if (audioNodesRef.current) {
         audioNodesRef.current.gainNode.gain.value = newMuted ? 0 : volume
       }
@@ -328,12 +279,5 @@ export const availableTracks: Track[] = [
     name: 'Deep Meditation',
     description: 'Frekuensi theta untuk meditasi dalam',
     color: 'from-violet-500 to-fuchsia-600'
-  },
-  {
-    id: 'dj-mbg',
-    name: 'DJ MBG MAS BAHLIL GANTENG',
-    description: 'FYP TIKTOK BASS HOREG TERBARU 2026',
-    color: 'from-pink-500 to-rose-600',
-    audioUrl: '/DJ MBG MAS BAHLIL GANTENG FYP TIKTOK BASS HOREG TERBARU 2026.mp4'
   }
 ]
