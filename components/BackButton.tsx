@@ -23,10 +23,10 @@ export default function BackButton({ className = '', label = 'Kembali', onClick 
   return (
     <button
       onClick={handleClick}
-      className={`inline-flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 hover:text-gray-900 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 ${className}`}
+      className={`inline-flex items-center justify-center p-2 hover:bg-gray-100 text-gray-600 hover:text-gray-900 rounded-full transition-all duration-200 ${className}`}
+      title={label}
     >
-      <ArrowLeft className="w-4 h-4" />
-      <span className="font-medium">{label}</span>
+      <ArrowLeft className="w-5 h-5" />
     </button>
   )
 }

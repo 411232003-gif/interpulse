@@ -279,6 +279,8 @@ export default function HealthTools() {
   const [anemiaResult, setAnemiaResult] = useState<AnemiaResult | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+  const streamRef = useRef<MediaStream | null>(null)
 
   // ========== HEARING TEST STATE ==========
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -292,13 +294,24 @@ export default function HealthTools() {
 
   // ==================== ANEMIA FUNCTIONS ====================
 
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+  }
 
   const initAnemiaCamera = async () => {
     try {
+      stopCamera()
       setCameraError(null)
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: 640, height: 480 }
+        video: { facingMode: facingMode, width: 640, height: 480 }
       })
+      streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
@@ -306,6 +319,11 @@ export default function HealthTools() {
     } catch (err) {
       setCameraError('Tidak dapat mengakses kamera. Pastikan izin diberikan.')
     }
+  }
+
+  const toggleFacingMode = () => {
+    setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')
+    setTimeout(initAnemiaCamera, 100)
   }
 
 
@@ -334,6 +352,7 @@ export default function HealthTools() {
     
     setAnemiaResult(result)
     setIsAnalyzing(false)
+    stopCamera()
   }
 
 
@@ -416,7 +435,6 @@ export default function HealthTools() {
           {/* Header */}
           <div className="flex items-center gap-3 px-4 mb-6">
             <BackButton onClick={() => router.push('/')} />
-            <h1 className="text-xl font-bold">Pemeriksaan Kesehatan</h1>
           </div>
           <div className="text-center mb-8 px-4">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl mb-4 shadow-lg">
@@ -530,6 +548,17 @@ export default function HealthTools() {
                     className="w-full h-full object-cover"
                   />
                   <canvas ref={canvasRef} className="hidden" />
+                  
+                  {/* Camera Controls */}
+                  <div className="absolute top-3 right-3">
+                    <button
+                      onClick={toggleFacingMode}
+                      className="p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                      title="Ganti Kamera"
+                    >
+                      <Camera className="w-5 h-5" />
+                    </button>
+                  </div>
                   
                   {/* Guide overlay - different for each method */}
                   <div className="absolute inset-0 pointer-events-none">
