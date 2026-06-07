@@ -355,7 +355,7 @@ export default function Profil() {
   const handleChange = (field: keyof UserProfile, value: string | number) => {
     console.log('[Profile] handleChange:', field, '=', value)
     setEditedProfile(prev => {
-      const updated = { ...prev, [field]: value }
+      const updated = { ...prev, [field]: value as any }
       console.log('[Profile] editedProfile updated:', updated)
       return updated
     })
