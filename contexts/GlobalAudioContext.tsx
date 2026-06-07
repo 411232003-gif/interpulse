@@ -40,19 +40,12 @@ const createAmbientSound = (trackId: string, audioContext: AudioContext): { gain
 
   switch (trackId) {
     case 'dj-mbg': {
-      // Use HTML5 Audio for file-based tracks
+      // Use simple HTML5 Audio for file-based tracks (no Web Audio API)
       const audio = new Audio('/DJ MBG MAS BAHLIL GANTENG FYP TIKTOK BASS HOREG TERBARU 2026.mp4')
       audio.loop = true
-      audio.play()
+      audio.volume = 0.5
+      audio.play().catch(err => console.error('Audio play error:', err))
       
-      const gain = audioContext.createGain()
-      gain.gain.value = 0.5
-      
-      const source = audioContext.createMediaElementSource(audio)
-      source.connect(gain)
-      gain.connect(masterGain)
-      
-      gainNodes.push(gain)
       ;(masterGain as any).audioElement = audio
       break
     }

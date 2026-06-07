@@ -73,6 +73,11 @@ export default function Profil() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authNewPassword, setAuthNewPassword] = useState('')
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('')
+  const [showAuthPassword, setShowAuthPassword] = useState(false)
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message })
@@ -275,24 +280,76 @@ export default function Profil() {
     setIsEditing(true)
   }
 
+  const handleAuthUpdate = async () => {
+    if (!authProfile?.uid) {
+      showNotification('error', 'User tidak terdeteksi')
+      return
+    }
+
+    // Validate password if provided
+    if (authNewPassword) {
+      if (authNewPassword.length < 6) {
+        showNotification('error', 'Password minimal 6 karakter')
+        return
+      }
+      if (authNewPassword !== authConfirmPassword) {
+        showNotification('error', 'Konfirmasi password tidak cocok')
+        return
+      }
+    }
+
+    if (!authEmail) {
+      showNotification('error', 'Email harus diisi')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await fetch('/api/update-admin-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: authProfile.uid,
+          email: authEmail,
+          password: authNewPassword || undefined
+        })
+      })
+      const result = await response.json()
+      if (!result.success) {
+        throw new Error(result.error || 'Gagal update Firebase Auth')
+      }
+
+      // Update Firestore email
+      const adminRef = doc(db, 'admins', authProfile.uid)
+      await updateDoc(adminRef, { email: authEmail })
+
+      setAuthEmail('')
+      setAuthNewPassword('')
+      setAuthConfirmPassword('')
+      setShowAuthModal(false)
+      await refreshProfile()
+      showNotification('success', 'Email dan password berhasil diupdate')
+    } catch (error) {
+      console.error('Error updating auth:', error)
+      showNotification('error', 'Gagal update email/password')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openAuthModal = () => {
+    setAuthEmail(profile.email || '')
+    setAuthNewPassword('')
+    setAuthConfirmPassword('')
+    setShowAuthModal(true)
+  }
+
   const handleSave = async () => {
     console.log('[Profile] handleSave called, authProfile:', authProfile)
     if (!authProfile?.uid) {
       console.error('[Profile] No authProfile.uid found')
       showNotification('error', 'Gagal menyimpan profil: User tidak terdeteksi. Silakan login ulang.')
       return
-    }
-
-    // Validate password if provided
-    if (newPassword) {
-      if (newPassword.length < 6) {
-        showNotification('error', 'Password minimal 6 karakter')
-        return
-      }
-      if (newPassword !== confirmPassword) {
-        showNotification('error', 'Konfirmasi password tidak cocok')
-        return
-      }
     }
 
     setSaving(true)
@@ -319,7 +376,7 @@ export default function Profil() {
       console.log('[Profile] Update data prepared:', updateData)
       console.log('[Profile] User role:', authProfile.role)
       
-      // If user is admin, save to admins collection and update Firebase Auth
+      // If user is admin, save to admins collection
       if (authProfile.role === 'admin') {
         const adminRef = doc(db, 'admins', authProfile.uid)
         const adminUpdateData: any = {
@@ -329,30 +386,6 @@ export default function Profil() {
         console.log('[Profile] Updating admin document:', adminUpdateData)
         await updateDoc(adminRef, adminUpdateData)
         console.log('[Profile] Admin document updated with adminKelurahan')
-
-        // Update Firebase Auth if email or password changed
-        if (editedProfile.email !== authProfile.email || newPassword) {
-          try {
-            const response = await fetch('/api/update-admin-auth', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                uid: authProfile.uid,
-                email: editedProfile.email,
-                password: newPassword || undefined
-              })
-            })
-            const result = await response.json()
-            if (!result.success) {
-              throw new Error(result.error || 'Gagal update Firebase Auth')
-            }
-            console.log('[Profile] Firebase Auth updated successfully')
-          } catch (authError) {
-            console.error('[Profile] Error updating Firebase Auth:', authError)
-            showNotification('error', 'Gagal update email/password di Firebase Auth')
-            return
-          }
-        }
       } else {
         // For non-admin users, update users collection
         const userRef = doc(db, 'users', authProfile.uid)
@@ -363,8 +396,6 @@ export default function Profil() {
 
       setProfile({ ...editedProfile })
       setIsEditing(false)
-      setNewPassword('')
-      setConfirmPassword('')
       await refreshProfile()
       console.log('[Profile] Profile refreshed')
 
@@ -657,19 +688,24 @@ export default function Profil() {
             {/* Informasi Pribadi */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between">
                   <CardTitle>{isAdmin ? 'admin kelurahan' : 'Informasi Pribadi'}</CardTitle>
                   <div className="flex gap-2">
                     {isAdmin && (
-                      isEditing ? (
-                        <Button variant="outline" size="sm" onClick={handleCancel}>
-                          <X className="w-4 h-4 mr-2" /> Batal
+                      <>
+                        <Button variant="outline" size="sm" onClick={openAuthModal}>
+                          <Mail className="w-4 h-4 mr-2" /> Edit Email/Password
                         </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" onClick={handleEdit}>
-                          <Settings className="w-4 h-4 mr-2" /> Edit
-                        </Button>
-                      )
+                        {isEditing ? (
+                          <Button variant="outline" size="sm" onClick={handleCancel}>
+                            <X className="w-4 h-4 mr-2" /> Batal
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={handleEdit}>
+                            <Settings className="w-4 h-4 mr-2" /> Edit
+                          </Button>
+                        )}
+                      </>
                     )}
                     <Button variant="outline" size="sm" onClick={handleLogout} className="text-red-600 hover:bg-red-50">
                       <LogOut className="w-4 h-4 mr-2" /> Keluar
@@ -687,47 +723,9 @@ export default function Profil() {
                     {isAdmin && (
                       <>
                         <div>
-                          <label htmlFor="edit-email" className="text-sm font-medium text-gray-700 mb-1 block">Email *</label>
-                          <input id="edit-email" type="email" value={editedProfile.email || ''} onChange={(e) => handleChange('email', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="admin@interpulse.id" required />
-                        </div>
-                        <div>
                           <label htmlFor="edit-kelurahan" className="text-sm font-medium text-gray-700 mb-1 block">Kelurahan *</label>
                           <input id="edit-kelurahan" type="text" value={editedProfile.adminKelurahan || ''} onChange={(e) => handleChange('adminKelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" required />
                         </div>
-                        <div>
-                          <label htmlFor="edit-password" className="text-sm font-medium text-gray-700 mb-1 block">Password Baru (Opsional)</label>
-                          <div className="relative">
-                            <input 
-                              id="edit-password" 
-                              type={showPassword ? 'text' : 'password'} 
-                              value={newPassword} 
-                              onChange={(e) => setNewPassword(e.target.value)} 
-                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 pr-10" 
-                              placeholder="Biarkan kosong jika tidak ingin mengubah password"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                            </button>
-                          </div>
-                        </div>
-                        {newPassword && (
-                          <div>
-                            <label htmlFor="edit-confirm-password" className="text-sm font-medium text-gray-700 mb-1 block">Konfirmasi Password *</label>
-                            <input 
-                              id="edit-confirm-password" 
-                              type="password" 
-                              value={confirmPassword} 
-                              onChange={(e) => setConfirmPassword(e.target.value)} 
-                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" 
-                              placeholder="Ulangi password baru"
-                              required
-                            />
-                          </div>
-                        )}
                       </>
                     )}
                     {!isAdmin && (
@@ -1185,6 +1183,82 @@ export default function Profil() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin: Edit Email/Password Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 transform transition-all animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-800">Edit Email & Password</h3>
+              <button onClick={() => setShowAuthModal(false)} className="p-2 hover:bg-gray-100 rounded-lg" title="Tutup modal">
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={e => setAuthEmail(e.target.value)}
+                  placeholder="admin@interpulse.id"
+                  required
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password Baru (Opsional)</label>
+                <div className="relative">
+                  <input
+                    type={showAuthPassword ? 'text' : 'password'}
+                    value={authNewPassword}
+                    onChange={e => setAuthNewPassword(e.target.value)}
+                    placeholder="Biarkan kosong jika tidak ingin mengubah"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthPassword(!showAuthPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showAuthPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+              {authNewPassword && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Konfirmasi Password *</label>
+                  <input
+                    type="password"
+                    value={authConfirmPassword}
+                    onChange={e => setAuthConfirmPassword(e.target.value)}
+                    placeholder="Ulangi password baru"
+                    required
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              )}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAuthModal(false)}
+                  className="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAuthUpdate}
+                  disabled={saving}
+                  className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
