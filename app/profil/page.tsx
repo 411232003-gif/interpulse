@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { User, Mail, Phone, Calendar, Settings, X, Save, Plus, Trash2, Edit3, Trophy, QrCode, Share2, LogOut, Eye, EyeOff, CheckCircle, AlertCircle, Info } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth, UserProfile } from '@/lib/auth-context'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 
@@ -321,7 +321,7 @@ export default function Profil() {
 
       // Update Firestore email
       const adminRef = doc(db, 'admins', authProfile.uid)
-      await updateDoc(adminRef, { email: authEmail })
+      await setDoc(adminRef, { email: authEmail }, { merge: true })
 
       setAuthEmail('')
       setAuthNewPassword('')
@@ -384,13 +384,15 @@ export default function Profil() {
           adminKelurahan: editedProfile.adminKelurahan || '',
         }
         console.log('[Profile] Updating admin document:', adminUpdateData)
-        await updateDoc(adminRef, adminUpdateData)
+        // Use setDoc with merge to create document if it doesn't exist
+        await setDoc(adminRef, adminUpdateData, { merge: true })
         console.log('[Profile] Admin document updated with adminKelurahan')
       } else {
         // For non-admin users, update users collection
         const userRef = doc(db, 'users', authProfile.uid)
         console.log('[Profile] Updating user document:', updateData)
-        await updateDoc(userRef, updateData)
+        // Use setDoc with merge to create document if it doesn't exist
+        await setDoc(userRef, updateData, { merge: true })
         console.log('[Profile] User document update successful')
       }
 
