@@ -44,23 +44,31 @@ export default function RootLayout({
         
         {/* PWA Icons - Only use logo-app.png */}
         <link rel="icon" type="image/png" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="57x57" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="60x60" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="72x72" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="76x76" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="114x114" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="120x120" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="144x144" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/logo-app.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/logo-app.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/logo-app.png" />
         <link rel="shortcut icon" type="image/png" href="/logo-app.png" />
         
         {/* Manifest */}
         <link rel="manifest" href="/manifest.json" />
         
-        {/* Service Worker - Temporarily disabled to fix cache issues */}
+        {/* Service Worker - Register for PWA support */}
         <script dangerouslySetInnerHTML={{
           __html: `
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
-                // Unregister semua service worker untuk clear cache
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  for(let registration of registrations) {
-                    console.log('[InterPulse] Unregistering SW:', registration.scope);
-                    registration.unregister();
-                  }
+                navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                  console.log('[InterPulse] Service Worker registered:', registration.scope);
+                }).catch(function(error) {
+                  console.log('[InterPulse] Service Worker registration failed:', error);
                 });
               });
             }
