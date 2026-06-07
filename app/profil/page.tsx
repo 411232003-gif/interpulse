@@ -639,6 +639,18 @@ export default function Profil() {
                       <label htmlFor="edit-name" className="text-sm font-medium text-gray-700 mb-1 block">Nama Lengkap *</label>
                       <input id="edit-name" type="text" value={editedProfile.name} onChange={(e) => handleChange('name', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" required />
                     </div>
+                    {isAdmin && (
+                      <>
+                        <div>
+                          <label htmlFor="edit-email" className="text-sm font-medium text-gray-700 mb-1 block">Email *</label>
+                          <input id="edit-email" type="email" value={editedProfile.email || ''} onChange={(e) => handleChange('email', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="admin@interpulse.id" required />
+                        </div>
+                        <div>
+                          <label htmlFor="edit-kelurahan" className="text-sm font-medium text-gray-700 mb-1 block">Kelurahan *</label>
+                          <input id="edit-kelurahan" type="text" value={editedProfile.adminKelurahan || ''} onChange={(e) => handleChange('adminKelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" required />
+                        </div>
+                      </>
+                    )}
                     {!isAdmin && (
                       <>
                         <div>
@@ -707,6 +719,24 @@ export default function Profil() {
                         <p className="font-semibold text-gray-900">{profile.name}</p>
                       </div>
                     </div>
+                    {isAdmin && (
+                      <>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-blue-100 p-3 rounded-full"><Mail className="w-6 h-6 text-blue-600" /></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">Email</p>
+                            <p className="font-semibold text-gray-900">{profile.email || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-green-100 p-3 rounded-full"><span className="text-green-600 text-xs font-bold">🏢</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">Kelurahan</p>
+                            <p className="font-semibold text-gray-900">{profile.adminKelurahan || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                     {!isAdmin && (
                       <>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
