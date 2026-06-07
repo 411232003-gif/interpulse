@@ -72,19 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clear any old QR login data for security
     localStorage.removeItem('interpulse_user')
 
-    // Use Firebase Auth only
+    // Use Firebase Auth only - no cookie handling to prevent conflicts
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser)
 
       if (firebaseUser) {
-        // Get and set auth token cookie
-        try {
-          const token = await getIdToken(firebaseUser)
-          setAuthCookie(token)
-        } catch (err) {
-          console.error('Error getting token:', err)
-        }
-
         // Check if user is admin first
         try {
           const adminsQuery = query(collection(db, 'admins'), where('uid', '==', firebaseUser.uid))
@@ -177,7 +169,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setUserProfile(null)
-        clearAuthCookie()
       }
 
       setLoading(false)
