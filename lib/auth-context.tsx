@@ -69,162 +69,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isGuest, setIsGuest] = useState(false)
 
   useEffect(() => {
-    // Check for QR code login first
-    const checkQRLogin = async () => {
-      const qrLoginData = localStorage.getItem('interpulse_user')
+    // Clear any old QR login data for security
+    localStorage.removeItem('interpulse_user')
 
-      if (qrLoginData) {
+    // Use Firebase Auth only
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser)
+
+      if (firebaseUser) {
+        // Get and set auth token cookie
         try {
-          const loginData = JSON.parse(qrLoginData)
-
-          // Verify login is recent (within 24 hours)
-          const loginTime = new Date(loginData.loginTime)
-          const now = new Date()
-          const hoursDiff = (now.getTime() - loginTime.getTime()) / (1000 * 60 * 60)
-
-          if (hoursDiff < 24) {
-            // Check if user is admin first
-            const adminsQuery = query(collection(db, 'admins'), where('uid', '==', loginData.uid))
-            const adminsSnapshot = await getDocs(adminsQuery)
-            
-            if (!adminsSnapshot.empty) {
-              const adminData = adminsSnapshot.docs[0].data()
-              setUserProfile({
-                uid: adminData.uid,
-                email: adminData.email,
-                nik: adminData.nik || '',
-                name: adminData.name || '',
-                phone: adminData.phone || '',
-                birthDate: '',
-                height: 0,
-                weight: 0,
-                targetWeight: 0,
-                gender: '',
-                rt: adminData.rt || '',
-                rw: adminData.rw || '',
-                kelurahan: adminData.adminKelurahan || '',
-                role: adminData.role || 'admin',
-                createdAt: adminData.createdAt || new Date().toISOString()
-              })
-              // Create a mock Firebase user object
-              setUser({
-                uid: loginData.uid,
-                email: loginData.email,
-                displayName: loginData.name,
-              } as FirebaseUser)
-              setLoading(false)
-              return
-            }
-
-            // Fetch user profile from Firestore
-            const profileDoc = await getDoc(doc(db, 'users', loginData.uid))
-            if (profileDoc.exists()) {
-              const profileData = profileDoc.data() as UserProfile
-              setUserProfile(profileData)
-              // Create a mock Firebase user object
-              setUser({
-                uid: loginData.uid,
-                email: loginData.email,
-                displayName: loginData.name,
-              } as FirebaseUser)
-              setLoading(false)
-              return
-            }
-          } else {
-            // Clear expired login data
-            localStorage.removeItem('interpulse_user')
-          }
+          const token = await getIdToken(firebaseUser)
+          setAuthCookie(token)
         } catch (err) {
-          console.error('Error parsing QR login data:', err)
-          localStorage.removeItem('interpulse_user')
+          console.error('Error getting token:', err)
         }
-      }
 
-      // Fall back to Firebase Auth
-      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        setUser(firebaseUser)
-
-        if (firebaseUser) {
-          // Get and set auth token cookie
-          try {
-            const token = await getIdToken(firebaseUser)
-            setAuthCookie(token)
-          } catch (err) {
-            console.error('Error getting token:', err)
+        // Check if user is admin first
+        try {
+          const adminsQuery = query(collection(db, 'admins'), where('uid', '==', firebaseUser.uid))
+          const adminsSnapshot = await getDocs(adminsQuery)
+          
+          if (!adminsSnapshot.empty) {
+            const adminData = adminsSnapshot.docs[0].data()
+            setUserProfile({
+              uid: adminData.uid,
+              email: adminData.email,
+              nik: adminData.nik || '',
+              name: adminData.name || '',
+              phone: adminData.phone || '',
+              birthDate: '',
+              height: 0,
+              weight: 0,
+              targetWeight: 0,
+              gender: '',
+              rt: adminData.rt || '',
+              rw: adminData.rw || '',
+              kelurahan: adminData.adminKelurahan || '',
+              role: adminData.role || 'admin',
+              createdAt: adminData.createdAt || new Date().toISOString()
+            })
+            setLoading(false)
+            return
           }
+        } catch (adminErr) {
+          console.error('Error checking admin collection:', adminErr)
+        }
 
-          // Check if user is admin first
-          try {
-            const adminsQuery = query(collection(db, 'admins'), where('uid', '==', firebaseUser.uid))
-            const adminsSnapshot = await getDocs(adminsQuery)
-            
-            if (!adminsSnapshot.empty) {
-              const adminData = adminsSnapshot.docs[0].data()
-              setUserProfile({
-                uid: adminData.uid,
-                email: adminData.email,
-                nik: adminData.nik || '',
-                name: adminData.name || '',
-                phone: adminData.phone || '',
-                birthDate: '',
-                height: 0,
-                weight: 0,
-                targetWeight: 0,
-                gender: '',
-                rt: adminData.rt || '',
-                rw: adminData.rw || '',
-                kelurahan: adminData.adminKelurahan || '',
-                role: adminData.role || 'admin',
-                createdAt: adminData.createdAt || new Date().toISOString()
-              })
-              setLoading(false)
-              return
-            }
-          } catch (adminErr) {
-            console.error('Error checking admin collection:', adminErr)
-          }
-
-          // Fetch user profile from Firestore
-          try {
-            const profileDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
-            if (profileDoc.exists()) {
-              setUserProfile(profileDoc.data() as UserProfile)
-            } else {
-              console.warn('User profile not found in Firestore for uid:', firebaseUser.uid)
-              // Create default profile for new user
-              const defaultProfile: UserProfile = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                role: 'user',
-                createdAt: new Date().toISOString(),
-                name: '',
-                phone: '',
-                birthDate: '',
-                height: 0,
-                weight: 0,
-                targetWeight: 0,
-                gender: '',
-                rt: '',
-                rw: '',
-                kelurahan: '',
-                nik: '',
-              }
-              try {
-                await setDoc(doc(db, 'users', firebaseUser.uid), defaultProfile)
-                setUserProfile(defaultProfile)
-                console.log('Created default profile for user:', firebaseUser.uid)
-              } catch (createErr: any) {
-                console.error('Error creating default profile:', createErr)
-                // Still set default profile locally even if Firestore write fails
-                setUserProfile(defaultProfile)
-              }
-            }
-          } catch (err: any) {
-            console.error('Error fetching user profile from Firestore:', err)
-            console.error('Error code:', err.code)
-            console.error('Error message:', err.message)
-            // Set minimal profile to allow app to function
-            const minimalProfile: UserProfile = {
+        // Fetch user profile from Firestore
+        try {
+          const profileDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
+          if (profileDoc.exists()) {
+            setUserProfile(profileDoc.data() as UserProfile)
+          } else {
+            console.warn('User profile not found in Firestore for uid:', firebaseUser.uid)
+            // Create default profile for new user
+            const defaultProfile: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
               role: 'user',
@@ -241,20 +141,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               kelurahan: '',
               nik: '',
             }
-            setUserProfile(minimalProfile)
+            try {
+              await setDoc(doc(db, 'users', firebaseUser.uid), defaultProfile)
+              setUserProfile(defaultProfile)
+              console.log('Created default profile for user:', firebaseUser.uid)
+            } catch (createErr: any) {
+              console.error('Error creating default profile:', createErr)
+              // Still set default profile locally even if Firestore write fails
+              setUserProfile(defaultProfile)
+            }
           }
-        } else {
-          setUserProfile(null)
-          clearAuthCookie()
+        } catch (err: any) {
+          console.error('Error fetching user profile from Firestore:', err)
+          console.error('Error code:', err.code)
+          console.error('Error message:', err.message)
+          // Set minimal profile to allow app to function
+          const minimalProfile: UserProfile = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            role: 'user',
+            createdAt: new Date().toISOString(),
+            name: '',
+            phone: '',
+            birthDate: '',
+            height: 0,
+            weight: 0,
+            targetWeight: 0,
+            gender: '',
+            rt: '',
+            rw: '',
+            kelurahan: '',
+            nik: '',
+          }
+          setUserProfile(minimalProfile)
         }
+      } else {
+        setUserProfile(null)
+        clearAuthCookie()
+      }
 
-        setLoading(false)
-      })
+      setLoading(false)
+    })
 
-      return () => unsubscribe()
-    }
-
-    checkQRLogin()
+    return () => unsubscribe()
   }, [])
 
   const login = async (email: string, password: string) => {
