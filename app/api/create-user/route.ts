@@ -37,9 +37,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat, adminId, phone, height, weight, targetWeight } = body
 
-    // If alamat not provided, fetch from admin profile
-    let kelurahan = alamat
-    if (!kelurahan && adminId) {
+    // Get kelurahan from admin profile if not provided
+    let kelurahan = ''
+    if (adminId) {
       try {
         const adminDoc = await db.collection('admins').doc(adminId).get()
         if (adminDoc.exists) {
@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
       birthDate: birthDate,
       gender: jenisKelamin,
       kelurahan: kelurahan,
+      alamat: alamat || '',
       role: 'user',
       password: password,
       phone: phone || '',
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
       birthDate: birthDate,
       umur: age,
       jenisKelamin: jenisKelamin,
-      alamat: kelurahan,
+      alamat: alamat || kelurahan,
       password: password
     })
 

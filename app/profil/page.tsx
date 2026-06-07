@@ -54,6 +54,7 @@ const defaultProfile: UserProfile = {
   rt: '001',
   rw: '01',
   kelurahan: 'Kelurahan Contoh',
+  alamat: '',
   role: 'user',
   createdAt: '',
 }
@@ -215,6 +216,7 @@ export default function Profil() {
         rt: authProfile.rt,
         rw: authProfile.rw,
         kelurahan: authProfile.kelurahan,
+        alamat: authProfile.alamat || '',
         adminKelurahan: authProfile.adminKelurahan || '',
         role: authProfile.role,
         createdAt: authProfile.createdAt
@@ -610,14 +612,16 @@ export default function Profil() {
                 <div className="flex items-center justify-between">
                   <CardTitle>{isAdmin ? 'admin kelurahan' : 'Informasi Pribadi'}</CardTitle>
                   <div className="flex gap-2">
-                    {isEditing ? (
-                      <Button variant="outline" size="sm" onClick={handleCancel}>
-                        <X className="w-4 h-4 mr-2" /> Batal
-                      </Button>
-                    ) : (
-                      <Button variant="outline" size="sm" onClick={handleEdit}>
-                        <Settings className="w-4 h-4 mr-2" /> Edit
-                      </Button>
+                    {isAdmin && (
+                      isEditing ? (
+                        <Button variant="outline" size="sm" onClick={handleCancel}>
+                          <X className="w-4 h-4 mr-2" /> Batal
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={handleEdit}>
+                          <Settings className="w-4 h-4 mr-2" /> Edit
+                        </Button>
+                      )
                     )}
                     <Button variant="outline" size="sm" onClick={handleLogout} className="text-red-600 hover:bg-red-50">
                       <LogOut className="w-4 h-4 mr-2" /> Keluar
@@ -684,7 +688,7 @@ export default function Profil() {
                     <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                       <div className="bg-teal-100 p-3 rounded-full"><User className="w-6 h-6 text-teal-600" /></div>
                       <div className="flex-1">
-                        <p className="text-sm text-gray-500">Nama</p>
+                        <p className="text-sm text-gray-500">Nama Lengkap</p>
                         <p className="font-semibold text-gray-900">{profile.name}</p>
                       </div>
                     </div>
@@ -705,14 +709,28 @@ export default function Profil() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">📍</span></div>
+                          <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">�</span></div>
                           <div className="flex-1">
-                            <p className="text-sm text-gray-500">Kelurahan</p>
-                            <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
+                            <p className="text-sm text-gray-500">Tanggal Lahir</p>
+                            <p className="font-semibold text-gray-900">{profile.birthDate || 'Belum diisi'}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-pink-100 p-3 rounded-full"><span className="text-pink-600 text-xs font-bold">🏠</span></div>
+                          <div className="bg-pink-100 p-3 rounded-full"><span className="text-pink-600 text-xs font-bold">👤</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">Jenis Kelamin</p>
+                            <p className="font-semibold text-gray-900">{profile.gender === 'L' ? 'Laki-laki' : profile.gender === 'P' ? 'Perempuan' : 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-green-100 p-3 rounded-full"><span className="text-green-600 text-xs font-bold">📍</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">Alamat</p>
+                            <p className="font-semibold text-gray-900">{profile.alamat || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-orange-100 p-3 rounded-full"><span className="text-orange-600 text-xs font-bold">🏠</span></div>
                           <div className="flex-1">
                             <p className="text-sm text-gray-500">RT</p>
                             <p className="font-semibold text-gray-900">{profile.rt || 'Belum diisi'}</p>
@@ -726,22 +744,13 @@ export default function Profil() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-orange-100 p-3 rounded-full"><span className="text-orange-600 text-xs font-bold">📌</span></div>
+                          <div className="bg-cyan-100 p-3 rounded-full"><span className="text-cyan-600 text-xs font-bold">🏘️</span></div>
                           <div className="flex-1">
-                            <p className="text-sm text-gray-500">Alamat</p>
+                            <p className="text-sm text-gray-500">Kelurahan</p>
                             <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
                           </div>
                         </div>
                       </>
-                    )}
-                    {isAdmin && (
-                      <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                        <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">📍</span></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-500">Kelurahan</p>
-                          <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
-                        </div>
-                      </div>
                     )}
                   </>
                 )}

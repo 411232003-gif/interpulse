@@ -36,6 +36,7 @@ export interface UserProfile {
   rt: string
   rw: string
   kelurahan: string
+  alamat: string
   adminKelurahan?: string
   role: 'user' | 'admin' | 'operator_rw'
   operatorRW?: string
@@ -98,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               rt: adminData.rt || '',
               rw: adminData.rw || '',
               kelurahan: adminData.adminKelurahan || '',
+              alamat: '',
               role: adminData.role || 'admin',
               createdAt: adminData.createdAt || new Date().toISOString()
             })
@@ -131,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               rt: '',
               rw: '',
               kelurahan: '',
+              alamat: '',
               nik: '',
             }
             try {
@@ -163,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             rt: '',
             rw: '',
             kelurahan: '',
+            alamat: '',
             nik: '',
           }
           setUserProfile(minimalProfile)
@@ -216,6 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       rt: '',
       rw: '',
       kelurahan: '',
+      alamat: '',
       nik: '',
       ...profile,
     }
@@ -302,6 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             rt: adminData.rt || '',
             rw: adminData.rw || '',
             kelurahan: adminData.adminKelurahan || '',
+            alamat: '',
             adminKelurahan: adminData.adminKelurahan || '',
             role: 'admin',
             createdAt: adminData.createdAt || new Date().toISOString()

@@ -70,7 +70,8 @@ export default function RegisterPage() {
           targetWeight: parseFloat(formData.weight) || 0,
           rt: formData.rt,
           rw: formData.rw,
-          kelurahan: formData.kelurahan
+          kelurahan: formData.kelurahan,
+          alamat: ''
         }
       )
       router.push('/')
