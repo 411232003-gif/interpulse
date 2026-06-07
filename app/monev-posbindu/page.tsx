@@ -3,9 +3,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
+import { useRouter } from 'next/navigation'
+import BackButton from '@/components/BackButton'
 import { Users, Activity, History } from 'lucide-react'
 
 export default function MonevPosbindu() {
+  const router = useRouter()
   const { isAdmin, loading } = useAuth()
   const [isMobile, setIsMobile] = useState(false)
 
@@ -34,9 +37,7 @@ export default function MonevPosbindu() {
       <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
           <p className="text-gray-600 mb-4">Halaman ini hanya untuk admin.</p>
-          <Link href="/" className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors">
-            Kembali ke Beranda
-          </Link>
+          <BackButton onClick={() => router.push('/')} />
         </div>
       </div>
     )

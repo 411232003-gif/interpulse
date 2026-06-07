@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Apple, Activity, Dumbbell, Heart, ArrowLeft, Lightbulb, RefreshCw, PlayCircle, Flame } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import BackButton from '@/components/BackButton'
+import { Apple, Activity, Dumbbell, Heart, Lightbulb, RefreshCw, PlayCircle, Flame } from 'lucide-react'
 
 interface Tip {
   href: string
@@ -13,6 +15,7 @@ interface Tip {
 }
 
 export default function TipsPage() {
+  const router = useRouter()
   const [isMobile, setIsMobile] = useState(false)
   const [dailyTip, setDailyTip] = useState('')
   const [currentTipIndex, setCurrentTipIndex] = useState(0)
@@ -125,9 +128,7 @@ export default function TipsPage() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6 flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors" aria-label="Kembali ke beranda">
-            <ArrowLeft className="w-6 h-6" />
-          </Link>
+          <BackButton onClick={() => router.push('/')} />
           <div className="mt-0">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
               Tips Kesehatan

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import BigNumpad from '@/components/BigNumpad'
 import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope, Download, MoreVertical, FileText, Table, MessageCircle, PlusCircle, Edit2, Trash2, Info, Lock } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import BackButton from '@/components/BackButton'
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import jsPDF from 'jspdf'
@@ -930,7 +931,7 @@ export default function CatatKesehatan() {
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <button onClick={() => router.push('/')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition-all text-sm">← Kembali</button>
+                <BackButton onClick={() => router.push('/')} />
                 <h1 className="text-2xl font-bold text-gray-800">Input Kesehatan Warga</h1>
               </div>
               <div className="text-right">

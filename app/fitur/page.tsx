@@ -2,9 +2,12 @@
 
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { Activity, Heart, PlayCircle, Loader2, ArrowLeft } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import BackButton from '@/components/BackButton'
+import { Activity, Heart, PlayCircle, Loader2 } from 'lucide-react'
 
 export default function FiturPage() {
+  const router = useRouter()
   const { user, loading, isGuest } = useAuth()
 
   // Show loading while checking auth
@@ -20,14 +23,6 @@ export default function FiturPage() {
   }
 
   const features = [
-    {
-      title: 'Kalori Tracker',
-      description: 'Pantau asupan kalori harian Anda',
-      href: '/kalori-tracker',
-      icon: Activity,
-      gradient: 'from-orange-500 to-yellow-500',
-      bgColor: 'bg-orange-50'
-    },
     {
       title: 'Skrining Jantung',
       description: 'Cek kesehatan jantung Anda',
@@ -51,10 +46,7 @@ export default function FiturPage() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <Link href="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-teal-600 mb-4">
-            <ArrowLeft className="w-5 h-5" />
-            <span className="text-sm font-medium">Kembali</span>
-          </Link>
+          <BackButton onClick={() => router.push('/')} />
           <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
             Fitur Kesehatan
           </h1>

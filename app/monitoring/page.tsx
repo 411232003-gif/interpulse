@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X, ArrowLeft, Info } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X, Info } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import BackButton from '@/components/BackButton'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
@@ -835,13 +836,7 @@ export default function MonitoringPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-b-3xl shadow-lg">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            aria-label="Kembali"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
+          <BackButton />
           <div>
             <h1 className="text-2xl font-bold">Laporan</h1>
             <p className="text-indigo-100 text-sm mt-1">Pantau data kesehatan warga</p>

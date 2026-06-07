@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { db, auth } = getFirebaseAdmin()
 
     const body = await request.json()
-    const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat, adminId, phone, height, weight, targetWeight } = body
+    const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat, adminId, phone } = body
 
     // Get kelurahan from admin profile if not provided
     let kelurahan = ''
@@ -113,9 +113,6 @@ export async function POST(request: NextRequest) {
       role: 'user',
       password: password,
       phone: phone || '',
-      height: height || 170,
-      weight: weight || 65,
-      targetWeight: targetWeight || 60,
       createdAt: new Date().toISOString()
     })
 

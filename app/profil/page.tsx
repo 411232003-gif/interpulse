@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import BackButton from '@/components/BackButton'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { User, Mail, Phone, Calendar, Ruler, Weight, Target, Settings, X, Save, Plus, Trash2, Edit3, Trophy, QrCode, Share2, LogOut, Eye, EyeOff, CheckCircle, AlertCircle, Info } from 'lucide-react'
+import { User, Mail, Phone, Calendar, Settings, X, Save, Plus, Trash2, Edit3, Trophy, QrCode, Share2, LogOut, Eye, EyeOff, CheckCircle, AlertCircle, Info } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth, UserProfile } from '@/lib/auth-context'
 import { doc, updateDoc } from 'firebase/firestore'
@@ -297,9 +297,6 @@ export default function Profil() {
         updateData.birthDate = editedProfile.birthDate || ''
         updateData.gender = editedProfile.gender || ''
         updateData.alamat = editedProfile.alamat || ''
-        updateData.height = editedProfile.height || 170
-        updateData.weight = editedProfile.weight || 65
-        updateData.targetWeight = editedProfile.targetWeight || 60
       }
 
       console.log('[Profile] Update data prepared:', updateData)
@@ -678,20 +675,6 @@ export default function Profil() {
                           <label htmlFor="edit-phone" className="text-sm font-medium text-gray-700 mb-1 block">No. Telepon</label>
                           <input id="edit-phone" type="tel" value={editedProfile.phone || ''} onChange={(e) => handleChange('phone', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="+62 8xx xxxx xxxx" />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label htmlFor="edit-height" className="text-sm font-medium text-gray-700 mb-1 block">Tinggi Badan (cm)</label>
-                            <input id="edit-height" type="number" value={editedProfile.height || 170} onChange={(e) => handleChange('height', parseInt(e.target.value) || 170)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="170" />
-                          </div>
-                          <div>
-                            <label htmlFor="edit-weight" className="text-sm font-medium text-gray-700 mb-1 block">Berat Badan (kg)</label>
-                            <input id="edit-weight" type="number" value={editedProfile.weight || 65} onChange={(e) => handleChange('weight', parseInt(e.target.value) || 65)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="65" />
-                          </div>
-                        </div>
-                        <div>
-                          <label htmlFor="edit-targetWeight" className="text-sm font-medium text-gray-700 mb-1 block">Target Berat (kg)</label>
-                          <input id="edit-targetWeight" type="number" value={editedProfile.targetWeight || 60} onChange={(e) => handleChange('targetWeight', parseInt(e.target.value) || 60)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="60" />
-                        </div>
                       </>
                     )}
                     <div className="flex gap-3 pt-4">
@@ -770,27 +753,6 @@ export default function Profil() {
                           <div className="flex-1">
                             <p className="text-sm text-gray-500">No. Telepon</p>
                             <p className="font-semibold text-gray-900">{profile.phone || 'Belum diisi'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-purple-100 p-3 rounded-full"><Ruler className="w-6 h-6 text-purple-600" /></div>
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-500">Tinggi Badan</p>
-                            <p className="font-semibold text-gray-900">{profile.height || 170} cm</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-orange-100 p-3 rounded-full"><Weight className="w-6 h-6 text-orange-600" /></div>
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-500">Berat Badan</p>
-                            <p className="font-semibold text-gray-900">{profile.weight || 65} kg</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-teal-100 p-3 rounded-full"><Target className="w-6 h-6 text-teal-600" /></div>
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-500">Target Berat</p>
-                            <p className="font-semibold text-gray-900">{profile.targetWeight || 60} kg</p>
                           </div>
                         </div>
                       </>

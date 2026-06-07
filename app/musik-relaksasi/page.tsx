@@ -2,10 +2,13 @@
 
 import { useGlobalAudio, availableTracks } from '@/contexts/GlobalAudioContext'
 import Link from 'next/link'
-import { Music, Play, Pause, Volume2, VolumeX, Headphones, ArrowLeft } from 'lucide-react'
+import { Music, Play, Pause, Volume2, VolumeX, Headphones } from 'lucide-react'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import BackButton from '@/components/BackButton'
 
 export default function MusikRelaksasi() {
+  const router = useRouter()
   const { 
     isPlaying, 
     currentTrack, 
@@ -38,9 +41,7 @@ export default function MusikRelaksasi() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-nav">
-      <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
-        <ArrowLeft className="w-6 h-6" />
-      </Link>
+      <BackButton onClick={() => router.push('/')} />
       
       <div className="mobile-container py-4 sm:py-6">
         {/* Header */}

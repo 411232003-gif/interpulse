@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Heart, Droplet, Activity, TrendingUp, Download, FileText, ArrowLeft, User, Clock } from 'lucide-react'
+import { Calendar, Heart, Droplet, Activity, TrendingUp, Download, FileText, User, Clock } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import BackButton from '@/components/BackButton'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import jsPDF from 'jspdf'
@@ -215,10 +216,7 @@ export default function TrafikUser() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <Link href="/" className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold mb-4 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-            Kembali
-          </Link>
+          <BackButton onClick={() => router.push('/')} />
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
               <User className="w-8 h-8 text-white" />
@@ -235,11 +233,11 @@ export default function TrafikUser() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100">
               <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Nama</p>
-              <p className="text-lg font-extrabold text-gray-900 mt-1">{userProfile?.name || '-'}</p>
+              <p className="text-lg font-extrabold text-gray-900 mt-1 break-words">{userProfile?.name || '-'}</p>
             </div>
             <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 border border-purple-100">
               <p className="text-xs font-bold text-purple-600 uppercase tracking-wider">NIK</p>
-              <p className="text-lg font-extrabold text-gray-900 mt-1">{userProfile?.nik || '-'}</p>
+              <p className="text-lg font-extrabold text-gray-900 mt-1 break-all">{userProfile?.nik || '-'}</p>
             </div>
             <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl p-4 border border-pink-100">
               <p className="text-xs font-bold text-pink-600 uppercase tracking-wider">RW</p>

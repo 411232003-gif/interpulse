@@ -130,9 +130,7 @@ export default function FascaCatatan() {
           <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">Halaman untuk Warga</h2>
           <p className="text-gray-600 mb-6">FASCA ini khusus untuk pengecekan mandiri warga.</p>
-          <button onClick={() => router.push('/')} className="px-6 py-3 bg-purple-600 text-white rounded-xl font-medium">
-            Kembali ke Beranda
-          </button>
+          <BackButton onClick={() => router.push('/')} />
         </div>
       </div>
     )

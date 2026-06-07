@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
+import BackButton from '@/components/BackButton'
 import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, ArrowLeft, CheckCircle, Download, FileText, MessageSquare, ChevronDown, Info, ArrowRight } from 'lucide-react'
+import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, CheckCircle, Download, FileText, MessageSquare, ChevronDown, Info, ArrowRight } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
@@ -422,9 +423,6 @@ export default function PosbinduMonitoring() {
             rw: residentForm.rw,
             alamat: residentForm.alamat,
             phone: residentForm.phone,
-            height: residentForm.height,
-            weight: residentForm.weight,
-            targetWeight: residentForm.targetWeight,
             birthDate: residentForm.birthDate,
             gender: residentForm.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan',
           })
@@ -1058,13 +1056,7 @@ export default function PosbinduMonitoring() {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-b-3xl shadow-lg">
         <div className="flex items-center gap-4 mb-2">
-          <button
-            onClick={() => router.push('/monev-posbindu')}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            title="Kembali ke Monev Posbindu"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
+          <BackButton onClick={() => router.push('/monev-posbindu')} />
           <h1 className="text-2xl font-bold">{isAdmin ? 'Data Warga' : 'Absensi Posbindu'}</h1>
         </div>
         <p className="text-blue-100 text-sm ml-10">{isAdmin ? 'Daftar warga kelurahan Duri Selatan' : 'Silakan isi form absensi saat datang ke Posbindu'}</p>
@@ -1449,50 +1441,15 @@ export default function PosbinduMonitoring() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">No. Telepon</label>
-                    <input
-                      type="text"
-                      value={residentForm.phone}
-                      onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="+62 8xx xxxx xxxx"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tinggi Badan (cm)</label>
-                    <input
-                      type="number"
-                      value={residentForm.height}
-                      onChange={(e) => setResidentForm({ ...residentForm, height: parseInt(e.target.value) || 170 })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="170"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Berat Badan (kg)</label>
-                    <input
-                      type="number"
-                      value={residentForm.weight}
-                      onChange={(e) => setResidentForm({ ...residentForm, weight: parseInt(e.target.value) || 65 })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="65"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Target Berat (kg)</label>
-                    <input
-                      type="number"
-                      value={residentForm.targetWeight}
-                      onChange={(e) => setResidentForm({ ...residentForm, targetWeight: parseInt(e.target.value) || 60 })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="60"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">No. Telepon</label>
+                  <input
+                    type="text"
+                    value={residentForm.phone}
+                    onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="+62 8xx xxxx xxxx"
+                  />
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

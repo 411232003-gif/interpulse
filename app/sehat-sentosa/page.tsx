@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Search, Heart, Leaf, Droplets, Sun, Wind, Shield, Star, Activity, Flame, ArrowLeft } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import BackButton from '@/components/BackButton'
+import { Search, Heart, Leaf, Droplets, Sun, Wind, Shield, Star, Activity, Flame } from 'lucide-react'
 
 interface Ramuan {
   id: number
@@ -245,6 +247,7 @@ const kategoriColors = {
 }
 
 export default function SehatSentosa() {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedKategori, setSelectedKategori] = useState<string>('semua')
   const [expandedBenefits, setExpandedBenefits] = useState<Set<number>>(new Set())
@@ -265,9 +268,7 @@ export default function SehatSentosa() {
         {/* Header */}
         <div className="mb-12">
           <div className="flex items-center gap-3 mb-4">
-            <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
-              <ArrowLeft className="w-6 h-6" />
-            </Link>
+            <BackButton onClick={() => router.push('/')} />
             <div className="text-center flex-1">
               <h1 className="text-5xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-4">
                 Sehat Sentosa 🌿

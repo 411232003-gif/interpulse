@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { 
   Ear,
-  Pill,
   Droplets,
   Camera,
   Volume2,
@@ -12,27 +11,20 @@ import {
   Plus,
   Trash2,
   Clock,
-  ChevronLeft,
   Info,
   CheckCircle,
   AlertTriangle,
   RotateCcw,
   ArrowLeft,
-  Play
+  Play,
+  ChevronLeft
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import BackButton from '@/components/BackButton'
+import { useRouter } from 'next/navigation'
 
 // ==================== TYPES ====================
-
-interface Medicine {
-  id: string
-  name: string
-  dosage: string
-  frequency: string
-  time: string
-  notes: string
-}
 
 interface AnemiaResult {
   score: number
@@ -372,30 +364,11 @@ const HEARING_FREQUENCIES = [
   { freq: 8000, label: '8 kHz', desc: 'Nada sangat tinggi' },
 ]
 
-// ==================== 3. PENGINGAT OBAT ====================
-
-const FREQUENCY_OPTIONS = [
-  { value: 'pagi', label: 'Pagi (06:00)', icon: '☀️' },
-  { value: 'siang', label: 'Siang (12:00)', icon: '🌤️' },
-  { value: 'sore', label: 'Sore (16:00)', icon: '🌅' },
-  { value: 'malam', label: 'Malam (20:00)', icon: '🌙' },
-  { value: 'sebelum_makan', label: 'Sebelum Makan', icon: '🍽️' },
-  { value: 'sesudah_makan', label: 'Sesudah Makan', icon: '🍽️' },
-]
-
-const DRUG_INTERACTIONS: Record<string, string[]> = {
-  'warfarin': ['aspirin', 'ibuprofen'],
-  'metformin': ['kontras iodine', 'alkohol'],
-  'amlodipine': ['grapefruit', 'simvastatin'],
-  'digoxin': ['furosemide', 'amiodarone'],
-  'lisinopril': ['kalium', 'spironolactone'],
-  'aspirin': ['warfarin', 'clopidogrel', 'ibuprofen'],
-}
-
 // ==================== MAIN COMPONENT ====================
 
 export default function HealthTools() {
-  const [activeFeature, setActiveFeature] = useState<'home' | 'anemia' | 'hearing' | 'medicine'>('home')
+  const router = useRouter()
+  const [activeFeature, setActiveFeature] = useState<'home' | 'anemia' | 'hearing'>('home')
 
   // ========== ANEMIA STATE ==========
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -406,6 +379,9 @@ export default function HealthTools() {
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [ppgData, setPpgData] = useState<number[]>([])
   const [isRecordingPpg, setIsRecordingPpg] = useState(false)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+  const [isFlashOn, setIsFlashOn] = useState(false)
+  const streamRef = useRef<MediaStream | null>(null)
 
   // ========== HEARING TEST STATE ==========
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -417,44 +393,58 @@ export default function HealthTools() {
   const [volume, setVolume] = useState(50)
   const [testComplete, setTestComplete] = useState(false)
 
-  // ========== MEDICINE REMINDER STATE ==========
-  const [medicines, setMedicines] = useState<Medicine[]>([])
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: 'pagi', time: '06:00', notes: '' })
-  const [interactions, setInteractions] = useState<string[]>([])
-
-  // Load medicines from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('medicineReminders')
-    if (saved) {
-      try {
-        setMedicines(JSON.parse(saved))
-      } catch (e) {
-        console.error('Error parsing medicineReminders:', e)
-        localStorage.removeItem('medicineReminders')
-      }
-    }
-  }, [])
-
-  // Save medicines to localStorage
-  useEffect(() => {
-    localStorage.setItem('medicineReminders', JSON.stringify(medicines))
-    checkInteractions()
-  }, [medicines])
-
   // ==================== ANEMIA FUNCTIONS ====================
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+  }
 
   const initAnemiaCamera = async () => {
     try {
+      stopCamera()
       setCameraError(null)
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: 640, height: 480 }
+        video: { facingMode: facingMode, width: 640, height: 480 }
       })
+      streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        await videoRef.current.play()
       }
     } catch (err) {
       setCameraError('Tidak dapat mengakses kamera. Pastikan izin diberikan.')
+    }
+  }
+
+  const toggleFacingMode = () => {
+    setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')
+    setTimeout(initAnemiaCamera, 100)
+  }
+
+  const toggleFlash = async () => {
+    try {
+      if (streamRef.current) {
+        const videoTrack = streamRef.current.getVideoTracks()[0]
+        const capabilities = (videoTrack as any).getCapabilities()
+        
+        if (capabilities.torch) {
+          await (videoTrack as any).applyConstraints({
+            advanced: [{ torch: !isFlashOn }]
+          })
+          setIsFlashOn(!isFlashOn)
+        } else {
+          alert('Flash tidak tersedia di perangkat ini')
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling flash:', err)
+      alert('Gagal mengaktifkan flash')
     }
   }
 
@@ -489,9 +479,7 @@ export default function HealthTools() {
     setAnemiaResult(result)
     setIsAnalyzing(false)
     
-    // Stop camera
-    const stream = video.srcObject as MediaStream
-    stream?.getTracks().forEach(t => t.stop())
+    stopCamera()
   }
 
   const startPpgRecording = async () => {
@@ -499,8 +487,15 @@ export default function HealthTools() {
     setPpgData([])
     
     try {
+      await initAnemiaCamera()
+      
+      // Auto-enable flash for PPG mode
+      if (!isFlashOn) {
+        await toggleFlash()
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: 640, height: 480 }
+        video: { facingMode: facingMode, width: 640, height: 480 }
       })
       
       if (videoRef.current) {
@@ -572,16 +567,13 @@ export default function HealthTools() {
     setAnemiaResult(result)
     setIsAnalyzing(false)
     
-    // Stop camera
-    if (videoRef.current) {
-      const stream = videoRef.current.srcObject as MediaStream
-      stream?.getTracks().forEach(t => t.stop())
-    }
+    stopCamera()
   }
 
   const resetAnemia = () => {
     setAnemiaResult(null)
     setCameraError(null)
+    setIsFlashOn(false)
     initAnemiaCamera()
   }
 
@@ -649,45 +641,6 @@ export default function HealthTools() {
     return { status: 'sedang', text: 'Gangguan pendengaran', color: 'text-red-600' }
   }
 
-  // ==================== MEDICINE FUNCTIONS ====================
-
-  const checkInteractions = () => {
-    const warnings: string[] = []
-    const medNames = medicines.map(m => m.name.toLowerCase())
-    
-    medicines.forEach(med => {
-      const interactions = DRUG_INTERACTIONS[med.name.toLowerCase()] || []
-      interactions.forEach(drug => {
-        if (medNames.some(m => m.includes(drug) || drug.includes(m))) {
-          warnings.push(`${med.name} tidak boleh diminum bersama ${drug}`)
-        }
-      })
-    })
-    
-    setInteractions([...new Set(warnings)])
-  }
-
-  const addMedicine = () => {
-    if (!newMed.name || !newMed.dosage) return
-    
-    const medicine: Medicine = {
-      id: Date.now().toString(),
-      ...newMed
-    }
-    
-    setMedicines(prev => [...prev, medicine])
-    setNewMed({ name: '', dosage: '', frequency: 'pagi', time: '06:00', notes: '' })
-    setShowAddForm(false)
-  }
-
-  const deleteMedicine = (id: string) => {
-    setMedicines(prev => prev.filter(m => m.id !== id))
-  }
-
-  const getFrequencyLabel = (value: string) => {
-    return FREQUENCY_OPTIONS.find(o => o.value === value)?.label || value
-  }
-
   // ==================== RENDER ====================
 
   if (activeFeature === 'home') {
@@ -696,9 +649,7 @@ export default function HealthTools() {
         <div className="mobile-container py-6">
           {/* Header */}
           <div className="flex items-center gap-3 px-4 mb-6">
-            <Link href="/" className="p-3 hover:bg-white/50 rounded-full ml-2" aria-label="Kembali ke beranda">
-              <ArrowLeft className="w-6 h-6" />
-            </Link>
+            <BackButton onClick={() => router.push('/')} />
             <h1 className="text-xl font-bold">Pemeriksaan Kesehatan</h1>
           </div>
           <div className="text-center mb-8 px-4">
@@ -743,25 +694,6 @@ export default function HealthTools() {
                   <div className="flex-1">
                     <h3 className="font-bold text-gray-800">Tes Pendengaran</h3>
                     <p className="text-sm text-gray-500">Cek kemampuan dengar frekuensi berbeda</p>
-                  </div>
-                  <ChevronLeft className="w-5 h-5 text-gray-400 rotate-180" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Medicine Reminder */}
-            <Card 
-              className="cursor-pointer hover:shadow-lg transition-all active:scale-95 border-l-4 border-l-green-400"
-              onClick={() => setActiveFeature('medicine')}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
-                    <Pill className="w-7 h-7 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-gray-800">Pengingat Obat</h3>
-                    <p className="text-sm text-gray-500">Jadwal minum obat & cek interaksi</p>
                   </div>
                   <ChevronLeft className="w-5 h-5 text-gray-400 rotate-180" />
                 </div>
@@ -840,6 +772,24 @@ export default function HealthTools() {
                       className="w-full h-full object-cover"
                     />
                     <canvas ref={canvasRef} className="hidden" />
+                    
+                    {/* Camera Controls */}
+                    <div className="absolute top-3 right-3 flex gap-2">
+                      <button
+                        onClick={toggleFacingMode}
+                        className="p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                        title="Ganti Kamera"
+                      >
+                        <Camera className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={toggleFlash}
+                        className={`p-2 rounded-full text-white transition-colors ${isFlashOn ? 'bg-yellow-500/80' : 'bg-black/50 hover:bg-black/70'}`}
+                        title={isFlashOn ? 'Matikan Flash' : 'Nyalakan Flash'}
+                      >
+                        {isFlashOn ? '🔦' : '🔌'}
+                      </button>
+                    </div>
                     
                     {/* Guide overlay - different for each method */}
                     <div className="absolute inset-0 pointer-events-none">
@@ -1162,187 +1112,6 @@ export default function HealthTools() {
                   Ulangi Tes
                 </Button>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // ========== MEDICINE REMINDER SCREEN ==========
-  if (activeFeature === 'medicine') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 pb-24">
-        <div className="mobile-container py-4">
-          {/* Header */}
-          <div className="flex items-center gap-3 px-4 mb-4">
-            <button onClick={() => setActiveFeature('home')} className="p-2 hover:bg-white/50 rounded-full" aria-label="Kembali ke menu">
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <h1 className="text-xl font-bold">Pengingat Obat</h1>
-          </div>
-
-          {/* Drug Interactions Warning */}
-          {interactions.length > 0 && (
-            <div className="mx-4 mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <h3 className="font-semibold text-red-700 flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-5 h-5" />
-                Perhatian Interaksi Obat!
-              </h3>
-              <ul className="text-sm text-red-600 space-y-1">
-                {interactions.map((warning, i) => (
-                  <li key={i}>• {warning}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Add Medicine Button */}
-          {!showAddForm && (
-            <div className="px-4 mb-4">
-              <Button 
-                onClick={() => setShowAddForm(true)}
-                className="w-full bg-green-500 hover:bg-green-600 text-white py-6"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Tambah Obat
-              </Button>
-            </div>
-          )}
-
-          {/* Add Form */}
-          {showAddForm && (
-            <Card className="mx-4 mb-4">
-              <CardContent className="p-4">
-                <h3 className="font-semibold mb-4">Tambah Obat Baru</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm text-gray-600 block mb-1">Nama Obat</label>
-                    <input
-                      type="text"
-                      value={newMed.name}
-                      onChange={(e) => setNewMed({ ...newMed, name: e.target.value })}
-                      placeholder="Contoh: Paracetamol"
-                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600 block mb-1">Dosis</label>
-                    <input
-                      type="text"
-                      value={newMed.dosage}
-                      onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })}
-                      placeholder="Contoh: 500mg"
-                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-sm text-gray-600 block mb-1">Frekuensi</label>
-                      <select
-                        value={newMed.frequency}
-                        onChange={(e) => setNewMed({ ...newMed, frequency: e.target.value })}
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        aria-label="Frekuensi minum obat"
-                      >
-                        {FREQUENCY_OPTIONS.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-600 block mb-1">Jam</label>
-                      <input
-                        type="time"
-                        value={newMed.time}
-                        onChange={(e) => setNewMed({ ...newMed, time: e.target.value })}
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        aria-label="Waktu minum obat"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600 block mb-1">Catatan (opsional)</label>
-                    <input
-                      type="text"
-                      value={newMed.notes}
-                      onChange={(e) => setNewMed({ ...newMed, notes: e.target.value })}
-                      placeholder="Contoh: Setelah makan"
-                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      onClick={() => setShowAddForm(false)}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      Batal
-                    </Button>
-                    <Button 
-                      onClick={addMedicine}
-                      disabled={!newMed.name || !newMed.dosage}
-                      className="flex-1 bg-green-500 hover:bg-green-600 text-white"
-                    >
-                      Simpan
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Medicine List */}
-          <div className="px-4 space-y-3">
-            {medicines.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Pill className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <p>Belum ada pengingat obat</p>
-                <p className="text-sm">Tambahkan obat yang rutin Anda minum</p>
-              </div>
-            ) : (
-              medicines.map(med => (
-                <Card key={med.id} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">{FREQUENCY_OPTIONS.find(o => o.value === med.frequency)?.icon}</span>
-                          <h3 className="font-semibold text-gray-800">{med.name}</h3>
-                        </div>
-                        <p className="text-sm text-gray-600">{med.dosage}</p>
-                        <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-                          <Clock className="w-4 h-4" />
-                          <span>{getFrequencyLabel(med.frequency)} - {med.time}</span>
-                        </div>
-                        {med.notes && (
-                          <p className="text-xs text-gray-400 mt-1">{med.notes}</p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => deleteMedicine(med.id)}
-                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                        aria-label="Hapus obat"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-
-          {/* Info */}
-          {medicines.length > 0 && (
-            <div className="mx-4 mt-6 p-4 bg-green-50 rounded-xl">
-              <p className="text-sm text-green-700 flex items-start gap-2">
-                <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>
-                  Aplikasi akan memeriksa interaksi berbahaya antar obat. 
-                  Selalu konsultasikan dengan dokter atau apoteker.
-                </span>
-              </p>
             </div>
           )}
         </div>
