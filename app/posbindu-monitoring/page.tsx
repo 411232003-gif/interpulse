@@ -425,6 +425,8 @@ export default function PosbinduMonitoring() {
             height: residentForm.height,
             weight: residentForm.weight,
             targetWeight: residentForm.targetWeight,
+            birthDate: residentForm.birthDate,
+            gender: residentForm.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan',
           })
         }
       } catch (syncError) {

@@ -117,6 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUserProfile(profileDoc.data() as UserProfile)
           } else {
             console.warn('User profile not found in Firestore for uid:', firebaseUser.uid)
+            // Don't create default profile for admin email to prevent duplicate admin accounts
+            if (firebaseUser.email === 'admin@interpulse.id') {
+              console.warn('Admin email detected, skipping default profile creation')
+              setLoading(false)
+              return
+            }
             // Create default profile for new user
             const defaultProfile: UserProfile = {
               uid: firebaseUser.uid,

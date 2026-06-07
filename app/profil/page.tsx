@@ -289,11 +289,17 @@ export default function Profil() {
         kelurahan: editedProfile.kelurahan || '',
       }
 
-      // For non-admin users, also save NIK, RT, RW
+      // For non-admin users, also save NIK, RT, RW, birthDate, gender, alamat, height, weight, targetWeight
       if (authProfile.role !== 'admin') {
         updateData.nik = editedProfile.nik || ''
         updateData.rt = editedProfile.rt || ''
         updateData.rw = editedProfile.rw || ''
+        updateData.birthDate = editedProfile.birthDate || ''
+        updateData.gender = editedProfile.gender || ''
+        updateData.alamat = editedProfile.alamat || ''
+        updateData.height = editedProfile.height || 170
+        updateData.weight = editedProfile.weight || 65
+        updateData.targetWeight = editedProfile.targetWeight || 60
       }
 
       console.log('[Profile] Update data prepared:', updateData)
@@ -633,35 +639,61 @@ export default function Profil() {
                 {isEditing ? (
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="edit-name" className="text-sm font-medium text-gray-700 mb-1 block">Nama</label>
-                      <input id="edit-name" type="text" value={editedProfile.name} onChange={(e) => handleChange('name', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
-                    </div>
-                    <div>
-                      <label htmlFor="edit-email" className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
-                      <input id="edit-email" type="email" value={editedProfile.email} onChange={(e) => handleChange('email', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
+                      <label htmlFor="edit-name" className="text-sm font-medium text-gray-700 mb-1 block">Nama Lengkap *</label>
+                      <input id="edit-name" type="text" value={editedProfile.name} onChange={(e) => handleChange('name', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" required />
                     </div>
                     {!isAdmin && (
                       <>
                         <div>
-                          <label htmlFor="edit-nik" className="text-sm font-medium text-gray-700 mb-1 block">NIK</label>
-                          <input id="edit-nik" type="text" value={editedProfile.nik || ''} onChange={(e) => handleChange('nik', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nomor Induk Kependudukan" />
+                          <label htmlFor="edit-nik" className="text-sm font-medium text-gray-700 mb-1 block">NIK *</label>
+                          <input id="edit-nik" type="text" value={editedProfile.nik || ''} onChange={(e) => handleChange('nik', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nomor Induk Kependudukan" required />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label htmlFor="edit-rt" className="text-sm font-medium text-gray-700 mb-1 block">RT</label>
-                            <input id="edit-rt" type="text" value={editedProfile.rt || ''} onChange={(e) => handleChange('rt', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="RT" />
+                            <label htmlFor="edit-rt" className="text-sm font-medium text-gray-700 mb-1 block">RT *</label>
+                            <input id="edit-rt" type="text" value={editedProfile.rt || ''} onChange={(e) => handleChange('rt', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="RT" required />
                           </div>
                           <div>
-                            <label htmlFor="edit-rw" className="text-sm font-medium text-gray-700 mb-1 block">RW</label>
-                            <input id="edit-rw" type="text" value={editedProfile.rw || ''} onChange={(e) => handleChange('rw', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="RW" />
+                            <label htmlFor="edit-rw" className="text-sm font-medium text-gray-700 mb-1 block">RW *</label>
+                            <input id="edit-rw" type="text" value={editedProfile.rw || ''} onChange={(e) => handleChange('rw', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="RW" required />
                           </div>
+                        </div>
+                        <div>
+                          <label htmlFor="edit-birthDate" className="text-sm font-medium text-gray-700 mb-1 block">Tanggal Lahir *</label>
+                          <input id="edit-birthDate" type="date" value={editedProfile.birthDate || ''} onChange={(e) => handleChange('birthDate', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" required />
+                        </div>
+                        <div>
+                          <label htmlFor="edit-gender" className="text-sm font-medium text-gray-700 mb-1 block">Jenis Kelamin *</label>
+                          <select id="edit-gender" value={editedProfile.gender || ''} onChange={(e) => handleChange('gender', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 bg-white" required>
+                            <option value="">Pilih Jenis Kelamin</option>
+                            <option value="Laki-laki">Laki-laki</option>
+                            <option value="Perempuan">Perempuan</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor="edit-alamat" className="text-sm font-medium text-gray-700 mb-1 block">Alamat *</label>
+                          <textarea id="edit-alamat" value={editedProfile.alamat || ''} onChange={(e) => handleChange('alamat', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" rows="3" placeholder="Alamat lengkap" required />
+                        </div>
+                        <div>
+                          <label htmlFor="edit-phone" className="text-sm font-medium text-gray-700 mb-1 block">No. Telepon</label>
+                          <input id="edit-phone" type="tel" value={editedProfile.phone || ''} onChange={(e) => handleChange('phone', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="+62 8xx xxxx xxxx" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label htmlFor="edit-height" className="text-sm font-medium text-gray-700 mb-1 block">Tinggi Badan (cm)</label>
+                            <input id="edit-height" type="number" value={editedProfile.height || 170} onChange={(e) => handleChange('height', parseInt(e.target.value) || 170)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="170" />
+                          </div>
+                          <div>
+                            <label htmlFor="edit-weight" className="text-sm font-medium text-gray-700 mb-1 block">Berat Badan (kg)</label>
+                            <input id="edit-weight" type="number" value={editedProfile.weight || 65} onChange={(e) => handleChange('weight', parseInt(e.target.value) || 65)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="65" />
+                          </div>
+                        </div>
+                        <div>
+                          <label htmlFor="edit-targetWeight" className="text-sm font-medium text-gray-700 mb-1 block">Target Berat (kg)</label>
+                          <input id="edit-targetWeight" type="number" value={editedProfile.targetWeight || 60} onChange={(e) => handleChange('targetWeight', parseInt(e.target.value) || 60)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="60" />
                         </div>
                       </>
                     )}
-                    <div>
-                      <label htmlFor="edit-kelurahan" className="text-sm font-medium text-gray-700 mb-1 block">Kelurahan</label>
-                      <input id="edit-kelurahan" type="text" value={editedProfile.kelurahan || ''} onChange={(e) => handleChange('kelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" />
-                    </div>
                     <div className="flex gap-3 pt-4">
                       <Button variant="outline" className="flex-1" onClick={handleCancel}>
                         <X className="w-4 h-4 mr-2" /> Batal
@@ -692,13 +724,6 @@ export default function Profil() {
                         <p className="font-semibold text-gray-900">{profile.name}</p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="bg-blue-100 p-3 rounded-full"><Mail className="w-6 h-6 text-blue-600" /></div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-500">Email</p>
-                        <p className="font-semibold text-gray-900 break-all">{profile.email}</p>
-                      </div>
-                    </div>
                     {!isAdmin && (
                       <>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
@@ -709,17 +734,28 @@ export default function Profil() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-purple-100 p-3 rounded-full"><span className="text-purple-600 text-xs font-bold">�</span></div>
+                          <div className="bg-orange-100 p-3 rounded-full"><span className="text-orange-600 text-xs font-bold">🏠</span></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">RT/RW</p>
+                            <p className="font-semibold text-gray-900">{profile.rt || 'Belum diisi'}/{profile.rw || 'Belum diisi'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-purple-100 p-3 rounded-full"><Calendar className="w-6 h-6 text-purple-600" /></div>
                           <div className="flex-1">
                             <p className="text-sm text-gray-500">Tanggal Lahir</p>
                             <p className="font-semibold text-gray-900">{profile.birthDate || 'Belum diisi'}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-pink-100 p-3 rounded-full"><span className="text-pink-600 text-xs font-bold">👤</span></div>
+                          <div className="bg-pink-100 p-3 rounded-full"><User className="w-6 h-6 text-pink-600" /></div>
                           <div className="flex-1">
                             <p className="text-sm text-gray-500">Jenis Kelamin</p>
-                            <p className="font-semibold text-gray-900">{profile.gender === 'L' ? 'Laki-laki' : profile.gender === 'P' ? 'Perempuan' : 'Belum diisi'}</p>
+                            <p className="font-semibold text-gray-900">
+                              {profile.gender === 'Laki-laki' || profile.gender === 'L' ? 'Laki-laki' : 
+                               profile.gender === 'Perempuan' || profile.gender === 'P' ? 'Perempuan' : 
+                               'Belum diisi'}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
@@ -730,24 +766,31 @@ export default function Profil() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-orange-100 p-3 rounded-full"><span className="text-orange-600 text-xs font-bold">🏠</span></div>
+                          <div className="bg-blue-100 p-3 rounded-full"><Phone className="w-6 h-6 text-blue-600" /></div>
                           <div className="flex-1">
-                            <p className="text-sm text-gray-500">RT</p>
-                            <p className="font-semibold text-gray-900">{profile.rt || 'Belum diisi'}</p>
+                            <p className="text-sm text-gray-500">No. Telepon</p>
+                            <p className="font-semibold text-gray-900">{profile.phone || 'Belum diisi'}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-rose-100 p-3 rounded-full"><span className="text-rose-600 text-xs font-bold">🏘️</span></div>
+                          <div className="bg-purple-100 p-3 rounded-full"><Ruler className="w-6 h-6 text-purple-600" /></div>
                           <div className="flex-1">
-                            <p className="text-sm text-gray-500">RW</p>
-                            <p className="font-semibold text-gray-900">{profile.rw || 'Belum diisi'}</p>
+                            <p className="text-sm text-gray-500">Tinggi Badan</p>
+                            <p className="font-semibold text-gray-900">{profile.height || 170} cm</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-cyan-100 p-3 rounded-full"><span className="text-cyan-600 text-xs font-bold">🏘️</span></div>
+                          <div className="bg-orange-100 p-3 rounded-full"><Weight className="w-6 h-6 text-orange-600" /></div>
                           <div className="flex-1">
-                            <p className="text-sm text-gray-500">Kelurahan</p>
-                            <p className="font-semibold text-gray-900">{profile.kelurahan || 'Belum diisi'}</p>
+                            <p className="text-sm text-gray-500">Berat Badan</p>
+                            <p className="font-semibold text-gray-900">{profile.weight || 65} kg</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="bg-teal-100 p-3 rounded-full"><Target className="w-6 h-6 text-teal-600" /></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-500">Target Berat</p>
+                            <p className="font-semibold text-gray-900">{profile.targetWeight || 60} kg</p>
                           </div>
                         </div>
                       </>

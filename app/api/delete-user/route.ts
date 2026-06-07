@@ -89,6 +89,11 @@ export async function POST(request: NextRequest) {
     const tbbbDeletePromises = tbbbSnapshot.docs.map(doc => doc.ref.delete())
     await Promise.all(tbbbDeletePromises)
 
+    // Cascade delete: Delete from notification collection
+    const notificationSnapshot = await db.collection('notification').where('userId', '==', uid).get()
+    const notificationDeletePromises = notificationSnapshot.docs.map(doc => doc.ref.delete())
+    await Promise.all(notificationDeletePromises)
+
     return NextResponse.json({
       success: true,
       message: 'User deleted successfully'
