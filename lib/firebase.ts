@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 // Firebase config - InterPulse Project (New)
@@ -19,5 +19,10 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 // Initialize services
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+// Set auth persistence to LOCAL to prevent logout on page refresh
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Error setting auth persistence:', error)
+})
 
 export default app
