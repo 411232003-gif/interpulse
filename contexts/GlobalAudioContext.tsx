@@ -7,6 +7,7 @@ interface Track {
   name: string
   description: string
   color: string
+  audioUrl?: string
 }
 
 interface AudioState {
@@ -38,6 +39,24 @@ const createAmbientSound = (trackId: string, audioContext: AudioContext): { gain
   const filters: (BiquadFilterNode | StereoPannerNode)[] = []
 
   switch (trackId) {
+    case 'dj-mbg': {
+      // Use HTML5 Audio for file-based tracks
+      const audio = new Audio('/DJ MBG MAS BAHLIL GANTENG FYP TIKTOK BASS HOREG TERBARU 2026.mp4')
+      audio.loop = true
+      audio.play()
+      
+      const gain = audioContext.createGain()
+      gain.gain.value = 0.5
+      
+      const source = audioContext.createMediaElementSource(audio)
+      source.connect(gain)
+      gain.connect(masterGain)
+      
+      gainNodes.push(gain)
+      ;(masterGain as any).audioElement = audio
+      break
+    }
+    
     case 'wind': {
       // Pink noise simulation for wind
       const bufferSize = 4096
@@ -138,6 +157,11 @@ const createAmbientSound = (trackId: string, audioContext: AudioContext): { gain
       const noiseNode = (masterGain as any).noiseNode
       if (noiseNode) {
         noiseNode.disconnect()
+      }
+      const audioElement = (masterGain as any).audioElement
+      if (audioElement) {
+        audioElement.pause()
+        audioElement.currentTime = 0
       }
     }
   }
@@ -278,5 +302,12 @@ export const availableTracks: Track[] = [
     name: 'Deep Meditation',
     description: 'Frekuensi theta untuk meditasi dalam',
     color: 'from-violet-500 to-fuchsia-600'
+  },
+  {
+    id: 'dj-mbg',
+    name: 'DJ MBG MAS BAHLIL GANTENG',
+    description: 'FYP TIKTOK BASS HOREG TERBARU 2026',
+    color: 'from-pink-500 to-rose-600',
+    audioUrl: '/DJ MBG MAS BAHLIL GANTENG FYP TIKTOK BASS HOREG TERBARU 2026.mp4'
   }
 ]

@@ -433,18 +433,22 @@ export default function HealthTools() {
         const videoTrack = streamRef.current.getVideoTracks()[0]
         const capabilities = (videoTrack as any).getCapabilities()
         
-        if (capabilities.torch) {
+        if (capabilities?.torch) {
+          const newFlashState = !isFlashOn
           await (videoTrack as any).applyConstraints({
-            advanced: [{ torch: !isFlashOn }]
+            advanced: [{ torch: newFlashState }]
           })
-          setIsFlashOn(!isFlashOn)
+          setIsFlashOn(newFlashState)
         } else {
-          alert('Flash tidak tersedia di perangkat ini')
+          // If torch not supported, just update state for UI feedback
+          console.warn('Flash torch not supported on this device')
+          setIsFlashOn(!isFlashOn)
         }
       }
     } catch (err) {
       console.error('Error toggling flash:', err)
-      alert('Gagal mengaktifkan flash')
+      // Still toggle state for UI feedback even if hardware fails
+      setIsFlashOn(!isFlashOn)
     }
   }
 
@@ -494,15 +498,9 @@ export default function HealthTools() {
         await toggleFlash()
       }
       
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facingMode, width: 640, height: 480 }
-      })
+      // Wait a moment for flash to activate
+      await new Promise(resolve => setTimeout(resolve, 500))
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
-
       const canvas = canvasRef.current
       const ctx = canvas?.getContext('2d')
       
@@ -553,7 +551,8 @@ export default function HealthTools() {
       
       recordFrame()
     } catch (err) {
-      setCameraError('Gagal merekam PPG. Pastikan flash aktif.')
+      console.error('Error in PPG recording:', err)
+      setCameraError('Gagal merekam PPG. Pastikan kamera aktif dan izin diberikan.')
       setIsRecordingPpg(false)
     }
   }
@@ -883,7 +882,7 @@ export default function HealthTools() {
                   )}
                   {anemiaMethod === 'ppg' && (
                     <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                      <li>Pastikan flash kamera aktif</li>
+                      <li>Tekan tombol 🔦 untuk menyalakan flash</li>
                       <li>Letakkan ujung jari di atas kamera & flash</li>
                       <li>Tekan dengan lembut, jangan terlalu kuat</li>
                       <li>Tahan selama 5 detik saat perekaman</li>

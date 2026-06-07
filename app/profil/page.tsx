@@ -68,6 +68,11 @@ export default function Profil() {
   const [mounted, setMounted] = useState(false)
   const [saving, setSaving] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+  
+  // Admin auth update state
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message })
@@ -120,7 +125,7 @@ export default function Profil() {
   })
   const [creatingUser, setCreatingUser] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const [showCreateUserPassword, setShowCreateUserPassword] = useState(false)
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -278,6 +283,18 @@ export default function Profil() {
       return
     }
 
+    // Validate password if provided
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        showNotification('error', 'Password minimal 6 karakter')
+        return
+      }
+      if (newPassword !== confirmPassword) {
+        showNotification('error', 'Konfirmasi password tidak cocok')
+        return
+      }
+    }
+
     setSaving(true)
     console.log('[Profile] Saving profile data:', editedProfile)
     try {
@@ -302,16 +319,40 @@ export default function Profil() {
       console.log('[Profile] Update data prepared:', updateData)
       console.log('[Profile] User role:', authProfile.role)
       
-      // If user is admin, save to admins collection only
+      // If user is admin, save to admins collection and update Firebase Auth
       if (authProfile.role === 'admin') {
         const adminRef = doc(db, 'admins', authProfile.uid)
         const adminUpdateData: any = {
           ...updateData,
-          adminKelurahan: editedProfile.kelurahan || '',
+          adminKelurahan: editedProfile.adminKelurahan || '',
         }
         console.log('[Profile] Updating admin document:', adminUpdateData)
         await updateDoc(adminRef, adminUpdateData)
         console.log('[Profile] Admin document updated with adminKelurahan')
+
+        // Update Firebase Auth if email or password changed
+        if (editedProfile.email !== authProfile.email || newPassword) {
+          try {
+            const response = await fetch('/api/update-admin-auth', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                uid: authProfile.uid,
+                email: editedProfile.email,
+                password: newPassword || undefined
+              })
+            })
+            const result = await response.json()
+            if (!result.success) {
+              throw new Error(result.error || 'Gagal update Firebase Auth')
+            }
+            console.log('[Profile] Firebase Auth updated successfully')
+          } catch (authError) {
+            console.error('[Profile] Error updating Firebase Auth:', authError)
+            showNotification('error', 'Gagal update email/password di Firebase Auth')
+            return
+          }
+        }
       } else {
         // For non-admin users, update users collection
         const userRef = doc(db, 'users', authProfile.uid)
@@ -322,6 +363,8 @@ export default function Profil() {
 
       setProfile({ ...editedProfile })
       setIsEditing(false)
+      setNewPassword('')
+      setConfirmPassword('')
       await refreshProfile()
       console.log('[Profile] Profile refreshed')
 
@@ -338,6 +381,8 @@ export default function Profil() {
   const handleCancel = () => {
     setEditedProfile({ ...profile })
     setIsEditing(false)
+    setNewPassword('')
+    setConfirmPassword('')
   }
 
   const handleLogout = async () => {
@@ -649,6 +694,40 @@ export default function Profil() {
                           <label htmlFor="edit-kelurahan" className="text-sm font-medium text-gray-700 mb-1 block">Kelurahan *</label>
                           <input id="edit-kelurahan" type="text" value={editedProfile.adminKelurahan || ''} onChange={(e) => handleChange('adminKelurahan', e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Nama Kelurahan" required />
                         </div>
+                        <div>
+                          <label htmlFor="edit-password" className="text-sm font-medium text-gray-700 mb-1 block">Password Baru (Opsional)</label>
+                          <div className="relative">
+                            <input 
+                              id="edit-password" 
+                              type={showPassword ? 'text' : 'password'} 
+                              value={newPassword} 
+                              onChange={(e) => setNewPassword(e.target.value)} 
+                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 pr-10" 
+                              placeholder="Biarkan kosong jika tidak ingin mengubah password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                        </div>
+                        {newPassword && (
+                          <div>
+                            <label htmlFor="edit-confirm-password" className="text-sm font-medium text-gray-700 mb-1 block">Konfirmasi Password *</label>
+                            <input 
+                              id="edit-confirm-password" 
+                              type="password" 
+                              value={confirmPassword} 
+                              onChange={(e) => setConfirmPassword(e.target.value)} 
+                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" 
+                              placeholder="Ulangi password baru"
+                              required
+                            />
+                          </div>
+                        )}
                       </>
                     )}
                     {!isAdmin && (
@@ -966,7 +1045,7 @@ export default function Profil() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
                 <div className="relative">
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showCreateUserPassword ? 'text' : 'password'}
                     value={createUserForm.password}
                     onChange={e => setCreateUserForm(f => ({ ...f, password: e.target.value }))}
                     placeholder="Masukkan password"
@@ -977,10 +1056,10 @@ export default function Profil() {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowCreateUserPassword(!showCreateUserPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showCreateUserPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
