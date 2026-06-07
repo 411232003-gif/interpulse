@@ -379,6 +379,7 @@ export default function HealthTools() {
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [ppgData, setPpgData] = useState<number[]>([])
   const [isRecordingPpg, setIsRecordingPpg] = useState(false)
+  const isRecordingPpgRef = useRef(false)
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
   const [isFlashOn, setIsFlashOn] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
@@ -428,27 +429,18 @@ export default function HealthTools() {
   }
 
   const toggleFlash = async () => {
+    const newState = !isFlashOn
+    setIsFlashOn(newState)
+    if (!streamRef.current) return
     try {
-      if (streamRef.current) {
-        const videoTrack = streamRef.current.getVideoTracks()[0]
-        const capabilities = (videoTrack as any).getCapabilities()
-        
-        if (capabilities?.torch) {
-          const newFlashState = !isFlashOn
-          await (videoTrack as any).applyConstraints({
-            advanced: [{ torch: newFlashState }]
-          })
-          setIsFlashOn(newFlashState)
-        } else {
-          // If torch not supported, just update state for UI feedback
-          console.warn('Flash torch not supported on this device')
-          setIsFlashOn(!isFlashOn)
-        }
-      }
+      const videoTrack = streamRef.current.getVideoTracks()[0]
+      if (!videoTrack) return
+      await (videoTrack as any).applyConstraints({
+        advanced: [{ torch: newState }]
+      })
     } catch (err) {
-      console.error('Error toggling flash:', err)
-      // Still toggle state for UI feedback even if hardware fails
-      setIsFlashOn(!isFlashOn)
+      console.warn('Torch constraint not supported:', err)
+      // State already updated above for UI feedback
     }
   }
 
@@ -487,19 +479,29 @@ export default function HealthTools() {
   }
 
   const startPpgRecording = async () => {
+    isRecordingPpgRef.current = true
     setIsRecordingPpg(true)
     setPpgData([])
+    setCameraError(null)
     
     try {
       await initAnemiaCamera()
       
       // Auto-enable flash for PPG mode
-      if (!isFlashOn) {
-        await toggleFlash()
+      if (!isFlashOn && streamRef.current) {
+        try {
+          const videoTrack = streamRef.current.getVideoTracks()[0]
+          if (videoTrack) {
+            await (videoTrack as any).applyConstraints({ advanced: [{ torch: true }] })
+            setIsFlashOn(true)
+          }
+        } catch (flashErr) {
+          console.warn('Could not auto-enable flash:', flashErr)
+        }
       }
       
-      // Wait a moment for flash to activate
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Wait for flash + camera to stabilize
+      await new Promise(resolve => setTimeout(resolve, 800))
       
       const canvas = canvasRef.current
       const ctx = canvas?.getContext('2d')
@@ -508,42 +510,51 @@ export default function HealthTools() {
         throw new Error('Kamera atau canvas tidak tersedia')
       }
 
-      // Record PPG data for 5 seconds
       const recordingDuration = 5000
-      const interval = 100 // 100ms per frame
+      const interval = 100
       const frames = recordingDuration / interval
-      
       let frameCount = 0
       
       const recordFrame = () => {
-        if (frameCount >= frames || !isRecordingPpg) {
-          stopPpgRecording()
+        // Use ref (not state) to avoid stale closure
+        if (frameCount >= frames || !isRecordingPpgRef.current) {
+          if (isRecordingPpgRef.current) {
+            isRecordingPpgRef.current = false
+            stopPpgRecording()
+          }
           return
         }
         
-        canvas.width = videoRef.current!.videoWidth
-        canvas.height = videoRef.current!.videoHeight
-        ctx.drawImage(videoRef.current!, 0, 0)
+        if (!videoRef.current || videoRef.current.videoWidth === 0) {
+          frameCount++
+          setTimeout(recordFrame, interval)
+          return
+        }
+
+        canvas.width = videoRef.current.videoWidth
+        canvas.height = videoRef.current.videoHeight
+        ctx.drawImage(videoRef.current, 0, 0)
         
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         const data = imageData.data
         
-        // Calculate average brightness of center area
-        let totalBrightness = 0
-        const startX = Math.floor(canvas.width * 0.4)
-        const endX = Math.floor(canvas.width * 0.6)
-        const startY = Math.floor(canvas.height * 0.4)
-        const endY = Math.floor(canvas.height * 0.6)
+        let totalRed = 0
+        const startX = Math.floor(canvas.width * 0.35)
+        const endX = Math.floor(canvas.width * 0.65)
+        const startY = Math.floor(canvas.height * 0.35)
+        const endY = Math.floor(canvas.height * 0.65)
+        let count = 0
         
         for (let y = startY; y < endY; y += 2) {
           for (let x = startX; x < endX; x += 2) {
             const i = (y * canvas.width + x) * 4
-            totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3
+            totalRed += data[i] // Red channel only for PPG
+            count++
           }
         }
         
-        const avgBrightness = totalBrightness / ((endX - startX) * (endY - startY) / 4)
-        setPpgData(prev => [...prev, avgBrightness])
+        const avgRed = count > 0 ? totalRed / count : 0
+        setPpgData(prev => [...prev, avgRed])
         
         frameCount++
         setTimeout(recordFrame, interval)
@@ -553,11 +564,13 @@ export default function HealthTools() {
     } catch (err) {
       console.error('Error in PPG recording:', err)
       setCameraError('Gagal merekam PPG. Pastikan kamera aktif dan izin diberikan.')
+      isRecordingPpgRef.current = false
       setIsRecordingPpg(false)
     }
   }
 
   const stopPpgRecording = () => {
+    isRecordingPpgRef.current = false
     setIsRecordingPpg(false)
     setIsAnalyzing(true)
     

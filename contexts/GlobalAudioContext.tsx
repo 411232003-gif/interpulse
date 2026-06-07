@@ -168,6 +168,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioNodesRef = useRef<{ gainNode: GainNode; cleanup: () => void } | null>(null)
+  const htmlAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
@@ -180,26 +181,42 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const playTrack = useCallback((track: Track) => {
-    initAudioContext()
-    if (!audioContextRef.current) return
-
-    // Stop current if different track
-    if (currentTrack?.id !== track.id && audioNodesRef.current) {
+    // Stop any existing HTML audio
+    if (htmlAudioRef.current) {
+      htmlAudioRef.current.pause()
+      htmlAudioRef.current = null
+    }
+    // Stop any existing Web Audio nodes
+    if (audioNodesRef.current) {
       audioNodesRef.current.cleanup()
       audioNodesRef.current = null
     }
 
-    // Create new audio nodes
+    // File-based track: use HTML5 Audio directly
+    if (track.audioUrl) {
+      const audio = new Audio(track.audioUrl)
+      audio.loop = true
+      audio.volume = isMuted ? 0 : volume
+      audio.play().catch(err => console.error('Audio play error:', err))
+      htmlAudioRef.current = audio
+      setCurrentTrack(track)
+      setIsPlaying(true)
+      return
+    }
+
+    // Synthesized track: use Web Audio API
+    initAudioContext()
+    if (!audioContextRef.current) return
     audioNodesRef.current = createAmbientSound(track.id, audioContextRef.current)
-    
-    // Set volume
     audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : volume
-    
     setCurrentTrack(track)
     setIsPlaying(true)
   }, [currentTrack, volume, isMuted, initAudioContext])
 
   const pauseTrack = useCallback(() => {
+    if (htmlAudioRef.current) {
+      htmlAudioRef.current.pause()
+    }
     if (audioNodesRef.current) {
       audioNodesRef.current.gainNode.gain.value = 0
     }
@@ -207,6 +224,11 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const resumeTrack = useCallback(() => {
+    if (htmlAudioRef.current) {
+      htmlAudioRef.current.play().catch(err => console.error('Resume error:', err))
+      setIsPlaying(true)
+      return
+    }
     initAudioContext()
     if (audioNodesRef.current && currentTrack) {
       audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : volume
@@ -217,6 +239,11 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [currentTrack, volume, isMuted, initAudioContext, playTrack])
 
   const stopTrack = useCallback(() => {
+    if (htmlAudioRef.current) {
+      htmlAudioRef.current.pause()
+      htmlAudioRef.current.currentTime = 0
+      htmlAudioRef.current = null
+    }
     if (audioNodesRef.current) {
       audioNodesRef.current.cleanup()
       audioNodesRef.current = null
@@ -227,6 +254,9 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
 
   const setVolume = useCallback((newVolume: number) => {
     setVolumeState(newVolume)
+    if (htmlAudioRef.current) {
+      htmlAudioRef.current.volume = isMuted ? 0 : newVolume
+    }
     if (audioNodesRef.current) {
       audioNodesRef.current.gainNode.gain.value = isMuted ? 0 : newVolume
     }
@@ -235,6 +265,9 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
       const newMuted = !prev
+      if (htmlAudioRef.current) {
+        htmlAudioRef.current.volume = newMuted ? 0 : volume
+      }
       if (audioNodesRef.current) {
         audioNodesRef.current.gainNode.gain.value = newMuted ? 0 : volume
       }
