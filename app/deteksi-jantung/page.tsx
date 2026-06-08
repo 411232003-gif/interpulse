@@ -430,7 +430,7 @@ export default function HealthTools() {
 
   if (activeFeature === 'home') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pb-24">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pb-24 overflow-x-hidden">
         <div className="mobile-container py-6">
           {/* Header */}
           <div className="flex items-center gap-3 px-4 mb-6">
@@ -503,7 +503,7 @@ export default function HealthTools() {
   // ========== ANEMIA SCREEN ==========
   if (activeFeature === 'anemia') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-rose-50 pb-24">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-rose-50 pb-24 overflow-x-hidden">
         <div className="mobile-container py-4">
           {/* Header */}
           <div className="flex items-center gap-3 px-4 mb-4">
@@ -688,7 +688,7 @@ export default function HealthTools() {
   // ========== HEARING TEST SCREEN ==========
   if (activeFeature === 'hearing') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-sky-50 pb-24">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-sky-50 pb-24 overflow-x-hidden">
         <div className="mobile-container py-4">
           {/* Header */}
           <div className="flex items-center gap-3 px-4 mb-4">

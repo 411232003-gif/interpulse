@@ -296,7 +296,7 @@ export default function InputTBBBPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 p-4 pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 p-4 pb-24 overflow-x-hidden">
       {/* Modern Notification */}
       {notification && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">

@@ -948,7 +948,7 @@ export default function CatatKesehatan() {
   // Redirect non-admin users
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4 overflow-x-hidden">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Akses Ditolak</h2>
@@ -966,7 +966,7 @@ export default function CatatKesehatan() {
   console.log('[Fasca] About to render table, sortedResidents:', sortedResidents.map(r => ({ nama: r.nama, nik: r.nik })))
   if (!showFascaModal) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pb-24">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pb-24 overflow-x-hidden">
         {/* TB/BB/LP Warning Popup Overlay */}
         {showTbbbWarning && warningResident && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>

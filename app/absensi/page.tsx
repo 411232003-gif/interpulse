@@ -166,7 +166,7 @@ export default function AbsensiPage() {
   // Redirect non-admin users
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4 overflow-x-hidden">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Akses Ditolak</h2>
@@ -338,6 +338,46 @@ export default function AbsensiPage() {
           console.error('Error deleting notification:', notifError)
           // Don't fail attendance cancellation if notification deletion fails
         }
+
+        // Delete healthReadings for this user in current month
+        try {
+          const healthReadingsQuery = query(
+            collection(db, 'healthReadings'),
+            where('nik', '==', resident.nik)
+          )
+          const healthReadingsSnapshot = await getDocs(healthReadingsQuery)
+          
+          healthReadingsSnapshot.docs.forEach(healthDoc => {
+            const d = healthDoc.data()
+            const docMonth = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+            const docYear = new Date(d.timestamp).getFullYear()
+            if (docMonth === currentMonth && docYear === currentYear) {
+              deleteDoc(doc(db, 'healthReadings', healthDoc.id))
+            }
+          })
+        } catch (healthError) {
+          console.error('Error deleting healthReadings:', healthError)
+        }
+
+        // Delete tb-bb data for this user in current month
+        try {
+          const tbbbQuery = query(
+            collection(db, 'tb-bb'),
+            where('nik', '==', resident.nik)
+          )
+          const tbbbSnapshot = await getDocs(tbbbQuery)
+          
+          tbbbSnapshot.docs.forEach(tbbbDoc => {
+            const d = tbbbDoc.data()
+            const docMonth = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+            const docYear = new Date(d.timestamp).getFullYear()
+            if (docMonth === currentMonth && docYear === currentYear) {
+              deleteDoc(doc(db, 'tb-bb', tbbbDoc.id))
+            }
+          })
+        } catch (tbbbError) {
+          console.error('Error deleting tb-bb:', tbbbError)
+        }
         
         setShowCancelFor(null)
         showNotification('success', `Absensi ${resident.nama} berhasil dibatalkan`)
@@ -415,7 +455,7 @@ export default function AbsensiPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center overflow-x-hidden">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Memuat data...</p>
@@ -425,7 +465,7 @@ export default function AbsensiPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 pb-24 overflow-x-hidden">
       {/* Modern Notification */}
       {notification && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">

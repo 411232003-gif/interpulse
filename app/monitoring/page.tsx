@@ -832,7 +832,7 @@ export default function MonitoringPage() {
   const [attendanceExportDropdown, setAttendanceExportDropdown] = useState<Record<string, boolean>>({})
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50 pb-24 overflow-x-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-b-3xl shadow-lg">
         <div className="flex items-center gap-4">

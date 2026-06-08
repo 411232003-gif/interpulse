@@ -83,7 +83,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center p-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center p-4 py-8 overflow-x-hidden">
       <div className="w-full max-w-2xl">
         {/* Logo */}
         <div className="text-center mb-6">

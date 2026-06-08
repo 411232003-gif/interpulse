@@ -643,7 +643,7 @@ export default function Profil() {
   if (!mounted) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-teal-50 via-cyan-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-b from-teal-50 via-cyan-50 to-blue-50 overflow-x-hidden">
       {/* Modern Notification */}
       {notification && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
@@ -690,27 +690,27 @@ export default function Profil() {
             {/* Informasi Pribadi */}
             <Card>
               <CardHeader>
-                  <div className="flex items-center justify-between">
-                  <CardTitle>{isAdmin ? 'admin kelurahan' : 'Informasi Pribadi'}</CardTitle>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle className="text-lg sm:text-xl">{isAdmin ? 'admin kelurahan' : 'Informasi Pribadi'}</CardTitle>
+                  <div className="flex flex-wrap gap-2">
                     {isAdmin && (
                       <>
-                        <Button variant="outline" size="sm" onClick={openAuthModal}>
-                          <Mail className="w-4 h-4 mr-2" /> Edit Email/Password
+                        <Button variant="outline" size="sm" onClick={openAuthModal} className="text-xs sm:text-sm">
+                          <Mail className="w-4 h-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Edit Email/Password</span><span className="sm:hidden">Email/Pass</span>
                         </Button>
                         {isEditing ? (
-                          <Button variant="outline" size="sm" onClick={handleCancel}>
-                            <X className="w-4 h-4 mr-2" /> Batal
+                          <Button variant="outline" size="sm" onClick={handleCancel} className="text-xs sm:text-sm">
+                            <X className="w-4 h-4 mr-1 sm:mr-2" /> Batal
                           </Button>
                         ) : (
-                          <Button variant="outline" size="sm" onClick={handleEdit}>
-                            <Settings className="w-4 h-4 mr-2" /> Edit
+                          <Button variant="outline" size="sm" onClick={handleEdit} className="text-xs sm:text-sm">
+                            <Settings className="w-4 h-4 mr-1 sm:mr-2" /> Edit
                           </Button>
                         )}
                       </>
                     )}
-                    <Button variant="outline" size="sm" onClick={handleLogout} className="text-red-600 hover:bg-red-50">
-                      <LogOut className="w-4 h-4 mr-2" /> Keluar
+                    <Button variant="outline" size="sm" onClick={handleLogout} className="text-red-600 hover:bg-red-50 text-xs sm:text-sm">
+                      <LogOut className="w-4 h-4 mr-1 sm:mr-2" /> Keluar
                     </Button>
                   </div>
                 </div>
