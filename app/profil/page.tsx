@@ -801,10 +801,10 @@ export default function Profil() {
                     {isAdmin && (
                       <>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="bg-blue-100 p-3 rounded-full"><Mail className="w-6 h-6 text-blue-600" /></div>
-                          <div className="flex-1">
+                          <div className="bg-blue-100 p-3 rounded-full flex-shrink-0"><Mail className="w-6 h-6 text-blue-600" /></div>
+                          <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-500">Email</p>
-                            <p className="font-semibold text-gray-900">{profile.email || 'Belum diisi'}</p>
+                            <p className="font-semibold text-gray-900 break-words">{profile.email || 'Belum diisi'}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
