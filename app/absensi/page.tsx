@@ -298,7 +298,7 @@ export default function AbsensiPage() {
       )
       const snapshot = await getDocs(attendanceQuery)
 
-      let docToDelete = null
+      let docToDelete: any = null
       snapshot.docs.forEach(doc => {
         const d = doc.data()
         const docMonth = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
