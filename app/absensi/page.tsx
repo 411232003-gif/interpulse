@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs } from 'firebase/firestore'
+import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs, deleteDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import BackButton from '@/components/BackButton'
-import { Users, Search, Filter, CheckCircle, Calendar, X, AlertCircle, Plus, Info } from 'lucide-react'
+import { Users, Search, Filter, CheckCircle, Calendar, X, AlertCircle, Plus, Info, MoreVertical } from 'lucide-react'
 
 interface Resident {
   id: string
@@ -34,6 +34,7 @@ export default function AbsensiPage() {
   const [loading, setLoading] = useState(true)
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [showCancelFor, setShowCancelFor] = useState<string | null>(null)
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message })
@@ -279,6 +280,76 @@ export default function AbsensiPage() {
     }
   }
 
+  // Handle cancel attendance
+  const handleCancelAttendance = async (resident: Resident) => {
+    if (!attendanceThisMonth.has(resident.nik)) {
+      showNotification('info', `${resident.nama} belum diabsen di bulan ini`)
+      return
+    }
+
+    try {
+      const currentMonth = new Date().toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+      const currentYear = new Date().getFullYear()
+
+      // Find and delete attendance record for this NIK in current month
+      const attendanceQuery = query(
+        collection(db, 'attendance'),
+        where('nik', '==', resident.nik)
+      )
+      const snapshot = await getDocs(attendanceQuery)
+
+      let docToDelete = null
+      snapshot.docs.forEach(doc => {
+        const d = doc.data()
+        const docMonth = new Date(d.timestamp).toLocaleString('id-ID', { month: 'long' }).toLowerCase()
+        const docYear = new Date(d.timestamp).getFullYear()
+        if (docMonth === currentMonth && docYear === currentYear) {
+          docToDelete = doc
+        }
+      })
+
+      if (docToDelete) {
+        await deleteDoc(doc(db, 'attendance', docToDelete.id))
+        
+        // Also delete the notification for this user
+        try {
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('nik', '==', resident.nik)
+          )
+          const usersSnapshot = await getDocs(usersQuery)
+          
+          if (!usersSnapshot.empty) {
+            const userId = usersSnapshot.docs[0].id
+            
+            // Find and delete attendance notification for this user
+            const notificationsQuery = query(
+              collection(db, 'notifications'),
+              where('userId', '==', userId),
+              where('type', '==', 'attendance')
+            )
+            const notificationsSnapshot = await getDocs(notificationsQuery)
+            
+            notificationsSnapshot.docs.forEach(notifDoc => {
+              deleteDoc(doc(db, 'notifications', notifDoc.id))
+            })
+          }
+        } catch (notifError) {
+          console.error('Error deleting notification:', notifError)
+          // Don't fail attendance cancellation if notification deletion fails
+        }
+        
+        setShowCancelFor(null)
+        showNotification('success', `Absensi ${resident.nama} berhasil dibatalkan`)
+      } else {
+        showNotification('error', 'Data absensi tidak ditemukan')
+      }
+    } catch (error) {
+      console.error('Error canceling attendance:', error)
+      showNotification('error', 'Gagal membatalkan absensi')
+    }
+  }
+
   // Generate random PIN (6 digits)
   const generatePIN = () => {
     return Math.floor(100000 + Math.random() * 900000).toString()
@@ -463,18 +534,39 @@ export default function AbsensiPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleAttendance(r)}
-                          disabled={isPresentThisMonth}
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
-                            isPresentThisMonth
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
-                          }`}
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                          {isPresentThisMonth ? 'Sudah Hadir' : 'Hadir'}
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleAttendance(r)}
+                            disabled={isPresentThisMonth}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
+                              isPresentThisMonth
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            {isPresentThisMonth ? 'Sudah Hadir' : 'Hadir'}
+                          </button>
+                          {isPresentThisMonth && (
+                            <button
+                              onClick={() => setShowCancelFor(showCancelFor === r.nik ? null : r.nik)}
+                              className="inline-flex items-center justify-center p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors"
+                              title="Opsi Absensi"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          )}
+                          {isPresentThisMonth && showCancelFor === r.nik && (
+                            <button
+                              onClick={() => handleCancelAttendance(r)}
+                              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors text-xs font-medium"
+                              title="Batalkan Absensi"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Batal
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

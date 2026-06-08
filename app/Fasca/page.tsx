@@ -54,6 +54,78 @@ export default function CatatKesehatan() {
   const [showTbbbWarning, setShowTbbbWarning] = useState(false)
   const [warningResident, setWarningResident] = useState<Resident | null>(null)
 
+  // Auto-delete old data (healthReadings, tb-bb, attendance)
+  // Data bulan Januari dihapus pada 15 Februari, data Februari dihapus pada 15 Maret, dst.
+  const cleanupOldData = async () => {
+    try {
+      const now = new Date()
+      const currentDay = now.getDate()
+      const currentMonth = now.getMonth()
+      const currentYear = now.getFullYear()
+
+      // Hitung bulan yang akan dihapus
+      let cutoffMonth, cutoffYear
+      if (currentDay >= 15) {
+        cutoffMonth = currentMonth - 1  // 1 bulan lalu
+      } else {
+        cutoffMonth = currentMonth - 2  // 2 bulan lalu
+      }
+      cutoffYear = currentYear
+
+      // Handle year rollover
+      if (cutoffMonth < 0) {
+        cutoffMonth += 12
+        cutoffYear -= 1
+      }
+
+      // Hitung tanggal cutoff (awal bulan yang akan dihapus)
+      const cutoffDate = new Date(cutoffYear, cutoffMonth, 1)
+      const cutoffTimestamp = cutoffDate.toISOString()
+
+      console.log('[Auto-Delete] Deleting data before:', cutoffDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }))
+
+      // Hapus healthReadings sebelum cutoff
+      const healthReadingsQuery = query(collection(db, 'healthReadings'))
+      const healthReadingsSnapshot = await getDocs(healthReadingsQuery)
+      const healthReadingsDeletePromises = healthReadingsSnapshot.docs
+        .filter(doc => {
+          const timestamp = doc.data().timestamp
+          return timestamp && timestamp < cutoffTimestamp
+        })
+        .map(doc => deleteDoc(doc.ref))
+      await Promise.all(healthReadingsDeletePromises)
+      console.log('[Auto-Delete] Deleted', healthReadingsDeletePromises.length, 'healthReadings')
+
+      // Hapus tb-bb sebelum cutoff
+      const tbbbQuery = query(collection(db, 'tb-bb'))
+      const tbbbSnapshot = await getDocs(tbbbQuery)
+      const tbbbDeletePromises = tbbbSnapshot.docs
+        .filter(doc => {
+          const timestamp = doc.data().timestamp
+          return timestamp && timestamp < cutoffTimestamp
+        })
+        .map(doc => deleteDoc(doc.ref))
+      await Promise.all(tbbbDeletePromises)
+      console.log('[Auto-Delete] Deleted', tbbbDeletePromises.length, 'tb-bb records')
+
+      // Hapus attendance sebelum cutoff
+      const attendanceQuery = query(collection(db, 'attendance'))
+      const attendanceSnapshot = await getDocs(attendanceQuery)
+      const attendanceDeletePromises = attendanceSnapshot.docs
+        .filter(doc => {
+          const timestamp = doc.data().timestamp
+          return timestamp && timestamp < cutoffTimestamp
+        })
+        .map(doc => deleteDoc(doc.ref))
+      await Promise.all(attendanceDeletePromises)
+      console.log('[Auto-Delete] Deleted', attendanceDeletePromises.length, 'attendance records')
+
+      console.log('[Auto-Delete] Cleanup completed')
+    } catch (error) {
+      console.error('[Auto-Delete] Error cleaning up old data:', error)
+    }
+  }
+
   // Fasca form state
   const [healthType, setHealthType] = useState<HealthType | null>(null)
   const [step, setStep] = useState<Step>('select')
@@ -155,6 +227,13 @@ export default function CatatKesehatan() {
 
     return () => unsubscribe()
   }, [])
+
+  // Run auto-delete cleanup when component mounts (admin only)
+  useEffect(() => {
+    if (isAdmin) {
+      cleanupOldData()
+    }
+  }, [isAdmin])
 
   // Show loading while auth state is being determined
   if (authLoading) {
