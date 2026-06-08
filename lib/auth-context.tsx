@@ -98,8 +98,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               gender: '',
               rt: adminData.rt || '',
               rw: adminData.rw || '',
-              kelurahan: adminData.adminKelurahan || '',
+              kelurahan: '',
               alamat: '',
+              adminKelurahan: adminData.adminKelurahan || '',
               role: adminData.role || 'admin',
               createdAt: adminData.createdAt || new Date().toISOString()
             })
