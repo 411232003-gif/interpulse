@@ -280,7 +280,9 @@ export default function HealthTools() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+  const [isFlashOn, setIsFlashOn] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null)
 
   // ========== HEARING TEST STATE ==========
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -302,6 +304,8 @@ export default function HealthTools() {
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
+    videoTrackRef.current = null
+    setIsFlashOn(false)
   }
 
   const initAnemiaCamera = async () => {
@@ -316,8 +320,32 @@ export default function HealthTools() {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
       }
+      // Store video track for flash control
+      const videoTrack = stream.getVideoTracks()[0]
+      videoTrackRef.current = videoTrack
     } catch (err) {
       setCameraError('Tidak dapat mengakses kamera. Pastikan izin diberikan.')
+    }
+  }
+
+  const toggleFlash = async () => {
+    if (!videoTrackRef.current) return
+
+    try {
+      const capabilities = (videoTrackRef.current as any).getCapabilities()
+      if (!capabilities.torch) {
+        setCameraError('Flash tidak tersedia di perangkat ini')
+        return
+      }
+
+      const newFlashState = !isFlashOn
+      await videoTrackRef.current.applyConstraints({
+        advanced: [{ torch: newFlashState }]
+      } as any)
+      setIsFlashOn(newFlashState)
+    } catch (err) {
+      console.error('Error toggling flash:', err)
+      setCameraError('Gagal mengaktifkan flash. Pastikan perangkat mendukung.')
     }
   }
 
@@ -550,7 +578,14 @@ export default function HealthTools() {
                   <canvas ref={canvasRef} className="hidden" />
                   
                   {/* Camera Controls */}
-                  <div className="absolute top-3 right-3">
+                  <div className="absolute top-3 right-3 flex gap-2">
+                    <button
+                      onClick={toggleFlash}
+                      className={`p-2 rounded-full text-white transition-colors ${isFlashOn ? 'bg-yellow-500' : 'bg-black/50 hover:bg-black/70'}`}
+                      title={isFlashOn ? 'Matikan Flash' : 'Nyalakan Flash'}
+                    >
+                      {isFlashOn ? '💡' : '🔦'}
+                    </button>
                     <button
                       onClick={toggleFacingMode}
                       className="p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
