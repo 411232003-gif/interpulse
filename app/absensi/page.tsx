@@ -48,7 +48,6 @@ export default function AbsensiPage() {
     birthDate: '',
     jenisKelamin: 'L' as 'L' | 'P',
     alamat: '',
-    email: '',
     phone: ''
   })
   const [generatedPassword, setGeneratedPassword] = useState('')
@@ -414,7 +413,6 @@ export default function AbsensiPage() {
           birthDate: residentForm.birthDate,
           jenisKelamin: residentForm.jenisKelamin,
           alamat: residentForm.alamat,
-          email: residentForm.email,
           phone: residentForm.phone
         })
       })
@@ -434,7 +432,6 @@ export default function AbsensiPage() {
         birthDate: '',
         jenisKelamin: 'L',
         alamat: '',
-        email: '',
         phone: ''
       })
 
@@ -455,7 +452,6 @@ export default function AbsensiPage() {
       birthDate: '',
       jenisKelamin: 'L',
       alamat: '',
-      email: '',
       phone: ''
     })
     setGeneratedPassword('')
@@ -740,27 +736,15 @@ export default function AbsensiPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                    <input
-                      type="email"
-                      value={residentForm.email}
-                      onChange={(e) => setResidentForm({ ...residentForm, email: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="email@contoh.com (opsional)"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">No. Telepon</label>
-                    <input
-                      type="tel"
-                      value={residentForm.phone}
-                      onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="+62 xxx xxxx xxxx (opsional)"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">No. Telepon</label>
+                  <input
+                    type="tel"
+                    value={residentForm.phone}
+                    onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="+62 xxx xxxx xxxx (opsional)"
+                  />
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

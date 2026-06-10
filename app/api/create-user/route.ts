@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { db, auth } = getFirebaseAdmin()
 
     const body = await request.json()
-    const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat, adminId, phone, email } = body
+    const { nama, nik, rw, rt, birthDate, jenisKelamin, alamat, adminId, phone } = body
 
     // Get kelurahan from admin profile if not provided
     let kelurahan = ''
@@ -92,9 +92,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user in Firebase Authentication
-    const userEmail = email || `${nik}@interpulse.id`
     const userRecord = await auth.createUser({
-      email: userEmail,
+      email: `${nik}@interpulse.id`,
       password: password,
       emailVerified: true
     })
@@ -104,7 +103,7 @@ export async function POST(request: NextRequest) {
       uid: userRecord.uid,
       name: nama,
       nik: nik,
-      email: userEmail,
+      email: `${nik}@interpulse.id`,
       rw: rw,
       rt: rt,
       birthDate: birthDate,
