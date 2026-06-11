@@ -18,7 +18,7 @@ const adminNavItems = [
 const getUserMainNavItems = () => [
   { href: '/', label: 'Beranda', icon: Home },
   { href: '/fasca-catatan', label: 'FASCA', icon: FileText },
-  { href: '/trafik-user', label: 'Trafik', icon: TrendingUp },
+  { href: '/trafik-user', label: 'Riwayat Pemeriksaan', icon: TrendingUp },
   { href: '/kalori-tracker', label: 'Kalori', icon: Flame },
   { href: '/deteksi-jantung', label: 'Skrining', icon: Heart },
 ]
