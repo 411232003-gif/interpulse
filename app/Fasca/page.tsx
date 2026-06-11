@@ -361,27 +361,30 @@ export default function CatatKesehatan() {
   }
 
   // Check if resident has health data for today (all types)
-  const getTodayReadings = (residentId: string) => {
+  const getTodayReadings = (residentId: string, residentNik?: string) => {
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
-    console.log('[Fasca] Getting today readings for resident:', residentId)
+    console.log('[Fasca] Getting today readings for resident:', residentId, 'NIK:', residentNik)
     console.log('[Fasca] All health readings:', healthReadings)
     const todayReadings = healthReadings.filter(reading => {
-      const match = reading.userId === residentId && 
+      // Match by userId OR nik to handle both cases
+      const match = (reading.userId === residentId || (residentNik && reading.nik === residentNik)) &&
       reading.timestamp.startsWith(todayStr) &&
       reading.source === 'posbindu'
-      console.log('[Fasca] Reading check:', { 
-        readingId: reading.id, 
-        readingUserId: reading.userId, 
-        residentId, 
+      console.log('[Fasca] Reading check:', {
+        readingId: reading.id,
+        readingUserId: reading.userId,
+        readingNik: reading.nik,
+        residentId,
+        residentNik,
         match,
-        type: reading.type 
+        type: reading.type
       })
       return match
     })
     console.log('[Fasca] Filtered today readings:', todayReadings)
     return {
-      allTypes: ['tensi', 'kolesterol', 'asamurat', 'guladarah'].every(type => 
+      allTypes: ['tensi', 'kolesterol', 'asamurat', 'guladarah'].every(type =>
         todayReadings.some(r => r.type === type)
       ),
       readings: todayReadings
@@ -574,10 +577,12 @@ export default function CatatKesehatan() {
 
   const handleEditAllReadings = (resident: Resident) => {
     // Get all today's readings for this resident
-    const todayData = getTodayReadings(resident.id)
+    const todayData = getTodayReadings(resident.id, resident.nik)
     const idsMap: Record<string, string> = {}
+    const timestampsMap: Record<string, string> = {}
     todayData.readings.forEach(r => {
       idsMap[r.type] = r.id
+      timestampsMap[r.type] = r.timestamp
     })
     setEditingReadingIds(idsMap)
     setSelectedResident(resident)
@@ -603,6 +608,8 @@ export default function CatatKesehatan() {
       }
     })
     setData(formData)
+    // Store original timestamps to preserve them during edit
+    ;(window as any).originalTimestamps = timestampsMap
   }
 
   // Fasca form handlers
@@ -650,11 +657,13 @@ export default function CatatKesehatan() {
     console.log('[Fasca] healthType:', healthType)
     console.log('[Fasca] allData:', allData)
     console.log('[Fasca] editingReadingId:', editingReadingId)
+    console.log('[Fasca] editingReadingIds:', editingReadingIds)
 
     try {
       if (healthType === 'all') {
         // Save all health readings at once
         const readings: any[] = []
+        const originalTimestamps = (window as any).originalTimestamps || {}
 
         // Tekanan Darah
         if (allData.sistolik && allData.diastolik) {
@@ -666,7 +675,7 @@ export default function CatatKesehatan() {
             sistolik: allData.sistolik,
             diastolik: allData.diastolik,
             nadi: allData.nadi,
-            timestamp,
+            timestamp: originalTimestamps['tensi'] || timestamp,
             userId: userInfo.uid,
             nik: userInfo.nik,
             userName: userInfo.name,
@@ -682,7 +691,7 @@ export default function CatatKesehatan() {
           readings.push({
             type: 'guladarah',
             nilai: allData.guladarah,
-            timestamp,
+            timestamp: originalTimestamps['guladarah'] || timestamp,
             userId: userInfo.uid,
             nik: userInfo.nik,
             userName: userInfo.name,
@@ -698,7 +707,7 @@ export default function CatatKesehatan() {
           readings.push({
             type: 'asamurat',
             nilai: allData.asamurat,
-            timestamp,
+            timestamp: originalTimestamps['asamurat'] || timestamp,
             userId: userInfo.uid,
             nik: userInfo.nik,
             userName: userInfo.name,
@@ -717,7 +726,7 @@ export default function CatatKesehatan() {
             ldl: allData.kolesterol_ldl || '0',
             hdl: allData.kolesterol_hdl || '0',
             trigliserida: allData.kolesterol_trigliserida || '0',
-            timestamp,
+            timestamp: originalTimestamps['kolesterol'] || timestamp,
             userId: userInfo.uid,
             nik: userInfo.nik,
             userName: userInfo.name,
@@ -741,6 +750,9 @@ export default function CatatKesehatan() {
             console.log('[Fasca] Added new reading type:', reading.type)
           }
         }
+
+        // Clear original timestamps after save
+        delete (window as any).originalTimestamps
 
         // Add notification to user
         try {
@@ -939,6 +951,8 @@ export default function CatatKesehatan() {
     setEditingReadingId(null)
     setEditingReadingIds({})
     setResult(null)
+    // Clear original timestamps
+    delete (window as any).originalTimestamps
   }
 
   const openFascaModal = (resident: Resident) => {
@@ -948,7 +962,7 @@ export default function CatatKesehatan() {
     setEditingReadingIds({}) // Reset all editing IDs
     // Clear previous readings first
     setTodayReadingsForResident([])
-    const todayData = getTodayReadings(resident.id)
+    const todayData = getTodayReadings(resident.id, resident.nik)
     setShowFascaModal(true)
     // Directly open all-in-one form
     setHealthType('all')
@@ -1121,7 +1135,7 @@ export default function CatatKesehatan() {
                         <td colSpan={10} className="px-4 py-8 text-center text-gray-400">Tidak ada warga yang sudah melakukan absensi hari ini</td>
                       </tr>
                     ) : sortedResidents.map(r => {
-                      const todayData = getTodayReadings(r.id)
+                      const todayData = getTodayReadings(r.id, r.nik)
                       const todayTD = todayData.readings.find(reading => reading.type === 'tensi')
                       const todayGDS = todayData.readings.find(reading => reading.type === 'guladarah')
                       const todayUA = todayData.readings.find(reading => reading.type === 'asamurat')
@@ -1144,7 +1158,7 @@ export default function CatatKesehatan() {
                           <td className="px-4 py-3 text-center">
                             {(() => {
                               const hasTbbb = !!getTodayTBBB(r.nik)
-                              const todayData = getTodayReadings(r.id)
+                              const todayData = getTodayReadings(r.id, r.nik)
                               const hasHealthData = todayData.readings.length > 0
                               return hasTbbb ? (
                                 <button
