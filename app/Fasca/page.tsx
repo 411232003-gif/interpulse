@@ -264,7 +264,7 @@ export default function CatatKesehatan() {
     const tableData = userHealthData.map(r => [
       new Date(r.timestamp).toLocaleDateString('id-ID'),
       healthConfig[r.type as HealthType]?.title || r.type,
-      r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
+      r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}${r.nadi ? ` (${r.nadi} bpm)` : ''} mmHg` :
       r.type === 'kolesterol' ? `${r.total} mg/dL` :
       `${r.nilai} mg/dL`
     ])
@@ -286,7 +286,7 @@ export default function CatatKesehatan() {
     const excelData = userHealthData.map(r => ({
       Tanggal: new Date(r.timestamp).toLocaleDateString('id-ID'),
       Jenis: healthConfig[r.type as HealthType]?.title || r.type,
-      Nilai: r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
+      Nilai: r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}${r.nadi ? ` (${r.nadi} bpm)` : ''} mmHg` :
              r.type === 'kolesterol' ? `${r.total} mg/dL` :
              `${r.nilai} mg/dL`
     }))
@@ -310,7 +310,7 @@ export default function CatatKesehatan() {
     userHealthData.forEach(r => {
       message += `📅 ${new Date(r.timestamp).toLocaleDateString('id-ID')}\n`
       message += `🏥 ${healthConfig[r.type as HealthType]?.title || r.type}\n`
-      message += `📊 ${r.type === 'tensi' ? `${r.sistolik}/${r.diastolik} mmHg` :
+      message += `📊 ${r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}${r.nadi ? ` (${r.nadi} bpm)` : ''} mmHg` :
                  r.type === 'kolesterol' ? `${r.total} mg/dL` :
                  `${r.nilai} mg/dL`}\n\n`
     })
@@ -789,7 +789,7 @@ export default function CatatKesehatan() {
             label: r.type === 'tensi' ? 'Tekanan Darah' :
                    r.type === 'guladarah' ? 'Gula Darah' :
                    r.type === 'asamurat' ? 'Asam Urat' : 'Kolesterol',
-            value: r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}` : r.nilai || r.total,
+            value: r.type === 'tensi' ? `${r.sistolik}/${r.diastolik}${r.nadi ? ` (${r.nadi} bpm)` : ''}` : r.nilai || r.total,
             unit: r.type === 'tensi' ? 'mmHg' : 'mg/dL'
           }))
         })
