@@ -1140,7 +1140,7 @@ export default function CatatKesehatan() {
                       const todayGDS = todayData.readings.find(reading => reading.type === 'guladarah')
                       const todayUA = todayData.readings.find(reading => reading.type === 'asamurat')
                       const todayCOL = todayData.readings.find(reading => reading.type === 'kolesterol')
-                      const tdValue = todayTD ? `${todayTD.sistolik}/${todayTD.diastolik}` : '-'
+                      const tdValue = todayTD ? `${todayTD.sistolik}/${todayTD.diastolik}${todayTD.nadi ? ` (${todayTD.nadi} bpm)` : ''}` : '-'
                       const gdsValue = todayGDS?.nilai || '-'
                       const uaValue = todayUA?.nilai || '-'
                       const colValue = todayCOL?.total || '-'
