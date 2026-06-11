@@ -138,6 +138,7 @@ export default function CatatKesehatan() {
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [editingReadingId, setEditingReadingId] = useState<string | null>(null)
+  const [editingReadingIds, setEditingReadingIds] = useState<Record<string, string>>({})
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message })
@@ -556,6 +557,7 @@ export default function CatatKesehatan() {
 
   const handleEditReading = (reading: any) => {
     setEditingReadingId(reading.id)
+    // When editing a single reading, set up for single type edit
     setSelectedResident({
       id: userProfile?.uid || '',
       nama: userProfile?.name || '',
@@ -568,6 +570,39 @@ export default function CatatKesehatan() {
     setHealthType(reading.type as HealthType)
     setStep('select')
     setShowFascaModal(true)
+  }
+
+  const handleEditAllReadings = (resident: Resident) => {
+    // Get all today's readings for this resident
+    const todayData = getTodayReadings(resident.id)
+    const idsMap: Record<string, string> = {}
+    todayData.readings.forEach(r => {
+      idsMap[r.type] = r.id
+    })
+    setEditingReadingIds(idsMap)
+    setSelectedResident(resident)
+    setHealthType('all')
+    setStep('input')
+    setShowFascaModal(true)
+    // Pre-fill form with existing data
+    const formData: Record<string, string> = {}
+    todayData.readings.forEach(r => {
+      if (r.type === 'tensi') {
+        formData.sistolik = r.sistolik
+        formData.diastolik = r.diastolik
+        formData.nadi = r.nadi
+      } else if (r.type === 'guladarah') {
+        formData.guladarah = r.nilai
+      } else if (r.type === 'asamurat') {
+        formData.asamurat = r.nilai
+      } else if (r.type === 'kolesterol') {
+        formData.kolesterol_total = r.total
+        formData.kolesterol_ldl = r.ldl
+        formData.kolesterol_hdl = r.hdl
+        formData.kolesterol_trigliserida = r.trigliserida
+      }
+    })
+    setData(formData)
   }
 
   // Fasca form handlers
@@ -695,14 +730,15 @@ export default function CatatKesehatan() {
 
         // Save all readings - check if editing existing data
         for (const reading of readings) {
-          if (editingReadingId) {
-            // Update existing reading
-            await updateDoc(doc(db, 'healthReadings', editingReadingId), reading)
-            console.log('[Fasca] Updated reading:', editingReadingId)
+          const existingId = editingReadingIds[reading.type]
+          if (existingId) {
+            // Update existing reading for this type
+            await updateDoc(doc(db, 'healthReadings', existingId), reading)
+            console.log('[Fasca] Updated reading type:', reading.type, 'ID:', existingId)
           } else {
-            // Add new reading
+            // Add new reading for this type
             await addDoc(collection(db, 'healthReadings'), reading)
-            console.log('[Fasca] Added new reading')
+            console.log('[Fasca] Added new reading type:', reading.type)
           }
         }
 
@@ -901,6 +937,7 @@ export default function CatatKesehatan() {
     setInputIndex(0)
     setData({})
     setEditingReadingId(null)
+    setEditingReadingIds({})
     setResult(null)
   }
 
@@ -908,6 +945,7 @@ export default function CatatKesehatan() {
     console.log('[Fasca] Opening modal for resident:', resident.nama, 'ID:', resident.id)
     setSelectedResident(resident)
     setEditingReadingId(null) // Reset editing state for new input
+    setEditingReadingIds({}) // Reset all editing IDs
     // Clear previous readings first
     setTodayReadingsForResident([])
     const todayData = getTodayReadings(resident.id)
@@ -1106,10 +1144,15 @@ export default function CatatKesehatan() {
                           <td className="px-4 py-3 text-center">
                             {(() => {
                               const hasTbbb = !!getTodayTBBB(r.nik)
+                              const todayData = getTodayReadings(r.id)
+                              const hasHealthData = todayData.readings.length > 0
                               return hasTbbb ? (
-                                <button onClick={() => openFascaModal(r)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
+                                <button
+                                  onClick={() => hasHealthData ? handleEditAllReadings(r) : openFascaModal(r)}
+                                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
+                                >
                                   <Stethoscope className="w-3.5 h-3.5" />
-                                  Input Kesehatan
+                                  {hasHealthData ? 'Edit Kesehatan' : 'Input Kesehatan'}
                                 </button>
                               ) : (
                                 <button

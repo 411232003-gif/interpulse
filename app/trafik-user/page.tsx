@@ -100,7 +100,10 @@ export default function TrafikUser() {
   const monthsWithData = Object.values(monthlyData).filter(m => m.length > 0).length
 
   const formatReadingValue = (reading: HealthReading) => {
-    if (reading.type === 'tensi') return `${reading.sistolik}/${reading.diastolik} mmHg`
+    if (reading.type === 'tensi') {
+      const nadi = reading.nadi ? `, ${reading.nadi} bpm` : ''
+      return `${reading.sistolik}/${reading.diastolik} mmHg${nadi}`
+    }
     if (reading.type === 'kolesterol') return `${reading.total} mg/dL`
     return `${reading.nilai || '-'} mg/dL`
   }
