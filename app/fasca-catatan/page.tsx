@@ -19,9 +19,13 @@ const STORAGE_KEY = 'fasca_mock_riwayat'
 type FormData = {
   sistolik: string
   diastolik: string
+  nadi: string
   guladarah: string
   asamurat: string
   kolesterol_total: string
+  kolesterol_ldl: string
+  kolesterol_hdl: string
+  kolesterol_trigliserida: string
 }
 
 type CheckResult = {
@@ -41,9 +45,13 @@ type RiwayatEntry = {
 const emptyForm: FormData = {
   sistolik: '',
   diastolik: '',
+  nadi: '',
   guladarah: '',
   asamurat: '',
   kolesterol_total: '',
+  kolesterol_ldl: '',
+  kolesterol_hdl: '',
+  kolesterol_trigliserida: '',
 }
 
 function validateTD(sys: number, dia: number): Omit<CheckResult, 'label' | 'value'> {
@@ -149,9 +157,11 @@ export default function FascaCatatan() {
     if (form.sistolik && form.diastolik) {
       const sys = parseInt(form.sistolik)
       const dia = parseInt(form.diastolik)
+      const nadi = form.nadi ? parseInt(form.nadi) : null
       if (!isNaN(sys) && !isNaN(dia)) {
         const v = validateTD(sys, dia)
-        checked.push({ label: 'Tekanan Darah (TD)', value: `${sys}/${dia} mmHg`, ...v })
+        const value = nadi ? `${sys}/${dia} mmHg, ${nadi} bpm` : `${sys}/${dia} mmHg`
+        checked.push({ label: 'Tekanan Darah (TD)', value, ...v })
       }
     }
 
@@ -173,9 +183,16 @@ export default function FascaCatatan() {
 
     if (form.kolesterol_total) {
       const total = parseInt(form.kolesterol_total)
+      const ldl = form.kolesterol_ldl ? parseInt(form.kolesterol_ldl) : null
+      const hdl = form.kolesterol_hdl ? parseInt(form.kolesterol_hdl) : null
+      const trigliserida = form.kolesterol_trigliserida ? parseInt(form.kolesterol_trigliserida) : null
       if (!isNaN(total)) {
         const v = validateKolesterol(total)
-        checked.push({ label: 'Kolesterol', value: `${total} mg/dL`, ...v })
+        let value = `${total} mg/dL`
+        if (ldl) value += `, LDL: ${ldl}`
+        if (hdl) value += `, HDL: ${hdl}`
+        if (trigliserida) value += `, Trigliserida: ${trigliserida}`
+        checked.push({ label: 'Kolesterol', value, ...v })
       }
     }
 
@@ -229,7 +246,7 @@ export default function FascaCatatan() {
               <h3 className="font-bold text-red-700 mb-3 flex items-center gap-2">
                 <span>❤️</span> Tekanan Darah (TD)
               </h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Sistolik (atas)</label>
                   <input
@@ -251,6 +268,17 @@ export default function FascaCatatan() {
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-400 text-sm"
                   />
                   <p className="text-xs text-gray-500 mt-1">mmHg</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Nadi</label>
+                  <input
+                    type="number"
+                    value={form.nadi}
+                    onChange={e => handleChange('nadi', e.target.value)}
+                    placeholder="72"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-400 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">bpm</p>
                 </div>
               </div>
             </div>
@@ -286,16 +314,55 @@ export default function FascaCatatan() {
 
             <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
               <h3 className="font-bold text-yellow-700 mb-3 flex items-center gap-2">
-                <span>🧈</span> Kolesterol Total
+                <span>🧈</span> Kolesterol
               </h3>
-              <input
-                type="number"
-                value={form.kolesterol_total}
-                onChange={e => handleChange('kolesterol_total', e.target.value)}
-                placeholder="200"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 text-sm"
-              />
-              <p className="text-xs text-gray-500 mt-1">mg/dL — normal &lt; 200</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Total</label>
+                  <input
+                    type="number"
+                    value={form.kolesterol_total}
+                    onChange={e => handleChange('kolesterol_total', e.target.value)}
+                    placeholder="200"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">LDL (Jahat)</label>
+                  <input
+                    type="number"
+                    value={form.kolesterol_ldl}
+                    onChange={e => handleChange('kolesterol_ldl', e.target.value)}
+                    placeholder="100"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">HDL (Baik)</label>
+                  <input
+                    type="number"
+                    value={form.kolesterol_hdl}
+                    onChange={e => handleChange('kolesterol_hdl', e.target.value)}
+                    placeholder="50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Trigliserida</label>
+                  <input
+                    type="number"
+                    value={form.kolesterol_trigliserida}
+                    onChange={e => handleChange('kolesterol_trigliserida', e.target.value)}
+                    placeholder="150"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">mg/dL</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Normal: Total &lt; 200, LDL &lt; 100, HDL &gt; 40, Trigliserida &lt; 150</p>
             </div>
 
             <button

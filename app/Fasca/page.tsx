@@ -6,7 +6,7 @@ import BigNumpad from '@/components/BigNumpad'
 import { Activity, CheckCircle, AlertCircle, XCircle, Search, Filter, Stethoscope, Download, MoreVertical, FileText, Table, MessageCircle, PlusCircle, Edit2, Trash2, Info, Lock } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import BackButton from '@/components/BackButton'
-import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc, getDocs } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -137,6 +137,7 @@ export default function CatatKesehatan() {
   const [showAllForm, setShowAllForm] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+  const [editingReadingId, setEditingReadingId] = useState<string | null>(null)
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message })
@@ -554,6 +555,7 @@ export default function CatatKesehatan() {
   }
 
   const handleEditReading = (reading: any) => {
+    setEditingReadingId(reading.id)
     setSelectedResident({
       id: userProfile?.uid || '',
       nama: userProfile?.name || '',
@@ -612,6 +614,7 @@ export default function CatatKesehatan() {
     console.log('[Fasca] Match check:', selectedResident.id === userProfile?.uid)
     console.log('[Fasca] healthType:', healthType)
     console.log('[Fasca] allData:', allData)
+    console.log('[Fasca] editingReadingId:', editingReadingId)
 
     try {
       if (healthType === 'all') {
@@ -690,9 +693,17 @@ export default function CatatKesehatan() {
           })
         }
 
-        // Save all readings
+        // Save all readings - check if editing existing data
         for (const reading of readings) {
-          await addDoc(collection(db, 'healthReadings'), reading)
+          if (editingReadingId) {
+            // Update existing reading
+            await updateDoc(doc(db, 'healthReadings', editingReadingId), reading)
+            console.log('[Fasca] Updated reading:', editingReadingId)
+          } else {
+            // Add new reading
+            await addDoc(collection(db, 'healthReadings'), reading)
+            console.log('[Fasca] Added new reading')
+          }
         }
 
         // Add notification to user
@@ -846,7 +857,14 @@ export default function CatatKesehatan() {
           else validationResult = { status: 'danger', title: 'Diabetes', color: 'text-red-700', bgColor: 'bg-gradient-to-br from-red-100 to-red-200', icon: <XCircle className="w-24 h-24 text-red-600" />, message: `${val} mg/dL`, advice: 'Diabetes! Segera ke dokter.' }
         }
 
-        await addDoc(collection(db, 'healthReadings'), newReading)
+        // Save or update based on editingReadingId
+        if (editingReadingId) {
+          await updateDoc(doc(db, 'healthReadings', editingReadingId), newReading)
+          console.log('[Fasca] Updated single reading:', editingReadingId)
+        } else {
+          await addDoc(collection(db, 'healthReadings'), newReading)
+          console.log('[Fasca] Added new single reading')
+        }
         setResult(validationResult)
         setStep('result')
         setTodayReadingsForResident(prev => [...prev, newReading])
@@ -882,12 +900,14 @@ export default function CatatKesehatan() {
     setCurrentInput('')
     setInputIndex(0)
     setData({})
+    setEditingReadingId(null)
     setResult(null)
   }
 
   const openFascaModal = (resident: Resident) => {
     console.log('[Fasca] Opening modal for resident:', resident.nama, 'ID:', resident.id)
     setSelectedResident(resident)
+    setEditingReadingId(null) // Reset editing state for new input
     // Clear previous readings first
     setTodayReadingsForResident([])
     const todayData = getTodayReadings(resident.id)
