@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X, Info } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import BackButton from '@/components/BackButton'
+import ScrollToTopButton from '@/components/ScrollToTopButton'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
@@ -1581,6 +1582,8 @@ export default function MonitoringPage() {
         </div>
       )}
       </div>
+
+      <ScrollToTopButton />
     </div>
   )
 }

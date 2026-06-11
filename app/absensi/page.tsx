@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context'
 import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, getDocs, deleteDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import BackButton from '@/components/BackButton'
+import ScrollToTopButton from '@/components/ScrollToTopButton'
 import { Users, Search, Filter, CheckCircle, Calendar, X, AlertCircle, Plus, Info, MoreVertical } from 'lucide-react'
 
 interface Resident {
@@ -772,6 +773,8 @@ export default function AbsensiPage() {
           </div>
         </div>
       )}
+
+      <ScrollToTopButton />
     </div>
   )
 }

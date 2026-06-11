@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import BackButton from '@/components/BackButton'
+import ScrollToTopButton from '@/components/ScrollToTopButton'
 import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Users, History, Search, Filter, Plus, Edit, Trash2, X, AlertCircle, TrendingUp, Target, UserPlus, Calendar, Activity, CheckCircle, Download, FileText, MessageSquare, ChevronDown, Info, ArrowRight } from 'lucide-react'
@@ -1713,6 +1714,7 @@ export default function PosbinduMonitoring() {
         </div>
       )}
 
+      <ScrollToTopButton />
     </div>
   )
 }
