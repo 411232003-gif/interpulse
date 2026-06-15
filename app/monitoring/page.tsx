@@ -52,6 +52,7 @@ export default function MonitoringPage() {
   const [attendanceByNik, setAttendanceByNik] = useState<Record<string, any>>({})
   const [healthReadingsDetails, setHealthReadingsDetails] = useState<Record<string, any[]>>({})
   const [residentsData, setResidentsData] = useState<Record<string, any>>({})
+  const [monthlySummary, setMonthlySummary] = useState<any[]>([])
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('id-ID', { month: 'long' }).toLowerCase())
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -725,6 +726,19 @@ export default function MonitoringPage() {
     return () => unsubscribe()
   }, [])
 
+  // Fetch monthly summary data for charts
+  useEffect(() => {
+    const monthlySummaryRef = collection(db, 'monthlySummary')
+    const unsubscribe = onSnapshot(monthlySummaryRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setMonthlySummary(data)
+    })
+    return () => unsubscribe()
+  }, [])
+
   const totalReadings = Object.entries(healthReadings).reduce((sum, [rw, months_data]) => {
     return sum + (months_data[selectedMonth] || 0)
   }, 0)
@@ -1120,6 +1134,21 @@ export default function MonitoringPage() {
                                        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
               const totalTarget = Object.values(customTargets).reduce((sum, target) => sum + target, 0)
               
+              // Use monthlySummary if available, otherwise fall back to attendanceData
+              if (monthlySummary.length > 0) {
+                return monthLabelsFull.map((label, index) => {
+                  const monthKey = months[index]
+                  const summary = monthlySummary.find((s: any) => s.month === index + 1)
+                  return {
+                    bulan: label,
+                    totalHadir: summary?.totalHadir || 0,
+                    totalTarget: summary?.totalTarget || totalTarget,
+                    capaian: summary?.capaian || 0
+                  }
+                })
+              }
+              
+              // Fallback to attendanceData if no summary exists
               return monthLabelsFull.map((label, index) => {
                 const monthKey = months[index]
                 let totalHadir = 0

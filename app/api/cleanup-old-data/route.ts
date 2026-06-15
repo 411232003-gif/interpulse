@@ -30,6 +30,64 @@ function getFirebaseAdmin() {
   }
 }
 
+// Helper function to save monthly summary before cleanup
+async function saveMonthlySummary(db: admin.firestore.Firestore, cutoffDate: Date) {
+  try {
+    const year = cutoffDate.getFullYear()
+    const month = cutoffDate.getMonth() + 1 // 1-12
+
+    // Calculate total attendance from attendance collection
+    const attendanceSnapshot = await db.collection('attendance').get()
+    let totalHadir = 0
+    let totalTarget = 0
+
+    attendanceSnapshot.docs.forEach(doc => {
+      const data = doc.data()
+      const timestamp = data.timestamp || data.createdAt
+      if (timestamp) {
+        const docDate = new Date(timestamp)
+        if (docDate.getMonth() + 1 === month && docDate.getFullYear() === year) {
+          totalHadir += data.hadir || 0
+          totalTarget += data.target || 0
+        }
+      }
+    })
+
+    // Calculate capaian
+    const capaian = totalTarget > 0 ? Math.round((totalHadir / totalTarget) * 100) : 0
+
+    // Save to monthlySummary
+    const docId = `${year}-${String(month).padStart(2, '0')}`
+    const summaryRef = db.collection('monthlySummary').doc(docId)
+    
+    const summaryData = {
+      year,
+      month,
+      totalHadir,
+      totalTarget,
+      capaian,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+
+    const docSnapshot = await summaryRef.get()
+    if (docSnapshot.exists) {
+      await summaryRef.update({
+        ...summaryData,
+        updatedAt: new Date().toISOString()
+      })
+    } else {
+      await summaryRef.set(summaryData)
+    }
+
+    console.log(`Saved monthly summary for ${year}-${month}:`, summaryData)
+    return summaryData
+  } catch (error) {
+    console.error('Error saving monthly summary:', error)
+    throw error
+  }
+}
+
 // Helper function to delete documents older than 2 months
 async function deleteOldDocuments(collectionName: string, db: admin.firestore.Firestore, cutoffDate: Date) {
   try {
@@ -92,6 +150,10 @@ export async function POST(request: NextRequest) {
     cutoffDate.setDate(1) // Set to 1st of the month to ensure clear cutoff
 
     console.log(`Starting cleanup for data older than ${cutoffDate.toISOString()}`)
+
+    // Save monthly summary before cleanup
+    console.log('Saving monthly summary before cleanup...')
+    await saveMonthlySummary(db, cutoffDate)
 
     // Collections to clean up
     const collections = ['attendance', 'tb-bb', 'healthReadings']
