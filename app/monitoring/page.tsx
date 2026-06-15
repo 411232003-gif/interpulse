@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2
 import { useAuth } from '@/lib/auth-context'
 import BackButton from '@/components/BackButton'
 import ScrollToTopButton from '@/components/ScrollToTopButton'
+import MonthlyChart from '@/components/MonthlyChart'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
@@ -1101,6 +1102,34 @@ export default function MonitoringPage() {
                 </table>
               </div>
             </div>
+          </div>
+
+          {/* Grafik Ringkasan Bulanan */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-4 h-4 text-indigo-600" />
+              <span className="font-semibold text-gray-800 text-sm">Grafik Ringkasan Bulanan</span>
+            </div>
+            <MonthlyChart monthlyData={(() => {
+              const monthLabelsFull = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                                       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+              const totalTarget = Object.values(customTargets).reduce((sum, target) => sum + target, 0)
+              
+              return monthLabelsFull.map((label, index) => {
+                const monthKey = months[index]
+                let totalHadir = 0
+                Object.keys(attendanceData).forEach(rw => {
+                  totalHadir += attendanceData[rw]?.[monthKey] || 0
+                })
+                const capaian = totalTarget > 0 ? Math.round((totalHadir / totalTarget) * 100) : 0
+                return {
+                  bulan: label,
+                  totalHadir,
+                  totalTarget,
+                  capaian
+                }
+              })
+            })()} />
           </div>
 
           {/* Table 2: Rekapitulasi Partisipasi Warga */}
