@@ -31,9 +31,9 @@ export default function MonthlyChart({ monthlyData }: MonthlyChartProps) {
   }
 
   const layout1 = {
-    title: 'Tren Kehadiran Warga Per Bulan',
-    xaxis: { title: 'Bulan' },
-    yaxis: { title: 'Jumlah Warga' },
+    title: { text: 'Tren Kehadiran Warga Per Bulan' },
+    xaxis: { title: { text: 'Bulan' } },
+    yaxis: { title: { text: 'Jumlah Warga' } },
     hovermode: 'x unified' as const,
     plot_bgcolor: 'rgba(255,255,255,0.9)',
     paper_bgcolor: 'rgba(255,255,255,0.9)',
@@ -63,9 +63,9 @@ export default function MonthlyChart({ monthlyData }: MonthlyChartProps) {
   }
 
   const layout2 = {
-    title: 'Total Hadir vs Target Per Bulan',
-    xaxis: { title: 'Bulan' },
-    yaxis: { title: 'Jumlah Warga' },
+    title: { text: 'Total Hadir vs Target Per Bulan' },
+    xaxis: { title: { text: 'Bulan' } },
+    yaxis: { title: { text: 'Jumlah Warga' } },
     hovermode: 'x unified' as const,
     plot_bgcolor: 'rgba(255,255,255,0.9)',
     paper_bgcolor: 'rgba(255,255,255,0.9)',
@@ -87,9 +87,9 @@ export default function MonthlyChart({ monthlyData }: MonthlyChartProps) {
   }
 
   const layout3 = {
-    title: 'Capaian Persentase Per Bulan',
-    xaxis: { title: 'Bulan' },
-    yaxis: { title: 'Capaian (%)' },
+    title: { text: 'Capaian Persentase Per Bulan' },
+    xaxis: { title: { text: 'Bulan' } },
+    yaxis: { title: { text: 'Capaian (%)' } },
     hovermode: 'x unified' as const,
     plot_bgcolor: 'rgba(255,255,255,0.9)',
     paper_bgcolor: 'rgba(255,255,255,0.9)',
@@ -115,9 +115,9 @@ export default function MonthlyChart({ monthlyData }: MonthlyChartProps) {
   }
 
   const layout4 = {
-    title: 'Perbandingan Kehadiran Per Bulan',
-    xaxis: { title: 'Bulan' },
-    yaxis: { title: 'Jumlah Warga' },
+    title: { text: 'Perbandingan Kehadiran Per Bulan' },
+    xaxis: { title: { text: 'Bulan' } },
+    yaxis: { title: { text: 'Jumlah Warga' } },
     barmode: 'group' as const,
     plot_bgcolor: 'rgba(255,255,255,0.9)',
     paper_bgcolor: 'rgba(255,255,255,0.9)',
@@ -128,8 +128,7 @@ export default function MonthlyChart({ monthlyData }: MonthlyChartProps) {
   const config = {
     responsive: true,
     displayModeBar: true,
-    displaylogo: false,
-    modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    displaylogo: false
   }
 
   return (
