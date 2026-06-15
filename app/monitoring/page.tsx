@@ -2,15 +2,20 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { ChevronDown, ChevronUp, Search, Filter, AlertCircle, Plus, Edit, Trash2, Activity, Users, Download, TrendingUp, Heart, Droplet, Thermometer, Target, CheckCircle, X, Info } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import BackButton from '@/components/BackButton'
 import ScrollToTopButton from '@/components/ScrollToTopButton'
-import MonthlyChart from '@/components/MonthlyChart'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
 import { exportMonitoringExcel, exportMonitoringPDF, type MonitoringExportContext, type HealthStatus } from '@/lib/export-monitoring'
+
+const MonthlyChart = dynamic(() => import('@/components/MonthlyChart'), {
+  ssr: false,
+  loading: () => <div className="text-center py-10 text-gray-500">Memuat grafik...</div>
+})
 
 const rwTargets: Record<string, number> = {
   '01': 32, '02': 65, '03': 60, '04': 60, '05': 70, '06': 33, '07': 0, '08': 0, '09': 0, '10': 0
